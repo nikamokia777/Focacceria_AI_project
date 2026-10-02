@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "focacceria-ai-project",
+  "main": "worker.js",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  // Shared storage for base prices and the Telegram bot's memory.
+  // Replace the id below with the ID of the KV namespace you create in Cloudflare.
+  "kv_namespaces": [
+    { "binding": "STORE", "id": "621d31e570a34511904e4535e1784571" }
+  ]
+}
