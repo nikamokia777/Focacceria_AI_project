@@ -3,14 +3,17 @@
 //   POST /api/scan-invoice   read a waybill photo/PDF with AI (website)
 //   GET  /api/base-prices    shared base price list
 //   POST /api/base-prices    save the base price list
+//   GET  /api/settings       app settings (accountant's WhatsApp number)
+//   POST /api/settings       save app settings
 //   GET  /api/status         which parts are configured + rs.ge login test
+//   GET  /wa/<token>/<a|d>   opens WhatsApp for the CEO (accountant / distributor)
 //   GET  /api/telegram-setup connect the Telegram bot to this app (run once)
 //   POST /telegram-webhook   Telegram delivers group messages / button taps here
 // Everything else is served from the static files in /public.
 
 import { checkServiceUser } from "./rsge.js";
-import { loadBasePrices, saveBasePrices } from "./store.js";
-import { handleUpdate, setupWebhook, webhookSecret } from "./telegram.js";
+import { loadBasePrices, saveBasePrices, loadSettings, saveSettings } from "./store.js";
+import { handleUpdate, handleWhatsAppLink, setupWebhook, webhookSecret } from "./telegram.js";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -144,6 +147,24 @@ async function handleBasePrices(request, env) {
   }
 }
 
+async function handleSettings(request, env) {
+  if (request.method === "OPTIONS") return new Response("", { status: 200, headers: CORS });
+  if (!env.STORE) {
+    return json({ error: "Shared storage is not connected yet (KV binding STORE is missing)." }, 503);
+  }
+  try {
+    if (request.method === "GET") return json({ settings: await loadSettings(env) });
+    if (request.method === "POST") {
+      const body = await request.json();
+      if (!body || typeof body.settings !== "object") return json({ error: "Expected { settings: {...} }" }, 400);
+      return json({ settings: await saveSettings(env, body.settings) });
+    }
+    return json({ error: "Method not allowed" }, 405);
+  } catch (err) {
+    return json({ error: err.message || "Unknown server error" }, 500);
+  }
+}
+
 // A quick health page: shows what is configured, never shows the secrets themselves.
 async function handleStatus(env) {
   const status = {
@@ -190,7 +211,7 @@ async function handleTelegramWebhook(request, env, ctx) {
   // Answer Telegram immediately and do the slow work (AI + rs.ge) afterwards,
   // otherwise Telegram would think the delivery failed and send it again.
   ctx.waitUntil(
-    handleUpdate(env, update).catch((err) => console.error("telegram update failed:", err?.stack || err))
+    handleUpdate(env, update, new URL(request.url).origin).catch((err) => console.error("telegram update failed:", err?.stack || err))
   );
   return json({ ok: true });
 }
@@ -201,9 +222,13 @@ export default {
 
     if (url.pathname === "/api/scan-invoice") return handleScanInvoice(request, env);
     if (url.pathname === "/api/base-prices") return handleBasePrices(request, env);
+    if (url.pathname === "/api/settings") return handleSettings(request, env);
     if (url.pathname === "/api/status") return handleStatus(env);
     if (url.pathname === "/api/telegram-setup") return handleTelegramSetup(request, env);
     if (url.pathname === "/telegram-webhook") return handleTelegramWebhook(request, env, ctx);
+
+    const wa = url.pathname.match(/^\/wa\/([^/]+)\/([ad])\/?$/);
+    if (wa && env.STORE) return handleWhatsAppLink(env, ctx, wa[1], wa[2]);
 
     // Everything else (index.html, etc.) is served by the static assets binding
     return env.ASSETS.fetch(request);

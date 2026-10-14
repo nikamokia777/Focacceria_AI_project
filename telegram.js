@@ -4,15 +4,20 @@
 //   1. An employee posts a photo of a waybill (or types its number) in the group.
 //   2. The bot reads the number, pulls the waybill from rs.ge, compares every
 //      line with the base price list and replies with Approve / Reject buttons.
-//   3. Approve  → the CEO gets a private message that the waybill is valid.
-//      Reject   → the bot asks for the reason; reason + waybill go to the CEO.
+//   3. Approve  → the CEO gets a private message that the waybill is valid,
+//                  with "Send to the accountant on WhatsApp?" Yes / No.
+//      Reject   → the bot asks for the reason; reason + waybill go to the CEO,
+//                  with "Send to the distributor on WhatsApp?" Yes / No.
+//   4. Yes opens WhatsApp on the CEO's phone with the message already written.
+//      No sends nothing but leaves a "send later" button under the message.
 //
 // The CEO registers once by opening a private chat with the bot and sending /start.
 
 import { lookupWaybill, normalizeWaybillNumber } from "./rsge.js";
-import { loadBasePrices } from "./store.js";
+import { loadBasePrices, loadSettings, toWhatsAppNumber } from "./store.js";
 
 const PENDING_TTL = 60 * 60 * 24 * 14; // keep an unanswered waybill for 14 days
+const LINK_TTL = 60 * 60 * 24 * 90;    // "send later" WhatsApp buttons keep working for 90 days
 const COMMENT_TTL = 60 * 60 * 2;       // wait up to 2 hours for a rejection reason
 const MAX_LINES = 40;
 
@@ -57,6 +62,17 @@ const TEXTS = {
     ceoTaken: "დირექტორი უკვე დარეგისტრირებულია. ეს ბოტი მუშაობს თანამშრომლების ჯგუფში.",
     ceoReset: "დირექტორის რეგისტრაცია გაუქმდა. ახალმა დირექტორმა უნდა გაგზავნოს /start.",
     help: "გააგზავნეთ ზედნადების ფოტო ან ნომერი და მე შევამოწმებ ფასებს.",
+    askDistributor: "გავუგზავნოთ მომწოდებელს WhatsApp-ით?",
+    askAccountant: "გავუგზავნოთ ბუღალტერს WhatsApp-ით?",
+    yesWa: "✅ დიახ (WhatsApp)",
+    no: "❌ არა",
+    laterDistributor: "📤 მომწოდებელთან გაგზავნა",
+    laterAccountant: "📤 ბუღალტერთან გაგზავნა",
+    notSent: "⏸ არ გაიგზავნა. მოგვიანებით გასაგზავნად დააჭირეთ ღილაკს.",
+    waOpened: "📲 WhatsApp გაიხსნა",
+    noDistributorPhone: "⚠️ მომწოდებლის ნომერი ბაზაში არ არის — WhatsApp-ში კონტაქტს თავად აირჩევთ.",
+    noAccountantPhone: "⚠️ ბუღალტრის ნომერი პარამეტრებში არ არის — WhatsApp-ში კონტაქტს თავად აირჩევთ.",
+    linkExpired: "ეს ბმული აღარ მოქმედებს.",
   },
   en: {
     reading: "🔎 Checking the waybill…",
@@ -94,12 +110,44 @@ const TEXTS = {
     ceoTaken: "A CEO is already registered. This bot works in the employees' group.",
     ceoReset: "CEO registration removed. The new CEO should send /start.",
     help: "Send a waybill photo or number and I will check the prices.",
+    askDistributor: "Send this to the distributor on WhatsApp?",
+    askAccountant: "Send this to the accountant on WhatsApp?",
+    yesWa: "✅ Yes (WhatsApp)",
+    no: "❌ No",
+    laterDistributor: "📤 Send to distributor",
+    laterAccountant: "📤 Send to accountant",
+    notSent: "⏸ Not sent. Tap the button below to send it later.",
+    waOpened: "📲 WhatsApp opened",
+    noDistributorPhone: "⚠️ The distributor's number is not in the base list — you will pick the contact in WhatsApp.",
+    noAccountantPhone: "⚠️ The accountant's number is not in Settings — you will pick the contact in WhatsApp.",
+    linkExpired: "This link is no longer valid.",
   },
 };
 
 function texts(env) {
   return TEXTS[env.BOT_LANG === "en" ? "en" : "ka"];
 }
+
+// ── WhatsApp message texts (plain text — edit the wording here) ──────────────
+
+const WHATSAPP = {
+  // kind "d": to the distributor after a rejection
+  d: (p) =>
+    `გამარჯობა!\n` +
+    `ზედნადები № ${p.number}${p.date ? ` (${p.date})` : ""} — მიღებისას აღმოჩნდა პრობლემა:\n` +
+    `${p.comment || "—"}\n\n` +
+    `გთხოვთ დაგვიკავშირდეთ.`,
+  // kind "a": to the accountant after an approval
+  a: (p) =>
+    `გამარჯობა!\n` +
+    `ზედნადები № ${p.number}${p.date ? ` (${p.date})` : ""} შემოწმებულია და დადასტურებულია.\n` +
+    (p.seller ? `მომწოდებელი: ${p.seller}\n` : "") +
+    (p.total ? `ჯამი: ${p.total} ₾\n` : "") +
+    `შეამოწმა: ${p.by || "—"}`,
+};
+
+// The web address of this app, e.g. https://focacceria-ai-project.….workers.dev
+let ORIGIN = "";
 
 // ── Telegram API ─────────────────────────────────────────────────────────────
 
@@ -217,7 +265,7 @@ export function compareGoods(goods, basePrices) {
       diff = g.price - basePrice;
       status = Math.abs(diff) < 0.005 ? "ok" : diff > 0 ? "high" : "low";
     }
-    return { ...g, basePrice, diff, status, supplier: base?.supplier || "" };
+    return { ...g, basePrice, diff, status, supplier: base?.supplier || "", baseId: base?.id ?? null, phone: base?.phone || "" };
   });
 }
 
@@ -269,6 +317,14 @@ function displayName(user) {
   return full || (user?.username ? `@${user.username}` : "—");
 }
 
+function mostCommon(list) {
+  const counts = new Map();
+  for (const x of list) counts.set(x, (counts.get(x) || 0) + 1);
+  let best = "";
+  for (const [x, n] of counts) if (!best || n > counts.get(best)) best = x;
+  return best;
+}
+
 function newToken() {
   const bytes = crypto.getRandomValues(new Uint8Array(9));
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -315,27 +371,35 @@ async function processWaybill(env, msg, number, hasPhoto = false) {
     sourceMessageId: msg.message_id,          // the employee's photo / text
     hasPhoto,                                 // copy the photo to the CEO later
     resultMessageId: sent.result.message_id,  // the bot's message with buttons
+    // details for the WhatsApp messages
+    seller: waybill.sellerName || "",
+    total: money(waybill.fullAmount || rows.reduce((sum, r) => sum + (r.amount || r.price * r.quantity), 0)),
+    date: String(waybill.deliveryDate || waybill.beginDate || waybill.createDate || "").slice(0, 10),
+    baseIds: [...new Set(rows.map((r) => r.baseId).filter((id) => id != null))],
+    distributorPhone: mostCommon(rows.map((r) => r.phone).filter(Boolean)),
   }), { expirationTtl: PENDING_TTL });
 }
 
-// Send the outcome to the CEO's private chat. Returns true when delivered.
-async function notifyCeo(env, pending, heading, byName, comment) {
+// ── CEO notification + WhatsApp follow-up ────────────────────────────────────
+
+const waLink = (token, kind) => `${ORIGIN}/wa/${token}/${kind}`;
+
+function laterButton(t, token, kind) {
+  return { text: kind === "d" ? t.laterDistributor : t.laterAccountant, url: waLink(token, kind) };
+}
+
+// Send the outcome to the CEO's private chat, with the WhatsApp Yes / No question.
+// kind: "a" (approved → accountant) or "d" (rejected → distributor).
+// Records the CEO message on `pending`; the caller saves `pending` afterwards.
+async function notifyCeo(env, pending, token, kind, heading, byName, comment) {
   const t = texts(env);
   const ceoChatId = env.CEO_CHAT_ID || (await env.STORE.get("ceo_chat_id"));
   if (!ceoChatId) {
     await send(env, pending.chatId, t.noCeo);
     return false;
   }
-  let text = `<b>${heading}</b>\n${t.checkedBy}: ${esc(byName)}\n`;
-  if (comment) text += `${t.reason}: ${esc(comment)}\n`;
-  text += `\n${pending.summary}`;
 
-  const sent = await send(env, ceoChatId, text);
-  if (!sent.ok) {
-    await send(env, pending.chatId, `${t.ceoFail} (${esc(sent.description || "")})`);
-    return false;
-  }
-  // Attach the employee's original photo so the CEO sees the paper waybill too.
+  // The employee's original photo first, so the question with buttons ends up last.
   if (pending.hasPhoto) {
     await tg(env, "copyMessage", {
       chat_id: ceoChatId,
@@ -343,12 +407,126 @@ async function notifyCeo(env, pending, heading, byName, comment) {
       message_id: pending.sourceMessageId,
     });
   }
+
+  let text = `<b>${heading}</b>\n${t.checkedBy}: ${esc(byName)}\n`;
+  if (comment) text += `${t.reason}: ${esc(comment)}\n`;
+  text += `\n${pending.summary}`;
+
+  let question = kind === "d" ? t.askDistributor : t.askAccountant;
+  if (kind === "a" && !toWhatsAppNumber((await loadSettings(env)).accountantPhone)) {
+    question += `\n${t.noAccountantPhone}`;
+  }
+  if (kind === "d" && !(await distributorNumber(env, pending))) {
+    question += `\n${t.noDistributorPhone}`;
+  }
+
+  const extra = ORIGIN
+    ? {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: t.yesWa, url: waLink(token, kind) },
+            { text: t.no, callback_data: `${kind}n:${token}` },
+          ]],
+        },
+      }
+    : {};
+  const sent = await send(env, ceoChatId, ORIGIN ? `${text}\n\n<b>${question}</b>` : text, extra);
+  if (!sent.ok) {
+    await send(env, pending.chatId, `${t.ceoFail} (${esc(sent.description || "")})`);
+    return false;
+  }
+  pending.ceoChatId = String(ceoChatId);
+  pending.ceoMessageId = sent.result.message_id;
+  pending.ceoText = text;
   return true;
+}
+
+// Replace the question under the CEO's message with a status line + "send later" button.
+async function updateCeoMessage(env, pending, token, kind, statusLine) {
+  const t = texts(env);
+  if (!pending.ceoMessageId) return;
+  await tg(env, "editMessageText", {
+    chat_id: pending.ceoChatId,
+    message_id: pending.ceoMessageId,
+    text: `${pending.ceoText}\n\n<b>${esc(statusLine)}</b>`,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup: { inline_keyboard: [[laterButton(t, token, kind)]] },
+  });
+}
+
+// Phone number of the distributor: taken from the base list products on this waybill.
+async function distributorNumber(env, pending) {
+  const ids = new Set(pending.baseIds || []);
+  let phone = "";
+  if (ids.size) {
+    const prices = await loadBasePrices(env);
+    phone = mostCommon(prices.filter((p) => ids.has(p.id) && p.phone).map((p) => p.phone));
+  }
+  return toWhatsAppNumber(phone || pending.distributorPhone);
+}
+
+// GET /wa/<token>/<a|d> — the CEO tapped "Yes" or "send later": open WhatsApp
+// with the message already written, and note it under the CEO's message.
+export async function handleWhatsAppLink(env, ctx, token, kind) {
+  const t = texts(env);
+  const raw = /^[0-9a-f]{8,64}$/.test(token) && (kind === "a" || kind === "d")
+    ? await env.STORE.get(`pending:${token}`)
+    : null;
+  const pending = raw ? JSON.parse(raw) : null;
+  const wanted = kind === "d" ? "rejected" : "approved";
+  if (!pending || pending.status !== wanted) {
+    return new Response(
+      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
+      `<p style="font:16px sans-serif;padding:24px">${esc(t.linkExpired)}</p>`,
+      { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } }
+    );
+  }
+
+  const number = kind === "d"
+    ? await distributorNumber(env, pending)
+    : toWhatsAppNumber((await loadSettings(env)).accountantPhone);
+  const message = WHATSAPP[kind](pending);
+  const target = `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+
+  const decisionKey = kind === "d" ? "distributorDecision" : "accountantDecision";
+  if (pending[decisionKey] !== "yes") {
+    pending[decisionKey] = "yes";
+    ctx.waitUntil((async () => {
+      await env.STORE.put(`pending:${token}`, JSON.stringify(pending), { expirationTtl: LINK_TTL });
+      await updateCeoMessage(env, pending, token, kind, t.waOpened);
+    })().catch((err) => console.error("whatsapp link update failed:", err?.stack || err)));
+  }
+  return new Response(null, {
+    status: 302,
+    headers: { Location: target, "Cache-Control": "no-store" },
+  });
+}
+
+// The CEO tapped "No" under the WhatsApp question.
+async function handleCeoNo(env, cq, kind, token) {
+  const t = texts(env);
+  const key = `pending:${token}`;
+  const raw = token ? await env.STORE.get(key) : null;
+  if (!raw) {
+    await tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: t.expired, show_alert: true });
+    return;
+  }
+  const pending = JSON.parse(raw);
+  const decisionKey = kind === "d" ? "distributorDecision" : "accountantDecision";
+  if (!pending[decisionKey]) {
+    pending[decisionKey] = "no";
+    await env.STORE.put(key, JSON.stringify(pending), { expirationTtl: LINK_TTL });
+  }
+  await tg(env, "answerCallbackQuery", { callback_query_id: cq.id });
+  await updateCeoMessage(env, pending, token, kind, t.notSent);
 }
 
 async function handleCallback(env, cq) {
   const t = texts(env);
   const [action, token] = String(cq.data || "").split(":");
+  if (action === "an" || action === "dn") return handleCeoNo(env, cq, action[0], token);
+
   const key = `pending:${token}`;
   const raw = token ? await env.STORE.get(key) : null;
 
@@ -366,7 +544,7 @@ async function handleCallback(env, cq) {
   if (action === "a") {
     pending.status = "approved";
     pending.by = name;
-    await env.STORE.put(key, JSON.stringify(pending), { expirationTtl: PENDING_TTL });
+    await env.STORE.put(key, JSON.stringify(pending), { expirationTtl: LINK_TTL });
     await tg(env, "answerCallbackQuery", { callback_query_id: cq.id });
     await tg(env, "editMessageText", {
       chat_id: pending.chatId,
@@ -375,7 +553,9 @@ async function handleCallback(env, cq) {
       parse_mode: "HTML",
       disable_web_page_preview: true,
     });
-    await notifyCeo(env, pending, t.ceoApproved, name, "");
+    if (await notifyCeo(env, pending, token, "a", t.ceoApproved, name, "")) {
+      await env.STORE.put(key, JSON.stringify(pending), { expirationTtl: LINK_TTL });
+    }
     return;
   }
 
@@ -420,7 +600,7 @@ async function tryConsumeComment(env, msg) {
   const comment = msg.text.trim();
   pending.status = "rejected";
   pending.comment = comment;
-  await env.STORE.put(key, JSON.stringify(pending), { expirationTtl: PENDING_TTL });
+  await env.STORE.put(key, JSON.stringify(pending), { expirationTtl: LINK_TTL });
 
   await tg(env, "editMessageText", {
     chat_id: pending.chatId,
@@ -429,8 +609,9 @@ async function tryConsumeComment(env, msg) {
     parse_mode: "HTML",
     disable_web_page_preview: true,
   });
-  const delivered = await notifyCeo(env, pending, t.ceoRejected, pending.by, comment);
+  const delivered = await notifyCeo(env, pending, token, "d", t.ceoRejected, pending.by, comment);
   if (delivered) {
+    await env.STORE.put(key, JSON.stringify(pending), { expirationTtl: LINK_TTL });
     await send(env, msg.chat.id, t.reasonSaved, {
       reply_to_message_id: msg.message_id,
       allow_sending_without_reply: true,
@@ -507,7 +688,8 @@ async function handleMessage(env, msg) {
   }
 }
 
-export async function handleUpdate(env, update) {
+export async function handleUpdate(env, update, origin) {
+  if (origin) ORIGIN = origin;
   if (update.callback_query) return handleCallback(env, update.callback_query);
   if (update.message) return handleMessage(env, update.message);
 }
