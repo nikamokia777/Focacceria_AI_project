@@ -27,14 +27,53 @@ export async function saveBasePrices(env, items) {
   return clean;
 }
 
+// Full settings, including the bot token — for server use only, never sent to the website.
 export async function loadSettings(env) {
   const saved = env.STORE ? await env.STORE.get(SETTINGS_KEY, "json") : null;
-  return { accountantPhone: "", ...(saved && typeof saved === "object" ? saved : {}) };
+  return {
+    accountantPhone: "",
+    reportChatId: "",
+    reportBotToken: "",
+    ...(saved && typeof saved === "object" ? saved : {}),
+  };
 }
 
+// "1234567890:AAH…xYz9" → "••••••••••xYz9" (the site is public, so the full token is never shown)
+export function maskToken(token) {
+  return token ? "••••••••••" + String(token).slice(-4) : "";
+}
+
+// What the website is allowed to see.
+export function publicSettings(s) {
+  return {
+    accountantPhone: s.accountantPhone || "",
+    reportChatId: s.reportChatId || "",
+    reportBotToken: maskToken(s.reportBotToken),
+  };
+}
+
+export class SettingsError extends Error {}
+
 export async function saveSettings(env, settings) {
+  const current = await loadSettings(env);
+  const pick = (k, max) => String(settings?.[k] ?? current[k] ?? "").trim().slice(0, max);
+  // Bot token: keep the saved one when the website sends back the hidden (masked) value.
+  let token = current.reportBotToken || "";
+  if (settings && typeof settings.reportBotToken === "string") {
+    const typed = settings.reportBotToken.trim();
+    if (typed !== maskToken(current.reportBotToken)) {
+      if (typed && !/^\d{5,}:[\w-]{20,}$/.test(typed)) {
+        throw new SettingsError("invalid_token");
+      }
+      token = typed; // empty = removed
+    }
+  }
   const clean = {
-    accountantPhone: String(settings?.accountantPhone ?? "").trim().slice(0, 40),
+    accountantPhone: pick("accountantPhone", 40),
+    // Telegram chat the website's "Send to Telegram" reports go to, e.g. -1001234567890
+    reportChatId: pick("reportChatId", 40).replace(/[^\d-]/g, ""),
+    // Bot used for those reports (falls back to the TELEGRAM_BOT_TOKEN secret when empty)
+    reportBotToken: token,
   };
   await env.STORE.put(SETTINGS_KEY, JSON.stringify(clean));
   return clean;

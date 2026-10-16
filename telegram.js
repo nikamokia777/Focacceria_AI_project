@@ -649,6 +649,10 @@ async function handleMessage(env, msg) {
   const command = text.startsWith("/") ? text.split(/[\s@]/)[0].toLowerCase() : "";
 
   if (isPrivate && command && (await handlePrivateCommand(env, msg, command))) return;
+  if (command === "/chatid") {
+    await send(env, msg.chat.id, `Chat ID: <code>${msg.chat.id}</code>`);
+    return;
+  }
   if (command === "/help" || (command === "/start" && !isPrivate)) {
     await send(env, msg.chat.id, t.help);
     return;

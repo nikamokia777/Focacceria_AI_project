@@ -65,10 +65,11 @@
         codeRequired: "Please enter a product name and price.",
         telegramConfigTitle: "Telegram Bot Configuration", botToken: "Bot Token", chatId: "Chat ID",
         howToSetup: "How to set up Telegram:",
-        step1: "1. Message @BotFather → /newbot → copy the token",
-        step2: "2. Add your bot to your restaurant group",
-        step3: "3. Get Chat ID from @userinfobot",
-        step4: "4. Paste both above and you're done!",
+        step1: "1. Bot Token: @BotFather → /mybots → your bot → API Token",
+        step2: "2. Add the bot to the group where reports should go",
+        step3: "3. In that group send /chatid — the bot replies with the Chat ID",
+        step4: "4. Paste both above and press Save. After saving, the token is shown hidden for safety.",
+        tokenInvalid: "This doesn't look like a bot token. It should look like 1234567890:AAH…",
         setTelegramAlert: "Please set Telegram config in Settings.",
         telegramError: "Telegram error: ", sendFailed: "Failed to send.",
         msgTitle: "Delivery Price Check", msgAlerts: "Price Mismatches:",
@@ -104,10 +105,11 @@
         codeRequired: "გთხოვთ შეიყვანოთ პროდუქტის სახელი და ფასი.",
         telegramConfigTitle: "Telegram ბოტის პარამეტრები", botToken: "ბოტის ტოკენი", chatId: "ჩატის ID",
         howToSetup: "როგორ დავაკონფიგურიროთ Telegram:",
-        step1: "1. მიწერეთ @BotFather-ს → /newbot → დააკოპირეთ ტოკენი",
-        step2: "2. დაამატეთ თქვენი ბოტი რესტორნის ჯგუფში",
-        step3: "3. აღმოაჩინეთ Chat ID @userinfobot-ის მეშვეობით",
-        step4: "4. ჩასვით ორივე ზემოთ და მზად არის!",
+        step1: "1. ბოტის ტოკენი: @BotFather → /mybots → თქვენი ბოტი → API Token",
+        step2: "2. დაამატეთ ბოტი იმ ჯგუფში, სადაც ანგარიშები უნდა მივიდეს",
+        step3: "3. ამ ჯგუფში გაგზავნეთ /chatid — ბოტი გიპასუხებთ Chat ID-ით",
+        step4: "4. ჩასვით ორივე ზემოთ და დააჭირეთ შენახვას. შენახვის შემდეგ ტოკენი უსაფრთხოებისთვის დამალულად ჩანს.",
+        tokenInvalid: "ეს ბოტის ტოკენს არ ჰგავს. უნდა გამოიყურებოდეს ასე: 1234567890:AAH…",
         setTelegramAlert: "გთხოვთ შეავსოთ Telegram-ის პარამეტრები პარამეტრების ჩანართში.",
         telegramError: "Telegram-ის შეცდომა: ", sendFailed: "გაგზავნა ვერ მოხერხდა.",
         msgTitle: "მიწოდების ფასების შემოწმება", msgAlerts: "ფასების შეუსაბამობა:",
@@ -146,21 +148,11 @@
       const [imagePreview, setImagePreview] = useState(null);
       const [scanning, setScanning] = useState(false);
       const [results, setResults] = useState(null);
-      const [telegramConfig, setTelegramConfig] = useState(() => {
-        try {
-          const saved = localStorage.getItem("pricecheck_telegramConfig");
-          if (saved) return JSON.parse(saved);
-        } catch {}
-        return { botToken: "", chatId: "" };
-      });
 
-      // Persist base prices and Telegram settings so a page reload doesn't lose them
+      // Keep an offline copy of the base prices in this browser
       useEffect(() => {
         try { localStorage.setItem("pricecheck_basePrices", JSON.stringify(basePrices)); } catch {}
       }, [basePrices]);
-      useEffect(() => {
-        try { localStorage.setItem("pricecheck_telegramConfig", JSON.stringify(telegramConfig)); } catch {}
-      }, [telegramConfig]);
 
       // Shared base prices: the list lives on the server so every device and the
       // Telegram bot see the same prices. localStorage stays as an offline copy.
@@ -205,29 +197,48 @@
       const [editingPrice, setEditingPrice] = useState(null);
       const [dragOver, setDragOver] = useState(false);
       const [newProduct, setNewProduct] = useState({ name: "", code: "", price: "", unit: "", supplier: "", phone: "" });
-      const [appSettings, setAppSettings] = useState({ accountantPhone: "" });
-      const [settingsStatus, setSettingsStatus] = useState(null); // null | "saving" | "saved" | "error"
+      const [appSettings, setAppSettings] = useState({ accountantPhone: "", reportChatId: "", reportBotToken: "" });
+      const [settingsStatus, setSettingsStatus] = useState(null); // { card, state: "saving" | "saved" | "error" }
       useEffect(() => {
         (async () => {
           try {
             const r = await fetch("/api/settings");
-            if (r.ok) { const d = JSON.parse(await r.text()); if (d.settings) setAppSettings(v => ({ ...v, ...d.settings })); }
+            if (r.ok) {
+              const d = JSON.parse(await r.text());
+              let s = { accountantPhone: "", reportChatId: "", reportBotToken: "", ...(d.settings || {}) };
+              // One-time move: token / Chat ID typed into this browser earlier go to the server.
+              let old = {};
+              try { old = JSON.parse(localStorage.getItem("pricecheck_telegramConfig") || "{}") || {}; } catch {}
+              const oldChatId = String(old.chatId || "").trim();
+              const oldToken = String(old.botToken || "").trim();
+              const move = {};
+              if (!s.reportChatId && oldChatId) move.reportChatId = oldChatId;
+              if (!s.reportBotToken && /^\d{5,}:[\w-]{20,}$/.test(oldToken)) move.reportBotToken = oldToken;
+              if (Object.keys(move).length) {
+                try {
+                  const m = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ settings: { ...s, ...move } }) });
+                  if (m.ok) { const md = JSON.parse(await m.text()); if (md.settings) s = md.settings; }
+                } catch {}
+              }
+              setAppSettings(s);
+            }
           } catch {}
         })();
       }, []);
-      const saveAppSettings = async () => {
-        setSettingsStatus("saving");
+      const saveAppSettings = async (card) => {
+        setSettingsStatus({ card, state: "saving" });
         try {
           const r = await fetch("/api/settings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ settings: appSettings }),
           });
-          if (!r.ok) throw new Error();
-          const d = JSON.parse(await r.text());
+          let d = {};
+          try { d = JSON.parse(await r.text()); } catch {}
+          if (!r.ok) { setSettingsStatus({ card, state: d.error === "invalid_token" ? "invalid" : "error" }); return; }
           if (d.settings) setAppSettings(d.settings);
-          setSettingsStatus("saved");
-        } catch { setSettingsStatus("error"); }
+          setSettingsStatus({ card, state: "saved" });
+        } catch { setSettingsStatus({ card, state: "error" }); }
       };
       const [addError, setAddError] = useState(false);
       const [scanError, setScanError] = useState(null);
@@ -386,16 +397,18 @@
       };
 
       const sendToTelegram = async () => {
-        const { botToken, chatId } = telegramConfig;
-        if (!botToken || !chatId) { alert(t.setTelegramAlert); setTab("settings"); return; }
+        if (!appSettings.reportChatId) { alert(t.setTelegramAlert); setTab("settings"); return; }
         setSending(true);
         try {
-          const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          const res = await fetch("/api/send-report", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: chatId, text: buildMessage(), parse_mode: "Markdown" })
+            body: JSON.stringify({ text: buildMessage() })
           });
-          const d = await res.json();
-          if (d.ok) setSentOk(true); else alert(t.telegramError + d.description);
+          let d = {};
+          try { d = JSON.parse(await res.text()); } catch {}
+          if (d.ok) setSentOk(true);
+          else if (d.error === "no_chat_id") { alert(t.setTelegramAlert); setTab("settings"); }
+          else alert(t.telegramError + (d.error || res.status));
         } catch { alert(t.sendFailed); } finally { setSending(false); }
       };
 
@@ -615,23 +628,31 @@
                   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                     <input type="tel" placeholder="5XX XX XX XX" value={appSettings.accountantPhone||""} onChange={e=>{setAppSettings(v=>({...v,accountantPhone:e.target.value}));setSettingsStatus(null);}}
                       style={{flex:"1 1 180px",background:"#0d0d0d",border:"1px solid #2a2a2a",borderRadius:6,color:"#e8e0d5",padding:"10px 12px",fontSize:13,fontFamily:"inherit"}} />
-                    <button onClick={saveAppSettings} disabled={settingsStatus==="saving"} style={{flex:"0 0 auto",background:"linear-gradient(135deg,#c8a96e,#a07840)",border:"none",borderRadius:6,color:"#0d0d0d",fontSize:12,fontWeight:500,padding:"10px 18px",cursor:"pointer",fontFamily:"inherit",letterSpacing:1}}>
+                    <button onClick={()=>saveAppSettings("accountant")} disabled={settingsStatus?.state==="saving"} style={{flex:"0 0 auto",background:"linear-gradient(135deg,#c8a96e,#a07840)",border:"none",borderRadius:6,color:"#0d0d0d",fontSize:12,fontWeight:500,padding:"10px 18px",cursor:"pointer",fontFamily:"inherit",letterSpacing:1}}>
                       {t.saveBtn}
                     </button>
                   </div>
-                  {settingsStatus==="saved" && <div style={{marginTop:8,fontSize:12,color:"#5dde8d"}}>{t.savedOk}</div>}
-                  {settingsStatus==="error" && <div style={{marginTop:8,fontSize:12,color:"#ff6b6b"}}>{t.saveFailed}</div>}
+                  {settingsStatus?.card==="accountant" && settingsStatus.state==="saved" && <div style={{marginTop:8,fontSize:12,color:"#5dde8d"}}>{t.savedOk}</div>}
+                  {settingsStatus?.card==="accountant" && settingsStatus.state==="error" && <div style={{marginTop:8,fontSize:12,color:"#ff6b6b"}}>{t.saveFailed}</div>}
                   <div style={{fontSize:11,color:"#444",lineHeight:1.7,marginTop:12}}>{t.accountantHint}</div>
                 </div>
                 <div style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,padding:20,marginBottom:16}}>
                   <div style={{fontSize:11,color:"#c8a96e",letterSpacing:2,textTransform:"uppercase",marginBottom:16}}>{t.telegramConfigTitle}</div>
-                  {[[t.botToken,"botToken","110201543:AAHdqTcvCH..."],[t.chatId,"chatId","-1001234567890"]].map(([label,key,ph]) => (
+                  {[[t.botToken,"reportBotToken","1234567890:AAH..."],[t.chatId,"reportChatId","-1001234567890"]].map(([label,key,ph]) => (
                     <div key={key} style={{marginBottom:14}}>
                       <label style={{display:"block",fontSize:11,color:"#555",letterSpacing:1,marginBottom:6}}>{label}</label>
-                      <input type="text" placeholder={ph} value={telegramConfig[key]} onChange={e=>setTelegramConfig(v=>({...v,[key]:e.target.value}))}
-                        style={{width:"100%",background:"#0d0d0d",border:"1px solid #2a2a2a",borderRadius:6,color:"#e8e0d5",padding:"10px 12px",fontSize:13,fontFamily:"inherit"}} />
+                      <input type="text" autoComplete="off" spellCheck={false} placeholder={ph} value={appSettings[key]||""}
+                        onFocus={e=>{ if (key==="reportBotToken" && String(e.target.value).startsWith("••")) e.target.select(); }}
+                        onChange={e=>{setAppSettings(v=>({...v,[key]:e.target.value}));setSettingsStatus(null);}}
+                        style={{width:"100%",background:"#0d0d0d",border:`1px solid ${key==="reportBotToken" && settingsStatus?.state==="invalid" ? "#8b3030" : "#2a2a2a"}`,borderRadius:6,color:"#e8e0d5",padding:"10px 12px",fontSize:13,fontFamily:"inherit"}} />
                     </div>
                   ))}
+                  <button onClick={()=>saveAppSettings("telegram")} disabled={settingsStatus?.state==="saving"} style={{width:"100%",background:"linear-gradient(135deg,#c8a96e,#a07840)",border:"none",borderRadius:6,color:"#0d0d0d",fontSize:12,fontWeight:500,padding:"10px 18px",cursor:"pointer",fontFamily:"inherit",letterSpacing:1}}>
+                    {t.saveBtn}
+                  </button>
+                  {settingsStatus?.card==="telegram" && settingsStatus.state==="saved" && <div style={{marginTop:8,fontSize:12,color:"#5dde8d"}}>{t.savedOk}</div>}
+                  {settingsStatus?.card==="telegram" && settingsStatus.state==="error" && <div style={{marginTop:8,fontSize:12,color:"#ff6b6b"}}>{t.saveFailed}</div>}
+                  {settingsStatus?.card==="telegram" && settingsStatus.state==="invalid" && <div style={{marginTop:8,fontSize:12,color:"#ff6b6b"}}>{t.tokenInvalid}</div>}
                   <div style={{fontSize:11,color:"#444",lineHeight:1.8,marginTop:16,borderTop:"1px solid #1e1e1e",paddingTop:14}}>
                     <strong style={{color:"#666"}}>{t.howToSetup}</strong><br/>
                     {t.step1}<br/>

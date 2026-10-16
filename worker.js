@@ -5,6 +5,7 @@
 //   POST /api/base-prices    save the base price list
 //   GET  /api/settings       app settings (accountant's WhatsApp number)
 //   POST /api/settings       save app settings
+//   POST /api/send-report    website's "Send to Telegram" (uses the bot token secret)
 //   GET  /api/status         which parts are configured + rs.ge login test
 //   GET  /wa/<token>/<a|d>   opens WhatsApp for the CEO (accountant / distributor)
 //   GET  /api/telegram-setup connect the Telegram bot to this app (run once)
@@ -12,7 +13,7 @@
 // Everything else is served from the static files in /public.
 
 import { checkServiceUser } from "./rsge.js";
-import { loadBasePrices, saveBasePrices, loadSettings, saveSettings } from "./store.js";
+import { loadBasePrices, saveBasePrices, loadSettings, saveSettings, publicSettings, SettingsError } from "./store.js";
 import { handleUpdate, handleWhatsAppLink, setupWebhook, webhookSecret } from "./telegram.js";
 
 const CORS = {
@@ -153,13 +154,43 @@ async function handleSettings(request, env) {
     return json({ error: "Shared storage is not connected yet (KV binding STORE is missing)." }, 503);
   }
   try {
-    if (request.method === "GET") return json({ settings: await loadSettings(env) });
+    if (request.method === "GET") return json({ settings: publicSettings(await loadSettings(env)) });
     if (request.method === "POST") {
       const body = await request.json();
       if (!body || typeof body.settings !== "object") return json({ error: "Expected { settings: {...} }" }, 400);
-      return json({ settings: await saveSettings(env, body.settings) });
+      return json({ settings: publicSettings(await saveSettings(env, body.settings)) });
     }
     return json({ error: "Method not allowed" }, 405);
+  } catch (err) {
+    if (err instanceof SettingsError) return json({ error: err.message }, 400);
+    return json({ error: err.message || "Unknown server error" }, 500);
+  }
+}
+
+// The website's "Send to Telegram" button. Uses the bot token saved in Settings
+// (or the TELEGRAM_BOT_TOKEN secret if none is saved). The token never leaves the server.
+async function handleSendReport(request, env) {
+  if (request.method === "OPTIONS") return new Response("", { status: 200, headers: CORS });
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (!env.STORE) return json({ error: "Shared storage is not connected." }, 503);
+  try {
+    const body = await request.json();
+    const text = String(body?.text ?? "").slice(0, 4000);
+    if (!text.trim()) return json({ error: "Empty message" }, 400);
+    const { reportChatId, reportBotToken } = await loadSettings(env);
+    const botToken = reportBotToken || env.TELEGRAM_BOT_TOKEN;
+    if (!reportChatId || !botToken) return json({ error: "no_chat_id" }, 400);
+
+    const send = (extra) =>
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: reportChatId, text, ...extra }),
+      }).then((r) => r.json());
+    let d = await send({ parse_mode: "Markdown" });
+    // Product names with * or _ can break Markdown — retry as plain text.
+    if (!d.ok && /parse/i.test(d.description || "")) d = await send({});
+    return d.ok ? json({ ok: true }) : json({ error: d.description || "Telegram error" }, 502);
   } catch (err) {
     return json({ error: err.message || "Unknown server error" }, 500);
   }
@@ -223,6 +254,7 @@ export default {
     if (url.pathname === "/api/scan-invoice") return handleScanInvoice(request, env);
     if (url.pathname === "/api/base-prices") return handleBasePrices(request, env);
     if (url.pathname === "/api/settings") return handleSettings(request, env);
+    if (url.pathname === "/api/send-report") return handleSendReport(request, env);
     if (url.pathname === "/api/status") return handleStatus(env);
     if (url.pathname === "/api/telegram-setup") return handleTelegramSetup(request, env);
     if (url.pathname === "/telegram-webhook") return handleTelegramWebhook(request, env, ctx);
