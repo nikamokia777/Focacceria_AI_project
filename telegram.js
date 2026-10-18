@@ -1,33 +1,40 @@
-// telegram.js — the waybill approval bot.
+// telegram.js — the Telegram bot.
 //
-// Flow:
-//   1. An employee posts a photo of a waybill (or types its number) in the group.
-//   2. The bot reads the number, pulls the waybill from rs.ge, compares every
-//      line with the base price list and replies with Approve / Reject buttons.
-//   3. Approve  → the CEO gets a private message that the waybill is valid,
-//                  with "Send to the accountant on WhatsApp?" Yes / No.
-//      Reject   → the bot asks for the reason; reason + waybill go to the CEO,
-//                  with "Send to the distributor on WhatsApp?" Yes / No.
-//   4. Yes opens WhatsApp on the CEO's phone with the message already written.
-//      No sends nothing but leaves a "send later" button under the message.
+// In the employees' group:
+//   • A photo of a waybill (or its number) → the bot pulls it from rs.ge, compares
+//     every line with the product list and replies with Approve / Reject buttons.
+//       Approve → the waybill goes to History on the website (with a "send to
+//                 accountant" button); ordered products in it count as received.
+//       Reject  → the bot asks for the reason; the waybill + reason go to the
+//                 Mistakes tab (with "send to distributor" and "resolved" buttons).
+//     Either way the CEO gets a short notice in his private chat.
+//   • A shopping list, one product per line ("რუკოლა 2კგ") → the products are
+//     ticked in the Orders tab.
 //
-// The CEO registers once by opening a private chat with the bot and sending /start.
+// In the CEO's private chat:
+//   /start               register as the CEO (first person only)
+//   /password <new>      set the website password (message is deleted right away)
+//   /resetceo            give up the CEO registration
 
 import { lookupWaybill, normalizeWaybillNumber } from "./rsge.js";
-import { loadBasePrices, loadSettings, toWhatsAppNumber } from "./store.js";
+import {
+  loadBasePrices, loadSettings, toWhatsAppNumber, upsertLog, patchLog, getLogRecord,
+  applyOrderOps, receiveOrderItems,
+} from "./store.js";
+import { parseOrderMessage, matchProduct } from "./orders.js";
+import { setPassword } from "./auth.js";
 
 const PENDING_TTL = 60 * 60 * 24 * 14; // keep an unanswered waybill for 14 days
-const LINK_TTL = 60 * 60 * 24 * 90;    // "send later" WhatsApp buttons keep working for 90 days
+const LINK_TTL = 60 * 60 * 24 * 90;    // old "send later" WhatsApp buttons keep working for 90 days
 const COMMENT_TTL = 60 * 60 * 2;       // wait up to 2 hours for a rejection reason
 const MAX_LINES = 40;
 
-const UNITS = { "1": "ცალი", "2": "კგ", "3": "გრ", "4": "ლ", "5": "ტ" };
+export const UNITS = { "1": "ცალი", "2": "კგ", "3": "გრ", "4": "ლ", "5": "ტ" };
 
 // ── Texts (Georgian by default, BOT_LANG=en for English) ─────────────────────
 
 const TEXTS = {
   ka: {
-    reading: "🔎 ვამოწმებ ზედნადებს…",
     noNumber: "ფოტოზე ზედნადების ნომერი ვერ ამოვიკითხე. გადაიღეთ უფრო მკაფიოდ ან ჩაწერეთ ნომერი ტექსტად.",
     notFound: (n) => `ზედნადები № ${n} rs.ge-ზე ვერ მოიძებნა. გადაამოწმეთ ნომერი.`,
     failed: (e) => `⚠️ შემოწმება ვერ მოხერხდა: ${e}`,
@@ -49,33 +56,35 @@ const TEXTS = {
     rejectedBy: (n) => `❌ უარყო: ${n}`,
     reason: "მიზეზი",
     askReason: (n) => `${n}, დაწერეთ უარყოფის მიზეზი ერთ შეტყობინებაში (ზედნადები № %N%).`,
-    reasonSaved: "მიზეზი გადაეგზავნა დირექტორს.",
+    reasonSaved: "მიზეზი შენახულია და დირექტორს ეცნობა.",
     already: "ეს ზედნადები უკვე დამუშავებულია.",
     expired: "ეს ზედნადები ვეღარ მოიძებნა (ვადა გაუვიდა). გააგზავნეთ თავიდან.",
-    ceoApproved: "✅ ზედნადები დადასტურებულია",
-    ceoRejected: "❌ ზედნადები უარყოფილია",
+    ceoApproved: (n) => `✅ ზედნადები № ${n} დადასტურებულია`,
+    ceoRejected: (n) => `❌ ზედნადები № ${n} უარყოფილია`,
     checkedBy: "შეამოწმა",
+    receivedFromOrder: (n) => `🛒 შეკვეთიდან მიღებულად მოინიშნა: ${n} პოზიცია`,
+    openHistory: "📋 ისტორიაში ნახვა",
+    openMistakes: "⚠️ შეცდომებში ნახვა",
     noCeo: "⚠️ დირექტორი ჯერ არ არის დარეგისტრირებული. მან უნდა გახსნას ბოტი პირად ჩატში და გაგზავნოს /start.",
-    ceoFail: "⚠️ დირექტორთან გაგზავნა ვერ მოხერხდა.",
-    ceoRegistered: "✅ თქვენ დარეგისტრირდით როგორც დირექტორი. ზედნადებების დადასტურებები და უარყოფები აქ მოვა.",
+    ceoRegistered: "✅ თქვენ დარეგისტრირდით როგორც დირექტორი. ზედნადებების შეტყობინებები აქ მოვა.\n\nსაიტის პაროლის დასაყენებლად გამოგზავნეთ:\n/password თქვენი_პაროლი",
     ceoAlready: "თქვენ უკვე დარეგისტრირებული ხართ. შეტყობინებები აქ მოვა.",
     ceoTaken: "დირექტორი უკვე დარეგისტრირებულია. ეს ბოტი მუშაობს თანამშრომლების ჯგუფში.",
     ceoReset: "დირექტორის რეგისტრაცია გაუქმდა. ახალმა დირექტორმა უნდა გაგზავნოს /start.",
-    help: "გააგზავნეთ ზედნადების ფოტო ან ნომერი და მე შევამოწმებ ფასებს.",
-    askDistributor: "გავუგზავნოთ მომწოდებელს WhatsApp-ით?",
-    askAccountant: "გავუგზავნოთ ბუღალტერს WhatsApp-ით?",
-    yesWa: "✅ დიახ (WhatsApp)",
-    no: "❌ არა",
+    help: "• გააგზავნეთ ზედნადების ფოტო ან ნომერი — შევამოწმებ ფასებს.\n• შეკვეთისთვის დაწერეთ თითო პროდუქტი ცალკე ხაზზე, მაგ.:\nრუკოლა 2კგ\nჩერი პომიდორი 3 კგ",
+    pwUsage: "გამოიყენეთ ასე:\n/password ახალი_პაროლი\n(მინიმუმ 4 სიმბოლო)",
+    pwSet: "✅ საიტის პაროლი დაყენებულია. თქვენი შეტყობინება წაიშალა.\nყველა მოწყობილობიდან გამოსვლა მოხდა — შედით ახალი პაროლით.",
+    pwNotCeo: "პაროლის შეცვლა მხოლოდ დირექტორს შეუძლია.",
+    orderAdded: "🛒 შეკვეთაში დაემატა:",
+    orderNotFound: "⚠️ პროდუქტებში ვერ ვიპოვე:",
+    orderNotFoundHint: "დაამატეთ საიტზე „პროდუქტებში“ ან დააზუსტეთ სახელი.",
+    linkExpired: "ეს ბმული აღარ მოქმედებს.",
+    // old messages (sent before this update) still have these buttons
     laterDistributor: "📤 მომწოდებელთან გაგზავნა",
     laterAccountant: "📤 ბუღალტერთან გაგზავნა",
     notSent: "⏸ არ გაიგზავნა. მოგვიანებით გასაგზავნად დააჭირეთ ღილაკს.",
     waOpened: "📲 WhatsApp გაიხსნა",
-    noDistributorPhone: "⚠️ მომწოდებლის ნომერი ბაზაში არ არის — WhatsApp-ში კონტაქტს თავად აირჩევთ.",
-    noAccountantPhone: "⚠️ ბუღალტრის ნომერი პარამეტრებში არ არის — WhatsApp-ში კონტაქტს თავად აირჩევთ.",
-    linkExpired: "ეს ბმული აღარ მოქმედებს.",
   },
   en: {
-    reading: "🔎 Checking the waybill…",
     noNumber: "I couldn't read a waybill number from the photo. Take a clearer photo or type the number.",
     notFound: (n) => `Waybill № ${n} was not found on rs.ge. Please check the number.`,
     failed: (e) => `⚠️ Check failed: ${e}`,
@@ -97,30 +106,32 @@ const TEXTS = {
     rejectedBy: (n) => `❌ Rejected by ${n}`,
     reason: "Reason",
     askReason: (n) => `${n}, write the reason for rejecting in one message (waybill № %N%).`,
-    reasonSaved: "The reason was sent to the CEO.",
+    reasonSaved: "The reason was saved and the CEO was notified.",
     already: "This waybill has already been handled.",
     expired: "This waybill is no longer available (expired). Please send it again.",
-    ceoApproved: "✅ Waybill approved",
-    ceoRejected: "❌ Waybill rejected",
+    ceoApproved: (n) => `✅ Waybill № ${n} approved`,
+    ceoRejected: (n) => `❌ Waybill № ${n} rejected`,
     checkedBy: "Checked by",
+    receivedFromOrder: (n) => `🛒 Marked as received from the order: ${n} item(s)`,
+    openHistory: "📋 Open History",
+    openMistakes: "⚠️ Open Mistakes",
     noCeo: "⚠️ The CEO is not registered yet. They need to open the bot in a private chat and send /start.",
-    ceoFail: "⚠️ Could not deliver the message to the CEO.",
-    ceoRegistered: "✅ You are registered as the CEO. Waybill approvals and rejections will arrive here.",
+    ceoRegistered: "✅ You are registered as the CEO. Waybill notifications will arrive here.\n\nTo set the website password send:\n/password your_password",
     ceoAlready: "You are already registered. Notifications arrive here.",
     ceoTaken: "A CEO is already registered. This bot works in the employees' group.",
     ceoReset: "CEO registration removed. The new CEO should send /start.",
-    help: "Send a waybill photo or number and I will check the prices.",
-    askDistributor: "Send this to the distributor on WhatsApp?",
-    askAccountant: "Send this to the accountant on WhatsApp?",
-    yesWa: "✅ Yes (WhatsApp)",
-    no: "❌ No",
+    help: "• Send a waybill photo or number and I will check the prices.\n• To order, write one product per line, e.g.:\nრუკოლა 2კგ\nჩერი პომიდორი 3 კგ",
+    pwUsage: "Use it like this:\n/password new_password\n(at least 4 characters)",
+    pwSet: "✅ Website password set. Your message was deleted.\nAll devices were logged out — log in with the new password.",
+    pwNotCeo: "Only the CEO can change the password.",
+    orderAdded: "🛒 Added to the order:",
+    orderNotFound: "⚠️ Not found in Products:",
+    orderNotFoundHint: "Add it under Products on the website or check the name.",
+    linkExpired: "This link is no longer valid.",
     laterDistributor: "📤 Send to distributor",
     laterAccountant: "📤 Send to accountant",
     notSent: "⏸ Not sent. Tap the button below to send it later.",
     waOpened: "📲 WhatsApp opened",
-    noDistributorPhone: "⚠️ The distributor's number is not in the base list — you will pick the contact in WhatsApp.",
-    noAccountantPhone: "⚠️ The accountant's number is not in Settings — you will pick the contact in WhatsApp.",
-    linkExpired: "This link is no longer valid.",
   },
 };
 
@@ -130,14 +141,14 @@ function texts(env) {
 
 // ── WhatsApp message texts (plain text — edit the wording here) ──────────────
 
-const WHATSAPP = {
-  // kind "d": to the distributor after a rejection
+export const WHATSAPP = {
+  // kind "d": to the distributor about a rejected waybill
   d: (p) =>
     `გამარჯობა!\n` +
     `ზედნადები № ${p.number}${p.date ? ` (${p.date})` : ""} — მიღებისას აღმოჩნდა პრობლემა:\n` +
     `${p.comment || "—"}\n\n` +
     `გთხოვთ დაგვიკავშირდეთ.`,
-  // kind "a": to the accountant after an approval
+  // kind "a": to the accountant about an approved waybill
   a: (p) =>
     `გამარჯობა!\n` +
     `ზედნადები № ${p.number}${p.date ? ` (${p.date})` : ""} შემოწმებულია და დადასტურებულია.\n` +
@@ -330,6 +341,12 @@ function newToken() {
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+const nowIso = () => new Date().toISOString();
+
+async function ceoChatId(env) {
+  return env.CEO_CHAT_ID || (await env.STORE.get("ceo_chat_id"));
+}
+
 // Look the waybill up, compare prices, post the result with buttons.
 async function processWaybill(env, msg, number, hasPhoto = false) {
   const t = texts(env);
@@ -371,16 +388,74 @@ async function processWaybill(env, msg, number, hasPhoto = false) {
     sourceMessageId: msg.message_id,          // the employee's photo / text
     hasPhoto,                                 // copy the photo to the CEO later
     resultMessageId: sent.result.message_id,  // the bot's message with buttons
-    // details for the WhatsApp messages
+    createdAt: nowIso(),
     seller: waybill.sellerName || "",
+    sellerTin: waybill.sellerTin || "",
     total: money(waybill.fullAmount || rows.reduce((sum, r) => sum + (r.amount || r.price * r.quantity), 0)),
     date: String(waybill.deliveryDate || waybill.beginDate || waybill.createDate || "").slice(0, 10),
     baseIds: [...new Set(rows.map((r) => r.baseId).filter((id) => id != null))],
     distributorPhone: mostCommon(rows.map((r) => r.phone).filter(Boolean)),
+    // compact copy of the lines for the website
+    rows: rows.map((r) => ({
+      n: r.name,
+      c: r.code,
+      q: r.quantity,
+      u: r.unitText || UNITS[r.unitId] || "",
+      p: r.price,
+      b: r.basePrice,
+      s: r.status,
+    })),
   }), { expirationTtl: PENDING_TTL });
 }
 
-// ── CEO notification + WhatsApp follow-up ────────────────────────────────────
+// The record shown on the website (History / Mistakes).
+function logRecord(token, p, extra) {
+  return {
+    token,
+    kind: "waybill",
+    number: p.number,
+    seller: p.seller || "",
+    sellerTin: p.sellerTin || "",
+    total: p.total || "",
+    date: p.date || "",
+    by: p.by || "",
+    comment: p.comment || "",
+    rows: p.rows || [],
+    baseIds: p.baseIds || [],
+    distributorPhone: p.distributorPhone || "",
+    createdAt: p.createdAt || nowIso(),
+    ...extra,
+  };
+}
+
+// Short notice to the CEO's private chat, with a button that opens the website.
+async function notifyCeo(env, rec, kind, extraLines = []) {
+  const t = texts(env);
+  const ceo = await ceoChatId(env);
+  if (!ceo) {
+    await send(env, rec.chatId, t.noCeo);
+    return false;
+  }
+  if (rec.hasPhoto) {
+    await tg(env, "copyMessage", { chat_id: ceo, from_chat_id: rec.chatId, message_id: rec.sourceMessageId });
+  }
+  const heading = kind === "a" ? t.ceoApproved(esc(rec.number)) : t.ceoRejected(esc(rec.number));
+  let text = `<b>${heading}</b>\n`;
+  if (rec.seller) text += `${t.seller}: ${esc(rec.seller)}\n`;
+  if (rec.total) text += `${t.total}: ${esc(rec.total)} ₾\n`;
+  text += `${t.checkedBy}: ${esc(rec.by)}\n`;
+  if (kind === "d") text += `${t.reason}: ${esc(rec.comment || "—")}\n`;
+  for (const line of extraLines.filter(Boolean)) text += `${line}\n`;
+
+  const url = /^https:\/\//.test(ORIGIN) ? `${ORIGIN}/#${kind === "a" ? "history" : "mistakes"}` : "";
+  const extra = url
+    ? { reply_markup: { inline_keyboard: [[{ text: kind === "a" ? t.openHistory : t.openMistakes, url }]] } }
+    : {};
+  const sent = await send(env, ceo, text.trim(), extra);
+  return !!sent.ok;
+}
+
+// ── WhatsApp links (/wa/<token>/<a|d>) ───────────────────────────────────────
 
 const waLink = (token, kind) => `${ORIGIN}/wa/${token}/${kind}`;
 
@@ -388,60 +463,18 @@ function laterButton(t, token, kind) {
   return { text: kind === "d" ? t.laterDistributor : t.laterAccountant, url: waLink(token, kind) };
 }
 
-// Send the outcome to the CEO's private chat, with the WhatsApp Yes / No question.
-// kind: "a" (approved → accountant) or "d" (rejected → distributor).
-// Records the CEO message on `pending`; the caller saves `pending` afterwards.
-async function notifyCeo(env, pending, token, kind, heading, byName, comment) {
-  const t = texts(env);
-  const ceoChatId = env.CEO_CHAT_ID || (await env.STORE.get("ceo_chat_id"));
-  if (!ceoChatId) {
-    await send(env, pending.chatId, t.noCeo);
-    return false;
+// Phone number of the distributor: taken from the products on this waybill.
+export async function distributorNumber(env, rec) {
+  const ids = new Set(rec.baseIds || []);
+  let phone = "";
+  if (ids.size) {
+    const prices = await loadBasePrices(env);
+    phone = mostCommon(prices.filter((p) => ids.has(p.id) && p.phone).map((p) => p.phone));
   }
-
-  // The employee's original photo first, so the question with buttons ends up last.
-  if (pending.hasPhoto) {
-    await tg(env, "copyMessage", {
-      chat_id: ceoChatId,
-      from_chat_id: pending.chatId,
-      message_id: pending.sourceMessageId,
-    });
-  }
-
-  let text = `<b>${heading}</b>\n${t.checkedBy}: ${esc(byName)}\n`;
-  if (comment) text += `${t.reason}: ${esc(comment)}\n`;
-  text += `\n${pending.summary}`;
-
-  let question = kind === "d" ? t.askDistributor : t.askAccountant;
-  if (kind === "a" && !toWhatsAppNumber((await loadSettings(env)).accountantPhone)) {
-    question += `\n${t.noAccountantPhone}`;
-  }
-  if (kind === "d" && !(await distributorNumber(env, pending))) {
-    question += `\n${t.noDistributorPhone}`;
-  }
-
-  const extra = ORIGIN
-    ? {
-        reply_markup: {
-          inline_keyboard: [[
-            { text: t.yesWa, url: waLink(token, kind) },
-            { text: t.no, callback_data: `${kind}n:${token}` },
-          ]],
-        },
-      }
-    : {};
-  const sent = await send(env, ceoChatId, ORIGIN ? `${text}\n\n<b>${question}</b>` : text, extra);
-  if (!sent.ok) {
-    await send(env, pending.chatId, `${t.ceoFail} (${esc(sent.description || "")})`);
-    return false;
-  }
-  pending.ceoChatId = String(ceoChatId);
-  pending.ceoMessageId = sent.result.message_id;
-  pending.ceoText = text;
-  return true;
+  return toWhatsAppNumber(phone || rec.distributorPhone);
 }
 
-// Replace the question under the CEO's message with a status line + "send later" button.
+// Messages sent before this update had their WhatsApp buttons in Telegram.
 async function updateCeoMessage(env, pending, token, kind, statusLine) {
   const t = texts(env);
   if (!pending.ceoMessageId) return;
@@ -455,27 +488,20 @@ async function updateCeoMessage(env, pending, token, kind, statusLine) {
   });
 }
 
-// Phone number of the distributor: taken from the base list products on this waybill.
-async function distributorNumber(env, pending) {
-  const ids = new Set(pending.baseIds || []);
-  let phone = "";
-  if (ids.size) {
-    const prices = await loadBasePrices(env);
-    phone = mostCommon(prices.filter((p) => ids.has(p.id) && p.phone).map((p) => p.phone));
-  }
-  return toWhatsAppNumber(phone || pending.distributorPhone);
-}
-
-// GET /wa/<token>/<a|d> — the CEO tapped "Yes" or "send later": open WhatsApp
-// with the message already written, and note it under the CEO's message.
+// Opens WhatsApp with the message already written (accountant "a" / distributor "d")
+// and records that it was sent. Used by the website buttons (and old Telegram buttons).
 export async function handleWhatsAppLink(env, ctx, token, kind) {
   const t = texts(env);
-  const raw = /^[0-9a-f]{8,64}$/.test(token) && (kind === "a" || kind === "d")
-    ? await env.STORE.get(`pending:${token}`)
-    : null;
-  const pending = raw ? JSON.parse(raw) : null;
-  const wanted = kind === "d" ? "rejected" : "approved";
-  if (!pending || pending.status !== wanted) {
+  const valid = /^[0-9a-f]{8,64}$/.test(token) && (kind === "a" || kind === "d");
+  let rec = valid ? await getLogRecord(env, token) : null;
+  let pending = null;
+  if (valid && !rec) {
+    const raw = await env.STORE.get(`pending:${token}`);
+    pending = raw ? JSON.parse(raw) : null;
+    rec = pending;
+  }
+  const allowed = kind === "d" ? ["rejected", "resolved"] : ["approved"];
+  if (!rec || !allowed.includes(rec.status)) {
     return new Response(
       `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
       `<p style="font:16px sans-serif;padding:24px">${esc(t.linkExpired)}</p>`,
@@ -484,26 +510,27 @@ export async function handleWhatsAppLink(env, ctx, token, kind) {
   }
 
   const number = kind === "d"
-    ? await distributorNumber(env, pending)
+    ? await distributorNumber(env, rec)
     : toWhatsAppNumber((await loadSettings(env)).accountantPhone);
-  const message = WHATSAPP[kind](pending);
-  const target = `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+  const target = `https://wa.me/${number}?text=${encodeURIComponent(WHATSAPP[kind](rec))}`;
 
-  const decisionKey = kind === "d" ? "distributorDecision" : "accountantDecision";
-  if (pending[decisionKey] !== "yes") {
-    pending[decisionKey] = "yes";
-    ctx.waitUntil((async () => {
-      await env.STORE.put(`pending:${token}`, JSON.stringify(pending), { expirationTtl: LINK_TTL });
-      await updateCeoMessage(env, pending, token, kind, t.waOpened);
-    })().catch((err) => console.error("whatsapp link update failed:", err?.stack || err)));
-  }
-  return new Response(null, {
-    status: 302,
-    headers: { Location: target, "Cache-Control": "no-store" },
-  });
+  ctx.waitUntil((async () => {
+    const field = kind === "d" ? "distributorSentAt" : "accountantSentAt";
+    const updated = await patchLog(env, token, (r) => ({ ...r, [field]: nowIso() }));
+    if (pending && !updated) {
+      const decisionKey = kind === "d" ? "distributorDecision" : "accountantDecision";
+      if (pending[decisionKey] !== "yes") {
+        pending[decisionKey] = "yes";
+        await env.STORE.put(`pending:${token}`, JSON.stringify(pending), { expirationTtl: LINK_TTL });
+        await updateCeoMessage(env, pending, token, kind, t.waOpened);
+      }
+    }
+  })().catch((err) => console.error("whatsapp link update failed:", err?.stack || err)));
+
+  return new Response(null, { status: 302, headers: { Location: target, "Cache-Control": "no-store" } });
 }
 
-// The CEO tapped "No" under the WhatsApp question.
+// "No" under an old Telegram WhatsApp question.
 async function handleCeoNo(env, cq, kind, token) {
   const t = texts(env);
   const key = `pending:${token}`;
@@ -522,6 +549,8 @@ async function handleCeoNo(env, cq, kind, token) {
   await updateCeoMessage(env, pending, token, kind, t.notSent);
 }
 
+// ── Approve / Reject buttons ─────────────────────────────────────────────────
+
 async function handleCallback(env, cq) {
   const t = texts(env);
   const [action, token] = String(cq.data || "").split(":");
@@ -529,7 +558,6 @@ async function handleCallback(env, cq) {
 
   const key = `pending:${token}`;
   const raw = token ? await env.STORE.get(key) : null;
-
   if (!raw) {
     await tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: t.expired, show_alert: true });
     return;
@@ -553,9 +581,25 @@ async function handleCallback(env, cq) {
       parse_mode: "HTML",
       disable_web_page_preview: true,
     });
-    if (await notifyCeo(env, pending, token, "a", t.ceoApproved, name, "")) {
-      await env.STORE.put(key, JSON.stringify(pending), { expirationTtl: LINK_TTL });
+
+    // Ordered products on this waybill have arrived → take them off the order.
+    const received = await receiveOrderItems(env, pending.baseIds);
+    let receivedItems = [];
+    if (received.length) {
+      const byId = new Map((await loadBasePrices(env)).map((p) => [p.id, p]));
+      receivedItems = received.map((it) => ({
+        name: byId.get(it.productId)?.name || `#${it.productId}`,
+        qty: it.qty,
+        unit: it.unit,
+      }));
     }
+    await upsertLog(env, logRecord(token, pending, { status: "approved", decidedAt: nowIso(), receivedItems }));
+
+    const bad = (pending.rows || []).filter((r) => r.s === "high" || r.s === "low").length;
+    await notifyCeo(env, pending, "a", [
+      bad ? t.hasIssues(bad) : "",
+      receivedItems.length ? t.receivedFromOrder(receivedItems.length) : "",
+    ]);
     return;
   }
 
@@ -572,6 +616,8 @@ async function handleCallback(env, cq) {
       parse_mode: "HTML",
       disable_web_page_preview: true,
     });
+    // Shows up in Mistakes right away; the reason is filled in when it arrives.
+    await upsertLog(env, logRecord(token, pending, { status: "rejected", decidedAt: nowIso() }));
     await send(env, pending.chatId, esc(t.askReason(name).replace("%N%", pending.number)), {
       reply_to_message_id: pending.resultMessageId,
       allow_sending_without_reply: true,
@@ -609,9 +655,10 @@ async function tryConsumeComment(env, msg) {
     parse_mode: "HTML",
     disable_web_page_preview: true,
   });
-  const delivered = await notifyCeo(env, pending, token, "d", t.ceoRejected, pending.by, comment);
-  if (delivered) {
-    await env.STORE.put(key, JSON.stringify(pending), { expirationTtl: LINK_TTL });
+  const updated = await patchLog(env, token, (r) => ({ ...r, comment }));
+  if (!updated) await upsertLog(env, logRecord(token, pending, { status: "rejected", decidedAt: nowIso() }));
+
+  if (await notifyCeo(env, pending, "d")) {
     await send(env, msg.chat.id, t.reasonSaved, {
       reply_to_message_id: msg.message_id,
       allow_sending_without_reply: true,
@@ -620,23 +667,68 @@ async function tryConsumeComment(env, msg) {
   return true;
 }
 
+// ── Shopping lists ───────────────────────────────────────────────────────────
+
+async function handleOrderMessage(env, msg, lines) {
+  const t = texts(env);
+  const products = await loadBasePrices(env);
+  const found = [];
+  const missing = [];
+  for (const line of lines) {
+    const p = matchProduct(products, line.name);
+    if (p) found.push({ p, line });
+    else missing.push(line);
+  }
+  if (!found.length) return; // ordinary chat, not a shopping list
+
+  const by = displayName(msg.from);
+  await applyOrderOps(env, found.map(({ p, line }) => ({
+    op: "set", productId: p.id, qty: line.qty, unit: line.unit, by, source: "telegram",
+  })), products);
+
+  const fmt = (name, l) => `• ${esc(name)} — ${qty(l.qty)}${l.unit ? " " + esc(l.unit) : ""}`;
+  let text = `${t.orderAdded}\n${found.map(({ p, line }) => fmt(p.name, line)).join("\n")}`;
+  if (missing.length) {
+    text += `\n\n${t.orderNotFound}\n${missing.map((l) => fmt(l.name, l)).join("\n")}\n${t.orderNotFoundHint}`;
+  }
+  await send(env, msg.chat.id, text, { reply_to_message_id: msg.message_id, allow_sending_without_reply: true });
+}
+
+// ── Commands ─────────────────────────────────────────────────────────────────
+
 async function handlePrivateCommand(env, msg, command) {
   const t = texts(env);
   const chatId = String(msg.chat.id);
-  const current = await env.STORE.get("ceo_chat_id");
+  const current = await ceoChatId(env);
 
   if (command === "/start") {
     if (!current) {
       await env.STORE.put("ceo_chat_id", chatId);
       await send(env, chatId, t.ceoRegistered);
     } else {
-      await send(env, chatId, current === chatId ? t.ceoAlready : t.ceoTaken);
+      await send(env, chatId, String(current) === chatId ? t.ceoAlready : t.ceoTaken);
     }
     return true;
   }
-  if (command === "/resetceo" && current === chatId) {
+  if (command === "/resetceo" && String(current) === chatId && !env.CEO_CHAT_ID) {
     await env.STORE.delete("ceo_chat_id");
     await send(env, chatId, t.ceoReset);
+    return true;
+  }
+  if (command === "/password") {
+    const password = String(msg.text || "").replace(/^\/password(@\S+)?/i, "").trim();
+    // Never leave a password visible in the chat, whatever happens next.
+    if (password) await tg(env, "deleteMessage", { chat_id: chatId, message_id: msg.message_id });
+    if (String(current) !== chatId) {
+      await send(env, chatId, t.pwNotCeo);
+      return true;
+    }
+    if (password.length < 4 || password.length > 64) {
+      await send(env, chatId, t.pwUsage);
+      return true;
+    }
+    await setPassword(env, password);
+    await send(env, chatId, t.pwSet);
     return true;
   }
   return false;
@@ -654,7 +746,13 @@ async function handleMessage(env, msg) {
     return;
   }
   if (command === "/help" || (command === "/start" && !isPrivate)) {
-    await send(env, msg.chat.id, t.help);
+    await send(env, msg.chat.id, esc(t.help));
+    return;
+  }
+  if (command === "/password" && !isPrivate) {
+    // someone typed a password in the group: remove it straight away
+    await tg(env, "deleteMessage", { chat_id: msg.chat.id, message_id: msg.message_id });
+    await send(env, msg.chat.id, t.pwNotCeo);
     return;
   }
 
@@ -689,7 +787,12 @@ async function handleMessage(env, msg) {
   // A message that is just a waybill number, e.g. "ელ-0988938607" or "0988938607".
   if (/^(?:ელ|el)?[\s\-–.№#]*\d{8,12}(?:\/\d+)?$/i.test(text)) {
     await processWaybill(env, msg, normalizeWaybillNumber(text));
+    return;
   }
+
+  // A shopping list: one product per line with an amount.
+  const lines = parseOrderMessage(text);
+  if (lines) await handleOrderMessage(env, msg, lines);
 }
 
 export async function handleUpdate(env, update, origin) {
