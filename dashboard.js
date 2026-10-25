@@ -12,7 +12,7 @@ import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, load
 import { loadLog } from "./store.js";
 
 const DATA_KEYS = ["fixed", "variable", "ratings", "tasks"];
-const LINKS_KEY = "dash:bank:links"; // { byTin: { tin: supplierId | "ignore" }, byTx: { txId: supplierId | "ignore" } }
+const LINKS_KEY = "dash:bank:links"; // { byTin, byIban, byTx: { key: supplierId | "ignore" } } — the CEO's remembered decisions
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" };
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: JSON_HEADERS });
 
@@ -304,7 +304,7 @@ const isTreasury = tx => tx.bankCode.toUpperCase() === "TRESGE22" || /^GE\d{2}NB
 
 async function loadLinks(env) {
   const l = (await env.STORE.get(LINKS_KEY, "json")) || {};
-  return { byTin: l.byTin || {}, byTx: l.byTx || {} };
+  return { byTin: l.byTin || {}, byIban: l.byIban || {}, byTx: l.byTx || {} };
 }
 
 // body: { txId, tin, supplierId | "ignore" | null, scope: "tin" | "tx" }
@@ -312,7 +312,11 @@ async function saveReview(env, body) {
   const links = await loadLinks(env);
   const target = body.supplierId === null ? null : String(body.supplierId || "").toLowerCase();
   if (body.supplierId !== null && !target) return { error: "supplierId required" };
-  if (body.scope === "tin") {
+  if (body.scope === "iban") {
+    const iban = String(body.iban || "").trim().toUpperCase();
+    if (!iban) return { error: "iban required" };
+    if (target === null) delete links.byIban[iban]; else links.byIban[iban] = target;
+  } else if (body.scope === "tin") {
     const tin = String(body.tin || "").trim();
     if (!tin) return { error: "tin required" };
     if (target === null) delete links.byTin[tin]; else links.byTin[tin] = target;
@@ -344,7 +348,7 @@ async function buildDebts(env, syrve) {
   let ignored = 0, matched = 0;
   for (const tx of payments) {
     let supplierId = null, reason = "", suggestion = null, how = "";
-    const forced = links.byTx[tx.id] ?? (tx.tin ? links.byTin[tx.tin] : undefined);
+    const forced = links.byTx[tx.id] ?? (tx.tin ? links.byTin[tx.tin] : undefined) ?? (tx.iban ? links.byIban[tx.iban.toUpperCase()] : undefined);
     if (forced === "ignore") { ignored++; continue; }
     if (forced && sup[forced]) { supplierId = forced; how = "confirmed"; }
     else if (tx.own || isTreasury(tx) || (!tx.tin && !tx.iban)) { ignored++; continue; } // own transfers, taxes, fees
@@ -386,7 +390,10 @@ async function buildDebts(env, syrve) {
     suppliers: list,
     review: { count: review.length, amount: Math.round(review.reduce((a, x) => a + x.amount, 0) * 100) / 100, items: review.slice(0, 150) },
     options: syrve.suppliers.map(s => ({ id: s.id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name)),
-    linkedTins: Object.entries(links.byTin).map(([tin, to]) => ({ tin, to, name: to === "ignore" ? "" : (sup[to]?.name || to) })),
+    linkedTins: [
+      ...Object.entries(links.byTin).map(([tin, to]) => ({ kind: "tin", key: tin, tin, to, name: to === "ignore" ? "" : (sup[to]?.name || to) })),
+      ...Object.entries(links.byIban).map(([iban, to]) => ({ kind: "iban", key: iban, tin: iban, to, name: to === "ignore" ? "" : (sup[to]?.name || to) })),
+    ],
     bank: { configured, settings, lastSyncAt: state.lastSyncAt, errors: state.errors, cursors: state.cursors, payments: payments.length, matched, ignored },
   };
 }

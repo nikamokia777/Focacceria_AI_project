@@ -311,3 +311,5 @@ details.bank-settings > summary::-webkit-details-marker { display: none; }
 details.bank-settings:not([open]) > summary { border-bottom: 0; }
 details.bank-settings textarea { width: 100%; resize: vertical; font-family: inherit; }
 .linked { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.remember { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; align-items: center; max-width: 300px; margin-left: auto; white-space: normal; }
+.remember .q { width: 100%; text-align: right; font-size: 13px; font-weight: 600; }
