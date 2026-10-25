@@ -68,7 +68,7 @@ export async function saveBankSettings(env, input) {
 
 export async function loadBankState(env) {
   const s = (await env.STORE.get(STATE_KEY, "json")) || {};
-  return { cursors: s.cursors || {}, lastSyncAt: s.lastSyncAt || null, errors: s.errors || {} };
+  return { cursors: s.cursors || {}, lastSyncAt: s.lastSyncAt || null, errors: s.errors || {}, notes: s.notes || {} };
 }
 
 export const recipientKey = tx =>
@@ -157,6 +157,67 @@ async function clientToken(url, id, secret, extraBody = "") {
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.access_token) throw new Error(`login failed (${res.status}) ${body.error_description || body.error || ""}`.trim());
   return body.access_token;
+}
+
+// ── TBC login, with self-diagnosis ───────────────────────────────────────────
+// The request format is the one TBC's own SDK uses. When TBC still says no, we try the
+// safe variants a person would try by hand and remember the one that works:
+//   1. keys as given   2. Client ID and Secret swapped   3. keys also sent in the body + apikey header
+// If none works on the real server, we check TBC's test server only to explain the problem
+// (test keys from developers.tbcbank.ge never work on real accounts). No data is read from the test server.
+
+const TBC_LOGIN_KEY = "dash:bank:tbc-login";
+const TBC_TEST_URL = "https://test-api.tbcbank.ge";
+
+async function tryToken(url, id, secret, { extraBody = "", apikey = false } = {}) {
+  const headers = { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic " + btoa(`${id}:${secret}`) };
+  let body = "grant_type=client_credentials" + extraBody;
+  if (apikey) { headers.apikey = id; body += `&client_id=${encodeURIComponent(id)}&client_secret=${encodeURIComponent(secret)}`; }
+  try {
+    const res = await fetch(url, { method: "POST", headers, body });
+    const text = await res.text();
+    let j = {}; try { j = JSON.parse(text); } catch (_) {}
+    if (res.ok && j.access_token) return { ok: true, token: j.access_token };
+    const msg = j.error_description || j.message || j.error || j.title || text.slice(0, 120);
+    return { ok: false, status: res.status, msg: String(msg || "").trim() };
+  } catch (e) {
+    return { ok: false, status: 0, msg: String(e.message || e) };
+  }
+}
+
+async function tbcLogin(env, budget) {
+  const id = String(env.TBC_CLIENT_ID || "").trim(), secret = String(env.TBC_CLIENT_SECRET || "").trim();
+  const base = (env.TBC_API_URL || TBC_API_URL).replace(/\/+$/, "");
+  const variants = [
+    { name: "normal", id, secret },
+    { name: "swapped", id: secret, secret: id },
+    { name: "apikey", id, secret, apikey: true },
+  ];
+  const remembered = await env.STORE.get(TBC_LOGIN_KEY);
+  if (remembered) variants.sort((a, b) => (b.name === remembered) - (a.name === remembered));
+
+  let first = null;
+  for (const v of variants) {
+    budget.used++;
+    const r = await tryToken(base + "/oauth/token", v.id, v.secret, { extraBody: "&scope=bab_accounts", apikey: v.apikey });
+    if (r.ok) {
+      if (remembered !== v.name) await env.STORE.put(TBC_LOGIN_KEY, v.name);
+      return { token: r.token, note: v.name === "swapped" ? "tbc_swapped" : "" };
+    }
+    first = first || r;
+    if (r.status === 0 || r.status >= 500) break; // TBC unreachable / down — no point trying variants
+  }
+  if (first && (first.status === 0 || first.status >= 500)) throw new Error(`tbc_down|${first.status}|${first.msg}`);
+
+  // explain: are these TBC *test* keys?
+  for (const v of variants.slice(0, 2)) {
+    budget.used++;
+    const r = await tryToken(TBC_TEST_URL + "/oauth/token", v.id, v.secret, { extraBody: "&scope=bab_accounts" });
+    if (r.ok) throw new Error("tbc_test_keys||");
+  }
+  const m = (first?.msg || "").toLowerCase();
+  if (m.includes("clientid") || m.includes("client id") || m.includes("invalid client")) throw new Error(`tbc_unknown_id|${first.status}|${first.msg}`);
+  throw new Error(`tbc_bad_keys|${first?.status || ""}|${first?.msg || ""}`);
 }
 
 // ── Bank of Georgia ──────────────────────────────────────────────────────────
@@ -269,6 +330,7 @@ export async function syncStep(env) {
   const tokens = {};
   const collected = [];
   state.errors = {};
+  state.notes = {};
 
   for (const src of sources) {
     let cursor = state.cursors[src.key] || settings.historyFrom;
@@ -278,9 +340,11 @@ export async function syncStep(env) {
         const to = addDays(cursor, CHUNK_DAYS - 1) < end ? addDays(cursor, CHUNK_DAYS - 1) : end;
         let recs;
         if (src.key === "tbc") {
-          tokens.tbc = tokens.tbc || await clientToken((env.TBC_API_URL || TBC_API_URL).replace(/\/+$/, "") + "/oauth/token",
-            env.TBC_CLIENT_ID, env.TBC_CLIENT_SECRET, "&scope=bab_accounts");
-          budget.used++;
+          if (!tokens.tbc) {
+            const login = await tbcLogin(env, budget);
+            tokens.tbc = login.token;
+            if (login.note) state.notes = { ...(state.notes || {}), tbc: login.note };
+          }
           recs = await tbcChunk(env, tokens.tbc, cursor, to, budget);
         } else {
           tokens.bog = tokens.bog || await clientToken(env.BOG_TOKEN_URL || BOG_TOKEN_URL, env.BOG_CLIENT_ID, env.BOG_CLIENT_SECRET);

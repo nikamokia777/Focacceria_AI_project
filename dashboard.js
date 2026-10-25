@@ -438,7 +438,7 @@ async function buildDebts(env, syrve) {
       ...Object.entries(links.byTin).map(([tin, to]) => ({ kind: "tin", key: tin, tin, to, name: to === "ignore" ? "" : (sup[to]?.name || to) })),
       ...Object.entries(links.byIban).map(([iban, to]) => ({ kind: "iban", key: iban, tin: iban, to, name: to === "ignore" ? "" : (sup[to]?.name || to) })),
     ],
-    bank: { configured, settings, lastSyncAt: state.lastSyncAt, errors: state.errors, cursors: state.cursors, payments, matched, ignored },
+    bank: { configured, settings, lastSyncAt: state.lastSyncAt, errors: state.errors, notes: state.notes, cursors: state.cursors, payments, matched, ignored },
   };
 }
 

@@ -82,7 +82,12 @@ const T = {
     bank_secrets_hint: "Cloudflare-ში დაამატეთ Secret-ები: BOG_CLIENT_ID, BOG_CLIENT_SECRET და/ან TBC_CLIENT_ID, TBC_CLIENT_SECRET.",
     need_start: "ქვემოთ, ბანკის პარამეტრებში მიუთითეთ თარიღი, საიდანაც იწყება Syrve-ის ისტორია, და BOG-ის ანგარიშები.",
     history_note: "Syrve-ში გადახდები არ ფიქსირდება, ამიტომ თარიღი უნდა იყოს Syrve-ის ზედნადებების დაწყების თარიღი. გადასახადები, საკუთარ ანგარიშებს შორის გადარიცხვები და საკომისიოები ავტომატურად გამოტოვებულია.",
-    loading_history: "იტვირთება ბანკის ისტორია…", linked: "დამახსოვრებული გადაწყვეტილებები",
+    loading_history: "იტვირთება ბანკის ისტორია…",
+    err_tbc_test_keys: "ეს TBC-ის სატესტო გასაღებებია (developers.tbcbank.ge-დან) — რეალურ ანგარიშებზე არ მუშაობს. საჭიროა გასაღებები TBC ბიზნეს ინტერნეტბანკიდან: API ინტეგრაცია → ახალი ინტეგრაცია → უფლება „ტრანზაქციების ისტორიის და ამონაწერების ნახვა“. Client ID → TBC_CLIENT_ID, Client Secret → TBC_CLIENT_SECRET.",
+    err_tbc_unknown_id: "TBC ამ Client ID-ს არ იცნობს (არც სვაპით). შექმენით ახალი ინტეგრაცია TBC ბიზნეს ინტერნეტბანკში (API ინტეგრაცია, SMS დადასტურებით) და ჩასვით ახალი Client ID და Secret Cloudflare-ში.",
+    err_tbc_bad_keys: "TBC გასაღებებს არ იღებს. შეამოწმეთ, რომ ინტეგრაცია აქტიურია და SMS-ით დადასტურებულია, დაკავშირებული მომხმარებელი აქტიურია და აქვს „ისტორიის ნახვის“ უფლება.",
+    err_tbc_down: "TBC-ის სერვერი ახლა არ პასუხობს — მოგვიანებით თავად სცდის.",
+    note_tbc_swapped: "Client ID და Secret Cloudflare-ში ადგილებშია არეული — აპი ავტომატურად ასწორებს, მაგრამ სასურველია გაასწოროთ.", linked: "დამახსოვრებული გადაწყვეტილებები",
   },
   en: {
     dashboard: "Dashboard", home: "← Home", password: "Password", login: "Log in", logout: "Log out",
@@ -146,7 +151,12 @@ const T = {
     bank_secrets_hint: "Add these Secrets in Cloudflare: BOG_CLIENT_ID, BOG_CLIENT_SECRET and/or TBC_CLIENT_ID, TBC_CLIENT_SECRET.",
     need_start: "In Bank settings below, set the date your Syrve history starts and your BOG accounts.",
     history_note: "Payments aren't recorded in Syrve, so the date should be when Syrve invoices start. Taxes, transfers between your own accounts and bank fees are skipped automatically.",
-    loading_history: "Loading bank history…", linked: "Remembered decisions",
+    loading_history: "Loading bank history…",
+    err_tbc_test_keys: "These are TBC test keys (from developers.tbcbank.ge) — they never work on real accounts. You need keys from TBC Business Internet Banking: API Integration → new integration → permission “View transaction history and statements”. Client ID → TBC_CLIENT_ID, Client Secret → TBC_CLIENT_SECRET.",
+    err_tbc_unknown_id: "TBC doesn't recognise this Client ID (also tried swapped). Create a new integration in TBC Business Internet Banking (API Integration, confirmed by SMS) and paste the new Client ID and Secret in Cloudflare.",
+    err_tbc_bad_keys: "TBC rejects these keys. Check that the integration is active and confirmed by SMS, and that the linked user is active and has the “view history” permission.",
+    err_tbc_down: "TBC's server isn't answering right now — the app will try again by itself.",
+    note_tbc_swapped: "The Client ID and Secret are swapped in Cloudflare — the app fixes this automatically, but it's better to swap them back.", linked: "Remembered decisions",
   },
 };
 
@@ -797,7 +807,14 @@ async function renderDebts(view, demo, fresh = false) {
   let notices = "";
   if (!connected) notices += `<div class="notice">🏦 <b>${esc(t("bank_not_connected"))}.</b> ${esc(t("bank_secrets_hint"))}</div>`;
   else if (!bank.settings.historyFrom) notices += `<div class="notice">🏦 ${esc(t("need_start"))}</div>`;
-  for (const [src, msg] of Object.entries(bank.errors || {})) notices += `<div class="notice bad">${esc(src.toUpperCase())}: ${esc(msg)}</div>`;
+  for (const [src, msg] of Object.entries(bank.errors || {})) {
+    const [code, status, detail] = String(msg).split("|");
+    const known = ["tbc_test_keys", "tbc_unknown_id", "tbc_bad_keys", "tbc_down"].includes(code);
+    notices += known
+      ? `<div class="notice bad"><b>TBC:</b> ${esc(t("err_" + code))}${detail ? `<div class="muted small">TBC: ${esc(status)} ${esc(detail)}</div>` : ""}</div>`
+      : `<div class="notice bad">${esc(src.toUpperCase())}: ${esc(msg)}</div>`;
+  }
+  if ((bank.notes || {}).tbc === "tbc_swapped") notices += `<div class="notice">TBC: ${esc(t("note_tbc_swapped"))}</div>`;
   notices += `<div id="bankProgress"></div>`;
 
   const supplierSelect = (sel, attrs) => `<select ${attrs}><option value="">${esc(t("choose_supplier"))}</option>${(r.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === sel ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select>`;
