@@ -8,6 +8,7 @@
 // ====================== settings ======================
 const API = "/api/dash";
 const DEMO = new URLSearchParams(location.search).get("demo") === "1";
+const PAGE = document.body.dataset.page === "main" ? "main" : "dashboard"; // "/" shows the Main overview
 const SUBITEMS_ENABLED = false;          // turn on later to show sub-items inside a fixed cost category
 const LIVE_REFRESH_MS = 2 * 60 * 1000;   // live income auto-refresh
 const CURRENCY = "₾";
@@ -63,6 +64,10 @@ const T = {
     open_tasks: "ღია დავალებები", done: "შესრულებული", no_tasks: "დავალებები ჯერ არ არის",
     syrve_error: "Syrve-დან მონაცემები ვერ მივიღე", loading: "იტვირთება…",
     demo: "დემო რეჟიმი — ნიმუშის მონაცემები, არაფერი ინახება.",
+    main: "მთავარი", app_name: "Focacceria", open: "გახსნა", profit_month: "მოგება ამ თვეში",
+    expenses: "ხარჯები", left_to_pay_all: "სულ გადასასახდელი", debts_short: "ვალები", fixed_short: "ფიქს.",
+    variable_short: "ცვლ.", avg_rating: "რეიტინგი", average: "საშუალო", vs_last_month: "წინა თვესთან",
+    load_failed: "ვერ ჩაიტვირთა", unpaid_total: "გადაუხდელი", today: "დღეს",
   },
   en: {
     dashboard: "Dashboard", home: "← Home", password: "Password", login: "Log in", logout: "Log out",
@@ -108,6 +113,10 @@ const T = {
     open_tasks: "Open tasks", done: "Done", no_tasks: "No tasks yet",
     syrve_error: "Couldn't get data from Syrve", loading: "Loading…",
     demo: "Demo mode — sample data, nothing is saved.",
+    main: "Main", app_name: "Focacceria", open: "Open", profit_month: "Profit this month",
+    expenses: "expenses", left_to_pay_all: "Left to pay", debts_short: "debts", fixed_short: "fixed",
+    variable_short: "variable", avg_rating: "Rating", average: "average", vs_last_month: "vs last month",
+    load_failed: "Couldn't load", unpaid_total: "Unpaid", today: "Today",
   },
 };
 
@@ -310,7 +319,8 @@ function applyStatic() {
   document.documentElement.lang = S.lang;
   $$("[data-t]").forEach(el => (el.textContent = t(el.dataset.t)));
   $("#langBtn").textContent = S.lang === "ka" ? "EN" : "ქარ";
-  document.title = t("dashboard");
+  document.title = PAGE === "main" ? t("app_name") : t("dashboard");
+  if (!$("#tabs")) return;
   $("#tabs").innerHTML = TABS.map(k =>
     `<button class="tab" role="tab" data-tab="${k}" aria-selected="${k === S.tab}">${esc(t("tab_" + k))}</button>`).join("");
   $$("#tabs .tab").forEach(b => b.addEventListener("click", () => { location.hash = b.dataset.tab; }));
@@ -324,7 +334,7 @@ async function logout() {
 }
 
 function route() {
-  const tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TABS[0];
+  const tab = PAGE === "main" ? "main" : TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : TABS[0];
   S.tab = tab;
   clearInterval(S.liveTimer);
   applyStatic();
@@ -333,7 +343,7 @@ function route() {
 
 async function render() {
   const view = $("#view");
-  const renderers = { fixed: renderFixed, variable: renderVariable, live: renderLive, monthly: renderMonthly,
+  const renderers = { main: renderMain, fixed: renderFixed, variable: renderVariable, live: renderLive, monthly: renderMonthly,
     debts: renderDebts, ratings: renderRatings, employees: renderEmployees, tasks: renderTasks };
   const demo = DEMO ? `<div class="notice">${esc(t("demo"))}</div>` : "";
   try {
@@ -350,6 +360,149 @@ function card(label, value, hint = "", cls = "") {
   return `<div class="card ${cls}"><div class="label">${esc(label)}</div><div class="value num ${cls.includes("good") ? "good" : cls.includes("bad") ? "bad" : ""}">${value}</div>${hint ? `<div class="hint">${hint}</div>` : ""}</div>`;
 }
 function confirmDel() { return confirm(t("confirm_delete")); }
+
+// "who works today" list — used by the Employees tab and by Main
+function whoWorksToday(tdata) {
+  const today = tdata.today || todayISO();
+  const now = new Date();
+  const nowHM = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const todayShifts = tdata.shifts.filter(s => (s.from || "").slice(0, 10) === today).sort((a, b) => (a.from || "").localeCompare(b.from || ""));
+  const att = tdata.attendance.filter(a => (a.from || "").slice(0, 10) === today);
+  const statusOf = s => {
+    const a = att.filter(x => x.employeeId === s.employeeId);
+    if (!a.length) return `<span class="pill neutral">○ ${esc(t("not_arrived"))}</span>`;
+    const open = a.find(x => !x.to || hhmm(x.to) > nowHM || (x.to || "").slice(0, 10) > today);
+    return open
+      ? `<span class="pill good">● ${esc(t("on_shift"))} · ${esc(hhmm(open.from))}</span>`
+      : `<span class="pill neutral">✓ ${esc(t("finished"))} · ${esc(hhmm(a[a.length - 1].to))}</span>`;
+  };
+  const initials = name => String(name).split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase() || "?";
+  const html = todayShifts.length ? `<div class="today-list">${todayShifts.map(s => `
+    <div class="person"><div class="who"><span class="avatar">${esc(initials(s.name))}</span>
+      <div><div><b>${esc(s.name)}</b></div><div class="muted small">${esc(t("shift"))} ${esc(hhmm(s.from))}–${esc(hhmm(s.to))}${s.department ? " · " + esc(s.department) : ""}</div></div></div>
+      ${statusOf(s)}</div>`).join("")}</div>`
+    : `<div class="empty">${esc(t("nobody_today"))}</div>`;
+  return { html, count: todayShifts.length };
+}
+
+// totals shared by the cost tabs and Main
+function fixedTotals(fx, ym = ymNow()) {
+  const total = fx.categories.reduce((a, c) => a + n(c.amount), 0);
+  const unpaid = fx.categories.filter(c => !(c.paid && c.paid[ym])).reduce((a, c) => a + n(c.amount), 0);
+  return { total, unpaid, paid: total - unpaid };
+}
+function variableTotals(vr, ym = ymNow()) {
+  const month = vr.entries.filter(e => (e.date || "").startsWith(ym)).reduce((a, e) => a + n(e.amount), 0);
+  const unpaid = vr.entries.filter(e => !e.paid).reduce((a, e) => a + n(e.amount), 0); // unpaid from any month
+  return { month, unpaid };
+}
+
+// ====================== MAIN (overview at "/") ======================
+async function renderMain(view, demo, fresh = false) {
+  if (!view.dataset.loaded) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
+  const ym = ymNow();
+  // each source loads on its own, so one failing box doesn't break the page
+  const [fx, vr, rt, tk, live, monthly, debts, emp] = await Promise.allSettled([
+    loadData("fixed"), loadData("variable"), loadData("ratings"), loadData("tasks"),
+    loadSyrve("live", "", fresh), loadSyrve("monthly", "", fresh), loadSyrve("debts", "", fresh),
+    loadSyrve("employees", "?month=" + ym, fresh),
+  ]);
+  const ok = r => r.status === "fulfilled";
+  const failed = r => `<div class="value muted">—</div><div class="hint bad-text">${esc(t("load_failed"))}${r.reason ? ": " + esc(r.reason.message) : ""}</div>`;
+  const link = tab => `<a class="box-link" href="/dashboard/#${tab}" title="${esc(t("open"))}">→</a>`;
+  const box = (cls, label, icon, tab, body) =>
+    `<section class="card box ${cls}"><div class="box-head"><span class="label">${icon} ${esc(label)}</span>${tab ? link(tab) : ""}</div>${body}</section>`;
+
+  const F = ok(fx) ? fixedTotals(fx.value, ym) : null;
+  const V = ok(vr) ? variableTotals(vr.value, ym) : null;
+  const D = ok(debts) ? n(debts.value.total) : null;
+  const months = ok(monthly) ? monthly.value.months : [];
+  const cur = months[months.length - 1], prev = months[months.length - 2];
+  const income = cur ? n(cur.income) : null;
+
+  // 1. Profit = monthly income − fixed − variable (this month) − supplier debts
+  let profitBox;
+  if (income !== null && F && V && D !== null) {
+    const exp = F.total + V.month + D;
+    const profit = income - exp;
+    profitBox = `<div class="value num ${profit >= 0 ? "good" : "bad"}">${money(profit)}</div>
+      <div class="hint">${esc(t("income"))} ${money(income)} − ${esc(t("expenses"))} ${money(exp)}</div>
+      <div class="hint">${esc(t("fixed_short"))} ${money(F.total)} · ${esc(t("variable_short"))} ${money(V.month)} · ${esc(t("debts_short"))} ${money(D)}</div>`;
+  } else profitBox = failed([monthly, fx, vr, debts].find(r => !ok(r)) || {});
+
+  // 2. Fixed costs
+  const fixedBox = F ? `<div class="value num">${money(F.total)}</div><div class="hint">${esc(t("per_month"))} · ${esc(t("unpaid"))} ${money(F.unpaid)}</div>` : failed(fx);
+
+  // 3. Left to pay = unpaid fixed + unpaid variable + supplier debts
+  let leftBox;
+  if (F && V && D !== null) {
+    const left = F.unpaid + V.unpaid + D;
+    leftBox = `<div class="value num ${left > 0 ? "bad" : ""}">${money(left)}</div>
+      <div class="hint">${esc(t("debts_short"))} ${money(D)} · ${esc(t("fixed_short"))} ${money(F.unpaid)} · ${esc(t("variable_short"))} ${money(V.unpaid)}</div>`;
+  } else leftBox = failed([fx, vr, debts].find(r => !ok(r)) || {});
+
+  // 4. Today's income
+  const liveBox = ok(live)
+    ? `<div class="value num">${money(live.value.total)}</div><div class="hint">${live.value.orders ? live.value.orders + " " + esc(t("orders").toLowerCase()) : esc(t("today"))}</div>`
+    : failed(live);
+
+  // 5. Monthly income
+  let monthBox = failed(monthly);
+  if (cur) {
+    const ch = prev && prev.income ? Math.round((cur.income - prev.income) / prev.income * 100) : null;
+    monthBox = `<div class="value num">${money(cur.income)}</div><div class="hint">${esc(monthLabel(cur.month))}${ch !== null ? ` · ${ch >= 0 ? "+" : "−"}${Math.abs(ch)}% ${esc(t("vs_last_month"))}` : ""}</div>`;
+  }
+
+  // 6. Rating — average of each app's latest score
+  let ratingBox = failed(rt);
+  if (ok(rt)) {
+    const latest = PLATFORMS.map(p => rt.value.entries.filter(e => e.platform === p).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0]).filter(Boolean);
+    const avg = latest.length ? latest.reduce((a, e) => a + n(e.rating), 0) / latest.length : null;
+    const per = PLATFORMS.filter(p => p !== "other" || latest.some(e => e.platform === "other"))
+      .map(p => { const e = latest.find(x => x.platform === p); return `${esc(t(p))} ${e ? n(e.rating).toFixed(1) : "—"}`; }).join(" · ");
+    ratingBox = `<div class="value num">${avg !== null ? avg.toFixed(2) : "—"} <span class="unit">${avg !== null ? esc(t("average")) : esc(t("no_rating"))}</span></div><div class="hint">${per}</div>`;
+  }
+
+  // 7. Employees today
+  let empBox = failed(emp), empCount = "";
+  if (ok(emp)) { const w = whoWorksToday(emp.value); empBox = w.html; empCount = ` · ${w.count}`; }
+
+  // 8. Daily tasks (tick here)
+  let taskBox = failed(tk), taskCount = "";
+  const today = todayISO();
+  if (ok(tk)) {
+    const daily = tk.value.daily;
+    const done = daily.filter(x => x.done && x.done[today]).length;
+    taskCount = ` · ${done} / ${daily.length}`;
+    taskBox = daily.length ? `<div class="progress main-progress"><div style="width:${daily.length ? Math.round(done / daily.length * 100) : 0}%"></div></div>
+      <ul class="task-list">${daily.map(x => { const d = !!(x.done && x.done[today]); return `<li class="task ${d ? "done" : ""}">
+        <input type="checkbox" data-id="${x.id}" ${d ? "checked" : ""}><span class="title">${esc(x.title)}</span><span class="meta">${esc(x.assignee || "")}</span><span></span></li>`; }).join("")}</ul>`
+      : `<div class="empty">${esc(t("no_tasks"))}</div>`;
+  }
+
+  const upd = new Date();
+  view.dataset.loaded = "1";
+  view.innerHTML = demo + `<div class="main-meta muted small">${esc(t("updated"))} ${pad(upd.getHours())}:${pad(upd.getMinutes())} <button class="btn ghost small" id="mainRefresh">${esc(t("refresh"))}</button></div>
+    <div class="main-grid">
+      ${box("span2 hero", t("profit_month"), "📈", "monthly", profitBox)}
+      ${box("", t("tab_fixed"), "🏠", "fixed", fixedBox)}
+      ${box("", t("left_to_pay_all"), "🧾", "debts", leftBox)}
+      ${box("", t("today_income"), "💵", "live", liveBox)}
+      ${box("", t("tab_monthly"), "📅", "monthly", monthBox)}
+      ${box("span2", t("avg_rating"), "⭐", "ratings", ratingBox)}
+      ${box("span2 list", t("working_today") + empCount, "👥", "employees", empBox)}
+      ${box("span2 list", t("daily_tasks") + taskCount, "✅", "tasks", taskBox)}
+    </div>`;
+
+  $("#mainRefresh", view).addEventListener("click", () => renderMain(view, demo, true).catch(e => toast(e.message)));
+  if (ok(tk)) $$(".task input[type=checkbox]", view).forEach(cb => cb.addEventListener("change", () => {
+    const x = tk.value.daily.find(v => v.id === cb.dataset.id); if (!x) return;
+    x.done = x.done || {}; if (cb.checked) x.done[today] = true; else delete x.done[today];
+    saveData("tasks"); renderMain(view, demo);
+  }));
+  clearInterval(S.liveTimer);
+  S.liveTimer = setInterval(() => { if (S.tab === "main" && !document.hidden) renderMain(view, demo, true).catch(() => {}); }, LIVE_REFRESH_MS);
+}
 
 // ====================== 1. FIXED COSTS ======================
 async function renderFixed(view, demo) {
@@ -441,6 +594,7 @@ async function renderVariable(view, demo) {
   const list = d.entries.filter(e => (e.date || "").startsWith(ym)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   const total = list.reduce((a, e) => a + n(e.amount), 0);
   const byType = Object.fromEntries(VAR_TYPES.map(k => [k, list.filter(e => e.type === k).reduce((a, e) => a + n(e.amount), 0)]));
+  const unpaidMonth = list.filter(e => !e.paid).reduce((a, e) => a + n(e.amount), 0);
 
   const typeSelect = (val, attrs) => `<select ${attrs}>${VAR_TYPES.map(k => `<option value="${k}" ${k === val ? "selected" : ""}>${esc(t(k))}</option>`).join("")}</select>`;
   const rows = list.map(e => `<tr>
@@ -448,6 +602,9 @@ async function renderVariable(view, demo) {
     <td>${typeSelect(e.type, `class="cell-input" data-f="type" data-id="${e.id}"`)}</td>
     <td><input class="cell-input" data-f="name" data-id="${e.id}" value="${esc(e.name)}"></td>
     <td class="r"><input class="cell-input amount" type="number" step="0.01" min="0" data-f="amount" data-id="${e.id}" value="${esc(e.amount)}"></td>
+    <td>${e.paid
+      ? `<button class="pill good" data-act="paid" data-id="${e.id}">✓ ${esc(t("paid"))}</button>`
+      : `<button class="pill neutral" data-act="paid" data-id="${e.id}">○ ${esc(t("unpaid"))}</button>`}</td>
     <td><input class="cell-input" data-f="comment" data-id="${e.id}" value="${esc(e.comment)}" placeholder="…"></td>
     <td class="r"><button class="icon-btn" data-act="del" data-id="${e.id}" title="${esc(t("delete"))}">✕</button></td>
   </tr>`).join("");
@@ -457,13 +614,14 @@ async function renderVariable(view, demo) {
     `<input type="month" id="varMonth" value="${ym}"><button class="btn" id="varExport">${esc(t("export"))}</button>`) +
     `<div class="cards">
       ${card(t("month_total"), money(total), esc(monthLabel(ym)), "hero")}
+      ${card(t("unpaid_total"), money(unpaidMonth), esc(monthLabel(ym)), unpaidMonth > 0 ? "bad" : "")}
       ${VAR_TYPES.map(k => card(t(k), money(byType[k]))).join("")}
     </div>
     <div class="panel">
       <div class="table-wrap"><table class="edit">
-        <thead><tr><th>${esc(t("date"))}</th><th>${esc(t("type"))}</th><th>${esc(t("name"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("comment"))}</th><th></th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="6" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
-        ${list.length ? `<tfoot><tr><td colspan="3">${esc(t("total"))}</td><td class="r num">${money(total)}</td><td colspan="2"></td></tr></tfoot>` : ""}
+        <thead><tr><th>${esc(t("date"))}</th><th>${esc(t("type"))}</th><th>${esc(t("name"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("status"))}</th><th>${esc(t("comment"))}</th><th></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="7" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        ${list.length ? `<tfoot><tr><td colspan="3">${esc(t("total"))}</td><td class="r num">${money(total)}</td><td colspan="3"></td></tr></tfoot>` : ""}
       </table></div>
       <form class="form-row" id="varAdd">
         <label class="w-s">${esc(t("date"))}<input type="date" name="date" value="${defaultDate}" required></label>
@@ -486,17 +644,21 @@ async function renderVariable(view, demo) {
     if (!confirmDel()) return;
     d.entries = d.entries.filter(x => x.id !== b.dataset.id); saveData("variable"); renderVariable(view, demo);
   }));
+  $$("[data-act=paid]", view).forEach(b => b.addEventListener("click", () => {
+    const e = find(b.dataset.id); if (!e) return;
+    e.paid = !e.paid; saveData("variable"); renderVariable(view, demo);
+  }));
   $("#varAdd", view).addEventListener("submit", ev => {
     ev.preventDefault();
     const f = new FormData(ev.target);
-    d.entries.push({ id: uid(), date: f.get("date"), type: f.get("type"), name: f.get("name").trim(), amount: n(f.get("amount")), comment: f.get("comment") || "" });
+    d.entries.push({ id: uid(), date: f.get("date"), type: f.get("type"), name: f.get("name").trim(), amount: n(f.get("amount")), comment: f.get("comment") || "", paid: false });
     S.varMonth = String(f.get("date")).slice(0, 7);
     saveData("variable"); renderVariable(view, demo);
   });
   $("#varExport", view).addEventListener("click", () => {
-    const rows = [[t("date"), t("type"), t("name"), t("amount"), t("comment")]];
-    list.forEach(e => rows.push([e.date, t(e.type), e.name, n(e.amount), e.comment || ""]));
-    rows.push([t("total"), "", "", total, ""]);
+    const rows = [[t("date"), t("type"), t("name"), t("amount"), t("status"), t("comment")]];
+    list.forEach(e => rows.push([e.date, t(e.type), e.name, n(e.amount), e.paid ? t("paid") : t("unpaid"), e.comment || ""]));
+    rows.push([t("total"), "", "", total, "", ""]);
     exportXlsx(`variable-costs-${ym}.xlsx`, t("tab_variable"), rows);
   });
 }
@@ -691,26 +853,8 @@ async function renderEmployees(view, demo, fresh = false) {
   ]);
   const tdata = rToday || r;
   const today = tdata.today || todayISO();
-  const now = new Date();
-  const nowHM = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-
-  // who works today
-  const todayShifts = tdata.shifts.filter(s => (s.from || "").slice(0, 10) === today).sort((a, b) => (a.from || "").localeCompare(b.from || ""));
-  const att = tdata.attendance.filter(a => (a.from || "").slice(0, 10) === today);
-  const statusOf = s => {
-    const a = att.filter(x => x.employeeId === s.employeeId);
-    if (!a.length) return `<span class="pill neutral">○ ${esc(t("not_arrived"))}</span>`;
-    const open = a.find(x => !x.to || hhmm(x.to) > nowHM || (x.to || "").slice(0, 10) > today);
-    return open
-      ? `<span class="pill good">● ${esc(t("on_shift"))} · ${esc(hhmm(open.from))}</span>`
-      : `<span class="pill neutral">✓ ${esc(t("finished"))} · ${esc(hhmm(a[a.length - 1].to))}</span>`;
-  };
-  const initials = name => String(name).split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase() || "?";
-  const todayHtml = todayShifts.length ? `<div class="today-list">${todayShifts.map(s => `
-    <div class="person"><div class="who"><span class="avatar">${esc(initials(s.name))}</span>
-      <div><div><b>${esc(s.name)}</b></div><div class="muted small">${esc(t("shift"))} ${esc(hhmm(s.from))}–${esc(hhmm(s.to))}${s.department ? " · " + esc(s.department) : ""}</div></div></div>
-      ${statusOf(s)}</div>`).join("")}</div>`
-    : `<div class="empty">${esc(t("nobody_today"))}</div>`;
+  const { html: todayHtml, count: todayCount } = whoWorksToday(tdata);
+  const todayShifts = { length: todayCount };
 
   // calendar
   const [y, m] = ym.split("-").map(Number);
@@ -835,8 +979,8 @@ function demoApi(path, opts) {
       variable: { entries: [
         { id: "v1", date: todayISO(), type: "goods", name: "Flour 00, 50kg", amount: 310, comment: "" },
         { id: "v2", date: todayISO(), type: "jars", name: "Pesto jars 250ml ×200", amount: 180, comment: "" },
-        { id: "v3", date: ymNow() + "-03", type: "packaging", name: "Pizza boxes ×500", amount: 420, comment: "" },
-        { id: "v4", date: ymNow() + "-02", type: "goods", name: "Mozzarella", amount: 1240, comment: "" },
+        { id: "v3", date: ymNow() + "-03", type: "packaging", name: "Pizza boxes ×500", amount: 420, comment: "", paid: true },
+        { id: "v4", date: ymNow() + "-02", type: "goods", name: "Mozzarella", amount: 1240, comment: "", paid: true },
       ] },
       ratings: { entries: [
         { id: "r1", date: ymShift(ymNow(), -1) + "-15", platform: "wolt", rating: 4.5, reviews: 812, comment: "" },

@@ -13,60 +13,44 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root { --bg:#f6f5f2; --surface:#fff; --line:#e7e4de; --ink:#1d1d1b; --ink-2:#57544e; --accent:#1f78b4; --accent-soft:#e8f1f8; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
-      font-family: "Noto Sans Georgian", "Inter", system-ui, sans-serif; display: grid; place-items: center; padding: 24px; }
-    main { width: 100%; max-width: 760px; }
-    .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    h1 { margin: 0; font-size: 22px; }
-    .lang { border: 1px solid #d6d2ca; background: var(--surface); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
-    a.tile { display: block; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--line);
-      border-radius: 16px; padding: 28px 24px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04); transition: transform .12s, box-shadow .12s; }
-    a.tile:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0,0,0,.05), 0 8px 20px rgba(0,0,0,.07); }
-    .icon { width: 44px; height: 44px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 22px; margin-bottom: 16px; }
-    h2 { margin: 0 0 6px; font-size: 20px; }
-    p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.45; }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/dashboard/app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <script src="/dashboard/app.js" defer></script>
 </head>
-<body>
-  <main>
-    <div class="top">
-      <h1 data-t="title">Focacceria</h1>
-      <button class="lang" id="lang" type="button">EN</button>
-    </div>
-    <div class="grid">
-      <a class="tile" href="/dashboard/">
-        <div class="icon" aria-hidden="true">▦</div>
-        <h2 data-t="dash">Dashboard</h2>
-        <p data-t="dash_d"></p>
-      </a>
-      <a class="tile" href="/pricecheck" id="pcLink">
-        <div class="icon" aria-hidden="true">✓</div>
-        <h2 data-t="pc">PriceCheck</h2>
-        <p data-t="pc_d"></p>
-      </a>
-    </div>
-  </main>
-  <script>
-    const T = {
-      ka: { title: "Focacceria", dash: "დეშბორდი", dash_d: "ხარჯები, შემოსავალი, ვალები, რეიტინგები, თანამშრომლები და დავალებები.",
-            pc: "PriceCheck", pc_d: "ზედნადებების ფასების შემოწმება, შეკვეთები და მომწოდებლები." },
-      en: { title: "Focacceria", dash: "Dashboard", dash_d: "Costs, income, debts, ratings, employees and tasks.",
-            pc: "PriceCheck", pc_d: "Waybill price checks, orders and suppliers." },
-    };
-    let lang; try { lang = localStorage.getItem("dash_lang") || "ka"; } catch (_) { lang = "ka"; }
-    function apply() {
-      document.documentElement.lang = lang;
-      document.querySelectorAll("[data-t]").forEach(el => el.textContent = T[lang][el.dataset.t]);
-      document.getElementById("lang").textContent = lang === "ka" ? "EN" : "ქარ";
-    }
-    document.getElementById("lang").onclick = () => { lang = lang === "ka" ? "en" : "ka"; try { localStorage.setItem("dash_lang", lang); } catch (_) {} apply(); };
-    apply();
-  </script>
+<body data-page="main">
+  <!-- Login (same CEO password as PriceCheck) -->
+  <section id="login" class="login" hidden>
+    <form id="loginForm" class="login-card">
+      <h1 data-t="app_name">Focacceria</h1>
+      <label>
+        <span data-t="password">Password</span>
+        <input type="password" id="loginPass" autocomplete="current-password" required>
+      </label>
+      <p id="loginErr" class="err" hidden></p>
+      <button type="submit" class="btn primary" data-t="login">Log in</button>
+    </form>
+  </section>
+
+  <!-- Main overview -->
+  <div id="app" hidden>
+    <header class="topbar main-top">
+      <div class="topbar-left">
+        <h1><span data-t="app_name">Focacceria</span> · <span data-t="main">Main</span></h1>
+      </div>
+      <div class="topbar-right">
+        <nav class="nav-btns">
+          <a class="nav-btn" href="/dashboard/">▦ <span data-t="dashboard">Dashboard</span></a>
+          <a class="nav-btn" href="/pricecheck">✓ PriceCheck</a>
+        </nav>
+        <button class="lang" id="langBtn" type="button">EN</button>
+        <button class="btn ghost small" id="logoutBtn" type="button" data-t="logout">Log out</button>
+      </div>
+    </header>
+    <main id="view" class="view"></main>
+  </div>
+
+  <div id="tooltip" class="tooltip" hidden></div>
+  <div id="toast" class="toast" hidden></div>
 </body>
 </html>

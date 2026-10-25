@@ -262,3 +262,39 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft
   .task { grid-template-columns: auto 1fr auto; }
   .task .meta { grid-column: 2 / 3; }
 }
+
+/* ---------- Main overview ---------- */
+.main-meta { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 10px; }
+.main-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.main-grid .span2 { grid-column: span 2; }
+.box { display: flex; flex-direction: column; min-width: 0; }
+.box-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.box-link {
+  color: var(--ink-3); text-decoration: none; font-weight: 700; padding: 2px 8px; border-radius: 6px; line-height: 1.4;
+}
+.box-link:hover { background: var(--accent-soft); color: var(--accent); }
+.box .hint + .hint { margin-top: 0; }
+.box .unit { font-size: 13px; font-weight: 500; color: var(--ink-3); }
+.box.list .today-list { margin-top: 10px; max-height: 300px; overflow-y: auto; }
+.box.list .task-list { margin: 6px -16px -16px; max-height: 300px; overflow-y: auto; }
+.box.list .task { grid-template-columns: auto 1fr auto; }
+.box.list .task > span:last-child { display: none; }
+.box .empty { padding: 18px 0 6px; }
+.main-progress { margin-top: 10px; }
+.bad-text { color: var(--bad); }
+.nav-btns { display: flex; gap: 8px; }
+.nav-btn {
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--ink);
+  border: 1px solid var(--line-strong); background: var(--surface); border-radius: 8px;
+  padding: 6px 12px; font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 900px) {
+  .main-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .main-grid { grid-template-columns: minmax(0, 1fr); }
+  .main-grid .span2 { grid-column: auto; }
+  .topbar.main-top { flex-wrap: wrap; }
+  .nav-btn { padding: 5px 10px; font-size: 13px; }
+}
