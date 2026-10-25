@@ -303,7 +303,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft
 .nowrap { white-space: nowrap; }
 .clip { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 table.review { min-width: 900px; }
-table.review select { max-width: 220px; }
+table.review select { max-width: 200px; }
+table.review .clip { max-width: 260px; }
+td.rv-actions { width: 180px; white-space: normal; }
+td.rv-actions > .btn { display: block; width: 100%; margin: 0 0 6px !important; }
 label.tiny { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--ink-3); margin-top: 4px; }
 table.review td .btn + .btn { margin-left: 4px; }
 details.bank-settings > summary { cursor: pointer; list-style: none; }
@@ -311,5 +314,7 @@ details.bank-settings > summary::-webkit-details-marker { display: none; }
 details.bank-settings:not([open]) > summary { border-bottom: 0; }
 details.bank-settings textarea { width: 100%; resize: vertical; font-family: inherit; }
 .linked { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-variant-numeric: tabular-nums; }
-.remember { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; align-items: center; max-width: 300px; margin-left: auto; white-space: normal; }
-.remember .q { width: 100%; text-align: right; font-size: 13px; font-weight: 600; }
+.remember { display: flex; flex-direction: column; gap: 6px; width: 180px; white-space: normal; }
+.remember .rm-cancel { align-self: flex-end; padding: 2px 8px; }
+.remember .btn { white-space: normal; text-align: center; }
+.remember .q { font-size: 12px; font-weight: 600; line-height: 1.35; }

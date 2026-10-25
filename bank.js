@@ -11,14 +11,23 @@
 // Settings kept in KV (edited in the Debts tab): BOG account IBANs, history start date.
 // TBC returns all accounts of the company, so it needs no account list.
 //
-// KV keys:
-//   dash:bank:settings   { bogAccounts: [iban], historyFrom: "YYYY-MM-DD" }
-//   dash:bank:state      { cursors: { "bog:<iban>": "YYYY-MM-DD", "tbc": "YYYY-MM-DD" }, lastSyncAt, errors }
-//   dash:bank:tx:<year>  { <id>: { id, bank, date, amount, name, tin, iban, bankCode, purpose, own } }
+// KV keys (compact, so the Debts page stays within Cloudflare's CPU limit):
+//   dash:bank:settings    { bogAccounts: [iban], historyFrom: "YYYY-MM-DD" }
+//   dash:bank:state2      { cursors: { "bog:<iban>": "YYYY-MM-DD", "tbc": "YYYY-MM-DD" }, lastSyncAt, errors }
+//   dash:bank:rcp         { <recipientKey>: [name, tin, iban, bankCode, own(0|1)] }   each recipient stored once
+//   dash:bank:v2:<year>   [[id, "YYYY-MM-DD", amountInTetri, recipientKey, purpose], ...]
+//   dash:bank:agg         { <recipientKey>: [count, totalTetri, lastDate, lastPurpose, banks(1=BOG,2=TBC)] }
+//                         running totals, so the Debts page never has to read every payment
 
 const SETTINGS_KEY = "dash:bank:settings";
-const STATE_KEY = "dash:bank:state";
-const TX_PREFIX = "dash:bank:tx:";
+const STATE_KEY = "dash:bank:state2";
+const RCP_KEY = "dash:bank:rcp";
+const TX_PREFIX = "dash:bank:v2:";
+const AGG_KEY = "dash:bank:agg";
+const VER_KEY = "dash:bank:ver"; // changes whenever anything the debts depend on changes
+
+export async function bumpVersion(env) { await env.STORE.put(VER_KEY, String(Date.now())); }
+export async function loadVersion(env) { return (await env.STORE.get(VER_KEY)) || "0"; }
 const CHUNK_DAYS = 31;        // one statement request covers about a month
 const STEP_FETCH_BUDGET = 30; // stay well under Cloudflare's per-request limit on outgoing calls
 const OVERLAP_DAYS = 3;       // re-read the last few days so late bookings are caught
@@ -46,10 +55,14 @@ export async function saveBankSettings(env, input) {
   const prev = await loadBankSettings(env);
   const next = { bogAccounts: [...new Set(ibans)], historyFrom };
   await env.STORE.put(SETTINGS_KEY, JSON.stringify(next));
-  // a new start date (or new account) restarts history from that date
+  // a new start date restarts the history from that date
   if (prev.historyFrom !== next.historyFrom) {
     await env.STORE.put(STATE_KEY, JSON.stringify({ cursors: {}, lastSyncAt: null, errors: {} }));
+    await env.STORE.put(AGG_KEY, "{}");
+    const y1 = new Date().getUTCFullYear();
+    for (let y = 2010; y <= y1; y++) await env.STORE.delete(TX_PREFIX + y);
   }
+  await bumpVersion(env);
   return next;
 }
 
@@ -58,27 +71,59 @@ export async function loadBankState(env) {
   return { cursors: s.cursors || {}, lastSyncAt: s.lastSyncAt || null, errors: s.errors || {} };
 }
 
-// all stored payments from the history start until today
-export async function loadPayments(env, historyFrom) {
+export const recipientKey = tx =>
+  tx.tin ? "t:" + tx.tin : tx.iban ? "i:" + tx.iban.toUpperCase() : "n:" + (tx.name || "").toLowerCase();
+
+// what the Debts page needs: each recipient once, with running totals
+export async function loadBankData(env) {
+  const [recipients, agg] = await Promise.all([env.STORE.get(RCP_KEY, "json"), env.STORE.get(AGG_KEY, "json")]);
+  return { recipients: recipients || {}, agg: agg || {} };
+}
+
+// all stored payments of one recipient (used when the CEO decides "only these payments")
+export async function loadRecipientPayments(env, historyFrom, rk) {
   const y0 = Number((historyFrom || "2015").slice(0, 4));
   const y1 = new Date().getUTCFullYear();
-  const keys = [];
-  for (let y = y0; y <= y1; y++) keys.push(TX_PREFIX + y);
-  const parts = await Promise.all(keys.map(k => env.STORE.get(k, "json")));
   const out = [];
-  for (const p of parts) if (p) out.push(...Object.values(p));
-  return out.filter(x => !historyFrom || x.date >= historyFrom);
+  for (let y = y0; y <= y1; y++) {
+    const rows = await env.STORE.get(TX_PREFIX + y, "json");
+    if (rows) for (const r of rows) if (r[3] === rk) out.push(r);
+  }
+  return out;
 }
 
 async function savePayments(env, list) {
+  const rcp = (await env.STORE.get(RCP_KEY, "json")) || {};
+  let rcpChanged = false;
   const byYear = {};
-  for (const tx of list) (byYear[tx.date.slice(0, 4)] = byYear[tx.date.slice(0, 4)] || []).push(tx);
-  for (const [year, txs] of Object.entries(byYear)) {
-    const key = TX_PREFIX + year;
-    const cur = (await env.STORE.get(key, "json")) || {};
-    for (const tx of txs) cur[tx.id] = tx;
-    await env.STORE.put(key, JSON.stringify(cur));
+  for (const tx of list) {
+    const key = recipientKey(tx);
+    const rec = [tx.name, tx.tin, tx.iban, tx.bankCode, tx.own ? 1 : 0];
+    if (!rcp[key] || (!rcp[key][0] && tx.name)) { rcp[key] = rec; rcpChanged = true; }
+    (byYear[tx.date.slice(0, 4)] = byYear[tx.date.slice(0, 4)] || []).push([tx.id, tx.date, Math.round(tx.amount * 100), key, (tx.purpose || "").slice(0, 80)]);
   }
+  if (rcpChanged) await env.STORE.put(RCP_KEY, JSON.stringify(rcp));
+  const agg = (await env.STORE.get(AGG_KEY, "json")) || {};
+  let aggChanged = false;
+  for (const [year, rows] of Object.entries(byYear)) {
+    const key = TX_PREFIX + year;
+    const cur = (await env.STORE.get(key, "json")) || [];
+    const seen = new Set(cur.map(r => r[0]));
+    let added = false;
+    for (const r of rows) {
+      if (seen.has(r[0])) continue;
+      cur.push(r); seen.add(r[0]); added = true;
+      // update the running totals for this recipient
+      const a = agg[r[3]] || (agg[r[3]] = [0, 0, "", "", 0]);
+      a[0] += 1; a[1] += r[2];
+      if (r[1] >= a[2]) { a[2] = r[1]; a[3] = r[4]; }
+      a[4] |= r[0].startsWith("tbc:") ? 2 : 1;
+      aggChanged = true;
+    }
+    if (added) await env.STORE.put(key, JSON.stringify(cur));
+  }
+  if (aggChanged) await env.STORE.put(AGG_KEY, JSON.stringify(agg));
+  if (aggChanged || rcpChanged) await bumpVersion(env);
 }
 
 // ── dates ────────────────────────────────────────────────────────────────────

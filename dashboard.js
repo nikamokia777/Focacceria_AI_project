@@ -8,7 +8,7 @@
 //   SYRVE_PASSWORD  that user's password (plain — it is hashed here)
 // Optional secrets: TZ_OFFSET (hours from UTC, default 4), DEBT_SIGN (default -1)
 
-import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadPayments, syncStep } from "./bank.js";
+import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadBankData, loadRecipientPayments, syncStep, bumpVersion, loadVersion } from "./bank.js";
 import { loadLog } from "./store.js";
 
 const DATA_KEYS = ["fixed", "variable", "ratings", "tasks"];
@@ -43,15 +43,15 @@ export async function handleDashboard(request, env, path) {
       if (parts[1] === "monthly") return json(await cached(env, "monthly", 3600, fresh, () => syrveMonthly(env)));
       if (parts[1] === "debts") {
         const syrve = await cached(env, "debts-syrve", 900, fresh, () => syrveDebts(env));
-        // keep the bank up to date: one small sync step if the last one is older than 10 minutes
-        const cfg = bankConfigured(env);
-        if (cfg.bog || cfg.tbc) {
-          const st = await loadBankState(env);
-          if (fresh || !st.lastSyncAt || Date.now() - Date.parse(st.lastSyncAt) > 10 * 60 * 1000) {
-            try { await syncStep(env); } catch (_) {}
-          }
+        // reuse the last result until something changes (bank sync, a CEO decision, Syrve refresh)
+        const version = `${syrve._at}|${await loadVersion(env)}`;
+        const saved = await env.STORE.get("dash:cache:debts-result");
+        if (saved && saved.startsWith(version + "\n")) {
+          return new Response(saved.slice(version.length + 1), { headers: JSON_HEADERS });
         }
-        return json(await buildDebts(env, syrve));
+        const body = JSON.stringify(await buildDebts(env, syrve));
+        await env.STORE.put("dash:cache:debts-result", version + "\n" + body);
+        return new Response(body, { headers: JSON_HEADERS });
       }
       if (parts[1] === "employees") {
         const month = url.searchParams.get("month") || localDate(env).slice(0, 7);
@@ -282,25 +282,29 @@ function norm(name) {
 // Georgian → Latin, so "ნიკორა" and "Nikora" compare equal
 const KA = { ა:"a",ბ:"b",გ:"g",დ:"d",ე:"e",ვ:"v",ზ:"z",თ:"t",ი:"i",კ:"k",ლ:"l",მ:"m",ნ:"n",ო:"o",პ:"p",ჟ:"zh",რ:"r",ს:"s",ტ:"t",უ:"u",ფ:"p",ქ:"k",ღ:"gh",ყ:"k",შ:"sh",ჩ:"ch",ც:"ts",ძ:"dz",წ:"ts",ჭ:"ch",ხ:"kh",ჯ:"j",ჰ:"h" };
 const latin = s => s.replace(/[ა-ჰ]/g, c => KA[c] || c).replace(/kh/g, "k").replace(/ts/g, "c").replace(/[wq]/g, "k").replace(/x/g, "ks");
+// Names are prepared once ("keys"), then compared cheaply many times.
+function nameKey(name) {
+  const n = norm(name);
+  const l = latin(n);
+  const words = w => new Set(w.split(" ").filter(x => x.length > 1));
+  return { n, l, wn: words(n), wl: words(l) };
+}
 // strict: the same name after removing legal forms (Georgian or Latin spelling)
-function sameName(a, b) {
-  const x = norm(a), y = norm(b);
-  return !!x && !!y && (x === y || latin(x) === latin(y));
-}
-function similar(a, b) {
-  return similarRaw(a, b) || similarRaw(latin(norm(a)), latin(norm(b)));
-}
-function similarRaw(a, b) {
-  const x = norm(a), y = norm(b);
+const sameKey = (A, B) => !!A.n && !!B.n && (A.n === B.n || A.l === B.l);
+function overlap(x, y, X, Y) {
   if (!x || !y) return false;
   if (x === y) return true;
   if (x.length >= 3 && y.length >= 3 && (x.includes(y) || y.includes(x))) return true;
-  const A = new Set(x.split(" ").filter(w => w.length > 1)), B = new Set(y.split(" ").filter(w => w.length > 1));
-  if (!A.size || !B.size) return false;
-  let both = 0; for (const w of A) if (B.has(w)) both++;
-  return both / Math.min(A.size, B.size) >= 0.6;
+  if (!X.size || !Y.size) return false;
+  let both = 0; for (const w of X) if (Y.has(w)) both++;
+  return both / Math.min(X.size, Y.size) >= 0.6;
 }
-const isTreasury = tx => tx.bankCode.toUpperCase() === "TRESGE22" || /^GE\d{2}NB/i.test(tx.iban) || /სახაზინო|treasury/i.test(tx.name);
+const similarKey = (A, B) => overlap(A.n, B.n, A.wn, B.wn) || overlap(A.l, B.l, A.wl, B.wl);
+// convenience for one-off checks
+const similar = (a, b) => similarKey(nameKey(a), nameKey(b));
+const sameName = (a, b) => sameKey(nameKey(a), nameKey(b));
+
+const isTreasury = r => String(r.bankCode || "").toUpperCase() === "TRESGE22" || /^GE\d{2}NB/i.test(r.iban || "") || /სახაზინო|treasury/i.test(r.name || "");
 
 async function loadLinks(env) {
   const l = (await env.STORE.get(LINKS_KEY, "json")) || {};
@@ -312,7 +316,13 @@ async function saveReview(env, body) {
   const links = await loadLinks(env);
   const target = body.supplierId === null ? null : String(body.supplierId || "").toLowerCase();
   if (body.supplierId !== null && !target) return { error: "supplierId required" };
-  if (body.scope === "iban") {
+  if (body.scope === "once") {
+    // only the payments we have now; future payments to this recipient will be asked about again
+    const rk = String(body.rk || "");
+    if (!rk || target === null) return { error: "rk and supplierId required" };
+    const settings = await loadBankSettings(env);
+    for (const r of await loadRecipientPayments(env, settings.historyFrom, rk)) links.byTx[r[0]] = { to: target, cents: r[2], rk };
+  } else if (body.scope === "iban") {
     const iban = String(body.iban || "").trim().toUpperCase();
     if (!iban) return { error: "iban required" };
     if (target === null) delete links.byIban[iban]; else links.byIban[iban] = target;
@@ -326,6 +336,7 @@ async function saveReview(env, body) {
     if (target === null) delete links.byTx[txId]; else links.byTx[txId] = target;
   }
   await env.STORE.put(LINKS_KEY, JSON.stringify(links));
+  await bumpVersion(env);
   return { ok: true };
 }
 
@@ -334,46 +345,79 @@ async function buildDebts(env, syrve) {
   const state = await loadBankState(env);
   const configured = bankConfigured(env);
   const links = await loadLinks(env);
-  const payments = (configured.bog || configured.tbc) ? await loadPayments(env, settings.historyFrom) : [];
+  const { recipients, agg } = (configured.bog || configured.tbc) ? await loadBankData(env) : { recipients: {}, agg: {} };
 
-  const sup = {}; for (const s of syrve.suppliers) sup[s.id] = s;
-  const byTin = {};  // Syrve card tax IDs
-  for (const s of syrve.suppliers) if (s.tin) (byTin[s.tin] = byTin[s.tin] || []).push(s);
-  // rs.ge waybills: seller tax ID → seller name (as written on the waybill)
+  // suppliers, prepared once, with a word index so each recipient is compared only with likely suppliers
+  const sup = {};
+  const supList = syrve.suppliers.map(s => { const x = { ...s, key: nameKey(s.name) }; sup[s.id] = x; return x; });
+  const byTin = {};
+  for (const s of supList) if (s.tin) (byTin[s.tin] = byTin[s.tin] || []).push(s);
+  const index = new Map();
+  supList.forEach((s, i) => { for (const w of [...s.key.wn, ...s.key.wl]) { if (!index.has(w)) index.set(w, new Set()); index.get(w).add(i); } });
+  const common = Math.max(8, Math.ceil(supList.length * 0.15)); // a word shared by many suppliers says little
+  const candidates = k => {
+    const ws = [...k.wn, ...k.wl].filter(w => index.has(w));
+    const rare = ws.filter(w => index.get(w).size <= common);
+    const hit = new Set();
+    for (const w of (rare.length ? rare : ws)) for (const i of index.get(w)) hit.add(i);
+    return [...hit].map(i => supList[i]);
+  };
+  // rs.ge waybills: seller tax ID → seller name
   const rsName = {};
   try { for (const r of await loadLog(env)) if (r.sellerTin && r.seller) rsName[r.sellerTin] = r.seller; } catch (_) {}
 
+  const decide = rk => {
+    const [name = "", tin = "", iban = "", bankCode = "", own = 0] = recipients[rk] || [];
+    const forced = (tin ? links.byTin[tin] : undefined) ?? (iban ? links.byIban[iban.toUpperCase()] : undefined);
+    if (forced === "ignore") return { skip: true };
+    if (forced && sup[forced]) return { supplierId: forced };
+    if (own || isTreasury({ name, iban, bankCode }) || (!tin && !iban)) return { skip: true }; // own transfers, taxes, fees
+    const k = nameKey(name);
+    if (tin && byTin[tin]?.length === 1) {
+      const s = byTin[tin][0];
+      if (!name || similarKey(k, s.key) || (rsName[tin] && similarKey(nameKey(rsName[tin]), s.key))) return { supplierId: s.id };
+      return { reason: "name_differs", suggestion: s.id };
+    }
+    if (tin && rsName[tin]) {
+      const rk2 = nameKey(rsName[tin]);
+      const c = [...new Set([...candidates(rk2), ...candidates(k)])].filter(s => (similarKey(s.key, rk2) || similarKey(s.key, k)) && (!s.tin || s.tin === tin));
+      if (c.length === 1) return { supplierId: c[0].id };
+      return { reason: c.length ? "several_matches" : "not_in_syrve", suggestion: c[0]?.id || null };
+    }
+    const near = candidates(k);
+    const exact = near.filter(s => sameKey(s.key, k));
+    const free = exact.filter(s => !s.tin || s.tin === tin);
+    if (free.length === 1 && exact.length === 1) return { supplierId: free[0].id };
+    if (exact.length && !free.length) return { reason: "tin_differs", suggestion: exact[0].id };
+    const c = near.filter(s => similarKey(s.key, k));
+    return { reason: c.length > 1 || exact.length > 1 ? "several_matches" : c.length ? "name_only" : "unknown", suggestion: (exact[0] || c[0])?.id || null };
+  };
+
+  // single-payment decisions ("only these payments"), grouped by recipient
+  const txByRk = {};
+  for (const v of Object.values(links.byTx)) if (v && typeof v === "object" && v.rk) (txByRk[v.rk] = txByRk[v.rk] || []).push(v);
+
   const paid = {};
   const review = [];
-  let ignored = 0, matched = 0;
-  for (const tx of payments) {
-    let supplierId = null, reason = "", suggestion = null, how = "";
-    const forced = links.byTx[tx.id] ?? (tx.tin ? links.byTin[tx.tin] : undefined) ?? (tx.iban ? links.byIban[tx.iban.toUpperCase()] : undefined);
-    if (forced === "ignore") { ignored++; continue; }
-    if (forced && sup[forced]) { supplierId = forced; how = "confirmed"; }
-    else if (tx.own || isTreasury(tx) || (!tx.tin && !tx.iban)) { ignored++; continue; } // own transfers, taxes, fees
-    else if (tx.tin && byTin[tx.tin]?.length === 1) {
-      const s = byTin[tx.tin][0];
-      if (!tx.name || similar(tx.name, s.name) || (rsName[tx.tin] && similar(rsName[tx.tin], s.name))) { supplierId = s.id; how = "tax_id"; }
-      else { reason = "name_differs"; suggestion = s.id; }
-    } else if (tx.tin && rsName[tx.tin]) {
-      const c = syrve.suppliers.filter(s => (similar(s.name, rsName[tx.tin]) || similar(s.name, tx.name)) && (!s.tin || s.tin === tx.tin));
-      if (c.length === 1) { supplierId = c[0].id; how = "rs_ge"; }
-      else { reason = c.length ? "several_matches" : "not_in_syrve"; suggestion = c[0]?.id || null; }
-    } else {
-      // no tax ID link anywhere: accept only an exact name match with a supplier that has no other tax ID
-      const exact = syrve.suppliers.filter(s => sameName(s.name, tx.name));
-      const free = exact.filter(s => !s.tin || s.tin === tx.tin);
-      if (free.length === 1 && exact.length === 1) { supplierId = free[0].id; how = "name"; }
-      else if (exact.length && !free.length) { reason = "tin_differs"; suggestion = exact[0].id; }
-      else {
-        const c = syrve.suppliers.filter(s => similar(s.name, tx.name));
-        reason = c.length > 1 || exact.length > 1 ? "several_matches" : c.length ? "name_only" : "unknown";
-        suggestion = (exact[0] || c[0])?.id || null;
-      }
+  let ignored = 0, matched = 0, reviewAmount = 0, payments = 0;
+  for (const [rk, a] of Object.entries(agg)) {
+    const [count, tetri, last, purpose, banks] = a;
+    payments += count;
+    const singles = txByRk[rk] || [];
+    for (const v of singles) {
+      if (v.to === "ignore") ignored++;
+      else if (sup[v.to]) { paid[v.to] = (paid[v.to] || 0) + v.cents / 100; matched++; }
     }
-    if (supplierId) { paid[supplierId] = (paid[supplierId] || 0) + tx.amount; matched++; }
-    else review.push({ ...tx, reason, suggestion, rsName: rsName[tx.tin] || "" });
+    const restCount = count - singles.length;
+    const restAmount = (tetri - singles.reduce((x, v) => x + v.cents, 0)) / 100;
+    if (restCount <= 0) continue;
+    const d = decide(rk);
+    if (d.skip) { ignored += restCount; continue; }
+    if (d.supplierId) { paid[d.supplierId] = (paid[d.supplierId] || 0) + restAmount; matched += restCount; continue; }
+    reviewAmount += restAmount;
+    const [name = "", tin = "", iban = ""] = recipients[rk] || [];
+    review.push({ rk, name, tin, iban, count: restCount, amount: Math.round(restAmount * 100) / 100, last, purpose,
+      bank: banks === 3 ? "BOG + TBC" : banks === 2 ? "TBC" : "BOG", reason: d.reason, suggestion: d.suggestion, rsName: rsName[tin] || "" });
   }
 
   const ids = new Set([...Object.keys(syrve.owed), ...Object.keys(paid)]);
@@ -383,18 +427,18 @@ async function buildDebts(env, syrve) {
     return { id, name: sup[id].name, tin: sup[id].tin, invoices, paid: p, owed: Math.round((invoices - p) * 100) / 100 };
   }).filter(x => Math.abs(x.owed) >= 0.01 || x.paid > 0).sort((a, b) => b.owed - a.owed);
 
-  review.sort((a, b) => b.date.localeCompare(a.date));
+  review.sort((a, b) => b.amount - a.amount); // biggest first: one decision clears the most money
   return {
     asOf: syrve.asOf,
     total: Math.round(list.reduce((a, x) => a + (x.owed > 0 ? x.owed : 0), 0) * 100) / 100,
     suppliers: list,
-    review: { count: review.length, amount: Math.round(review.reduce((a, x) => a + x.amount, 0) * 100) / 100, items: review.slice(0, 150) },
+    review: { count: review.length, payments: review.reduce((a, x) => a + x.count, 0), amount: Math.round(reviewAmount * 100) / 100, items: review.slice(0, 150) },
     options: syrve.suppliers.map(s => ({ id: s.id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name)),
     linkedTins: [
       ...Object.entries(links.byTin).map(([tin, to]) => ({ kind: "tin", key: tin, tin, to, name: to === "ignore" ? "" : (sup[to]?.name || to) })),
       ...Object.entries(links.byIban).map(([iban, to]) => ({ kind: "iban", key: iban, tin: iban, to, name: to === "ignore" ? "" : (sup[to]?.name || to) })),
     ],
-    bank: { configured, settings, lastSyncAt: state.lastSyncAt, errors: state.errors, cursors: state.cursors, payments: payments.length, matched, ignored },
+    bank: { configured, settings, lastSyncAt: state.lastSyncAt, errors: state.errors, cursors: state.cursors, payments, matched, ignored },
   };
 }
 

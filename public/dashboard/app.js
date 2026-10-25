@@ -69,12 +69,13 @@ const T = {
     variable_short: "ცვლ.", avg_rating: "რეიტინგი", average: "საშუალო", vs_last_month: "წინა თვესთან",
     load_failed: "ვერ ჩაიტვირთა", unpaid_total: "გადაუხდელი", today: "დღეს",
     invoices: "ზედნადებები (Syrve)", paid_bank: "გადახდილი (ბანკი)", tax_id: "ს/კ", to_review: "გადასამოწმებელი",
-    review_sub: "გადახდები, რომლებიც ავტომატურად ვერ დავაკავშირე მომწოდებელს", recipient: "მიმღები", why: "მიზეზი",
+    review_sub: "მიმღებები, რომელთა გადახდები ავტომატურად ვერ დავაკავშირე მომწოდებელს", recipient: "მიმღები", why: "მიზეზი",
     why_name_differs: "ს/კ ემთხვევა, სახელი განსხვავდება", why_several_matches: "რამდენიმე შესაძლო მომწოდებელი",
     why_not_in_syrve: "rs.ge-ზეა, Syrve-ში ვერ ვიპოვე", why_name_only: "მხოლოდ სახელი ემთხვევა", why_unknown: "უცნობი მიმღები", why_tin_differs: "სახელი ემთხვევა, ს/კ განსხვავდება",
-    remember_q: "დავიმახსოვრო „{name}“-სთვის?", remember_yes: "კი, ყოველთვის", remember_once: "მხოლოდ ეს გადახდა", in_list: "სიაში {n} გადახდა",
+    remember_q: "დავიმახსოვრო „{name}“-ის მომავალი გადახდებისთვისაც?", remember_yes: "კი, ყოველთვის", remember_these: "მხოლოდ ეს {n} გადახდა",
+    payments_col: "გადახდები", last: "ბოლო",
     choose_supplier: "აირჩიეთ მომწოდებელი", all_with_tin: "ამ ს/კ-ის ყველა გადახდა", confirm: "დადასტურება",
-    not_supplier: "არ არის მომწოდებელი", showing_of: "ნაჩვენებია {a} / {b}", bank: "ბანკი", last_sync: "ბოლო სინქრ.",
+    not_supplier: "არ არის მომწოდებელი", showing_of: "ნაჩვენებია {a} / {b} მიმღები", bank: "ბანკი", last_sync: "ბოლო სინქრ.",
     bank_settings: "ბანკის პარამეტრები", history_from: "ისტორია თარიღიდან", bog_accounts: "BOG ანგარიშები (IBAN, თითო ხაზზე)",
     save: "შენახვა", tbc_auto: "TBC-ის GEL ანგარიშები ავტომატურად იკითხება", payments_loaded: "გადახდა", matched: "დაკავშირებული",
     ignored: "გამოტოვებული", bank_not_connected: "ბანკი არ არის დაკავშირებული",
@@ -132,12 +133,13 @@ const T = {
     variable_short: "variable", avg_rating: "Rating", average: "average", vs_last_month: "vs last month",
     load_failed: "Couldn't load", unpaid_total: "Unpaid", today: "Today",
     invoices: "Invoices (Syrve)", paid_bank: "Paid (bank)", tax_id: "Tax ID", to_review: "To review",
-    review_sub: "Payments the app couldn't match to a supplier on its own", recipient: "Recipient", why: "Why",
+    review_sub: "Recipients whose payments the app couldn't match to a supplier on its own", recipient: "Recipient", why: "Why",
     why_name_differs: "Tax ID matches, name differs", why_several_matches: "Several possible suppliers",
     why_not_in_syrve: "On rs.ge, not found in Syrve", why_name_only: "Only the name matches", why_unknown: "Unknown recipient", why_tin_differs: "Name matches, tax ID differs",
-    remember_q: "Remember this for “{name}”?", remember_yes: "Yes, always", remember_once: "Only this payment", in_list: "{n} payments in the list",
+    remember_q: "Remember this for future payments to “{name}” too?", remember_yes: "Yes, always", remember_these: "Only these {n} payments",
+    payments_col: "Payments", last: "last",
     choose_supplier: "Choose supplier", all_with_tin: "All payments with this tax ID", confirm: "Confirm",
-    not_supplier: "Not a supplier", showing_of: "Showing {a} of {b}", bank: "Bank", last_sync: "Last sync",
+    not_supplier: "Not a supplier", showing_of: "Showing {a} of {b} recipients", bank: "Bank", last_sync: "Last sync",
     bank_settings: "Bank settings", history_from: "History from", bog_accounts: "BOG accounts (IBAN, one per line)",
     save: "Save", tbc_auto: "TBC GEL accounts are read automatically", payments_loaded: "payments", matched: "matched",
     ignored: "skipped", bank_not_connected: "Bank not connected",
@@ -803,10 +805,11 @@ async function renderDebts(view, demo, fresh = false) {
   const reviewHtml = rev.count ? `<div class="panel">
       <div class="panel-head"><h3>⚠ ${esc(t("to_review"))} · ${rev.count}</h3><span class="muted small">${esc(t("review_sub"))}</span></div>
       <div class="table-wrap"><table class="edit review">
-        <thead><tr><th>${esc(t("date"))}</th><th>${esc(t("recipient"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("why"))}</th><th>${esc(t("supplier"))}</th><th></th></tr></thead>
-        <tbody>${rev.items.map(x => `<tr data-tx="${esc(x.id)}" data-tin="${esc(x.tin)}" data-iban="${esc(x.iban || "")}" data-name="${esc(x.name || x.tin || x.iban || "")}">
-          <td class="nowrap">${esc(x.date)}<div class="muted small">${esc(x.bank)}</div></td>
-          <td><b>${esc(x.name || "—")}</b><div class="muted small">${x.tin ? esc(t("tax_id")) + " " + esc(x.tin) : ""}${x.rsName ? " · rs.ge: " + esc(x.rsName) : ""}</div><div class="muted small clip" title="${esc(x.purpose)}">${esc(x.purpose)}</div></td>
+        <thead><tr><th>${esc(t("recipient"))}</th><th class="r">${esc(t("payments_col"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("why"))}</th><th>${esc(t("supplier"))}</th><th></th></tr></thead>
+        <tbody>${rev.items.map(x => `<tr data-rk="${esc(x.rk)}" data-tin="${esc(x.tin)}" data-iban="${esc(x.iban || "")}" data-name="${esc(x.name || x.tin || x.iban || "")}" data-count="${x.count}">
+          <td><b>${esc(x.name || "—")}</b><div class="muted small">${x.tin ? esc(t("tax_id")) + " " + esc(x.tin) : esc(x.iban || "")}${x.rsName ? " · rs.ge: " + esc(x.rsName) : ""}</div>
+            <div class="muted small clip" title="${esc(x.purpose)}">${esc(x.bank)} · ${esc(t("last"))} ${esc(x.last)} · ${esc(x.purpose)}</div></td>
+          <td class="r num">${x.count}</td>
           <td class="r num nowrap"><b>${money(x.amount)}</b></td>
           <td><span class="pill ${["name_differs", "name_only", "tin_differs"].includes(x.reason) ? "warn" : "neutral"}">${esc(t("why_" + x.reason))}</span></td>
           <td>${supplierSelect(x.suggestion, 'class="rv-sup"')}</td>
@@ -838,7 +841,7 @@ async function renderDebts(view, demo, fresh = false) {
     `<div class="cards">
       ${card(t("total_owed"), money(r.total), "", r.total > 0 ? "hero bad" : "hero")}
       ${card(t("suppliers"), String(owing.length))}
-      ${card(t("to_review"), String(rev.count), rev.count ? money(rev.amount) : "", rev.count ? "bad" : "")}
+      ${card(t("to_review"), String(rev.count), rev.count ? `${rev.payments || rev.count} ${esc(t("payments_col").toLowerCase())} · ${money(rev.amount)}` : "", rev.count ? "bad" : "")}
       ${card(t("bank"), connected ? "✓" : "—", lastSync ? `${esc(t("last_sync"))} ${pad(lastSync.getHours())}:${pad(lastSync.getMinutes())}` : esc(t("bank_not_connected")))}
     </div>
     ${reviewHtml}
@@ -866,8 +869,8 @@ async function renderDebts(view, demo, fresh = false) {
   const reload = async () => { S.syrve.debts = null; await renderDebts(view, demo); };
 
   // review actions
-  // after Confirm / Not a supplier the row asks: remember this for the company (all its payments) or only this payment?
-  $$("tr[data-tx]", view).forEach(tr => {
+  // after Confirm / Not a supplier the row asks: remember for this recipient's future payments too, or only these?
+  $$("tr[data-rk]", view).forEach(tr => {
     const cell = $(".rv-actions", tr);
     const original = cell.innerHTML;
     const save = async body => {
@@ -875,16 +878,16 @@ async function renderDebts(view, demo, fresh = false) {
       catch (e) { toast(e.message); }
     };
     const ask = supplierId => {
-      const { tin, iban, name, tx } = tr.dataset;
-      const same = $$("tr[data-tx]", view).filter(r => (tin && r.dataset.tin === tin) || (!tin && iban && r.dataset.iban === iban)).length;
+      const { tin, iban, name, rk, count } = tr.dataset;
       const always = tin ? { scope: "tin", tin, supplierId } : iban ? { scope: "iban", iban, supplierId } : null;
-      if (!always) return save({ scope: "tx", txId: tx, supplierId }); // no tax ID and no account — only this payment
-      cell.innerHTML = `<div class="remember"><div class="q">${esc(t("remember_q").replace("{name}", name))}${same > 1 ? ` <span class="muted">(${esc(t("in_list").replace("{n}", same))})</span>` : ""}</div>
+      const once = { scope: "once", rk, supplierId };
+      if (!always) return save(once);
+      cell.innerHTML = `<div class="remember"><div class="q">${esc(t("remember_q").replace("{name}", name))}</div>
         <button class="btn small primary rm-yes">${esc(t("remember_yes"))}</button>
-        <button class="btn small rm-once">${esc(t("remember_once"))}</button>
+        <button class="btn small rm-once">${esc(t("remember_these").replace("{n}", count))}</button>
         <button class="btn small ghost rm-cancel">✕</button></div>`;
       $(".rm-yes", cell).addEventListener("click", () => save(always));
-      $(".rm-once", cell).addEventListener("click", () => save({ scope: "tx", txId: tx, supplierId }));
+      $(".rm-once", cell).addEventListener("click", () => save(once));
       $(".rm-cancel", cell).addEventListener("click", () => { cell.innerHTML = original; wire(); });
     };
     const wire = () => {
@@ -918,7 +921,9 @@ async function renderDebts(view, demo, fresh = false) {
     const recent = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
     return need.some(k => !(bank.cursors || {})[k] || bank.cursors[k] < recent);
   })();
-  if (behind && !S.bankSyncing && !DEMO) loadBankHistory(view, demo);
+  // keep the bank fresh: sync when the last sync is older than 10 minutes (runs separately, page stays fast)
+  const stale = connected && bank.settings.historyFrom && (!bank.lastSyncAt || Date.now() - Date.parse(bank.lastSyncAt) > 10 * 60 * 1000);
+  if ((behind || stale) && !S.bankSyncing && !DEMO) loadBankHistory(view, demo);
 }
 
 async function loadBankHistory(view, demo) {
@@ -933,7 +938,8 @@ async function loadBankHistory(view, demo) {
     }
   } catch (e) { toast(e.message); }
   S.bankSyncing = false;
-  if (S.tab === "debts") { S.syrve.debts = null; renderDebts(view, demo).catch(() => {}); }
+  S.syrve.debts = null;
+  if (S.tab === "debts") renderDebts(view, demo).catch(() => {});
 }
 
 // ====================== 6. RATINGS ======================
@@ -1166,10 +1172,9 @@ function demoApi(path, opts) {
     const rows = [["Nikora", "204567891", 12420.5, 9000], ["Sante GMT", "205123456", 6180, 4000], ["Ori Nabiji", "400112233", 3460, 2000], ["Metro Cash & Carry", "211334455", 890.4, 0], ["Local farm (veg)", "01001012345", 300, 500]];
     const suppliers = rows.map(([name, tin, inv, paid], i) => ({ id: "s" + i, name, tin, invoices: inv, paid, owed: Math.round((inv - paid) * 100) / 100 }));
     return { asOf: todayISO(), total: suppliers.filter(s => s.owed > 0).reduce((a, s) => a + s.owed, 0), suppliers,
-      review: { count: 3, amount: 1700, items: [
-        { id: "bog:1", bank: "BOG", date: todayISO(), amount: 1200, name: "შპს ნიკორა ტრეიდი", tin: "204999888", purpose: "ზედნადები #0457812", reason: "name_only", suggestion: "s0", rsName: "" },
-        { id: "bog:3", bank: "BOG", date: ymNow() + "-14", amount: 250, name: "შპს ნიკორა ტრეიდი", tin: "204999888", purpose: "ზედნადები #0457001", reason: "name_only", suggestion: "s0", rsName: "" },
-        { id: "tbc:2", bank: "TBC", date: ymNow() + "-12", amount: 250, name: "Giorgi Beridze", tin: "01001055555", iban: "GE33TB0000000000000003", purpose: "transfer", reason: "unknown", suggestion: null, rsName: "" },
+      review: { count: 2, payments: 7, amount: 1700, items: [
+        { rk: "t:204999888", name: "შპს ნიკორა ტრეიდი", tin: "204999888", iban: "", count: 5, amount: 1450, last: todayISO(), purpose: "ზედნადები #0457812", bank: "BOG", reason: "name_only", suggestion: "s0", rsName: "" },
+        { rk: "t:01001055555", name: "Giorgi Beridze", tin: "01001055555", iban: "GE33TB0000000000000003", count: 2, amount: 250, last: ymNow() + "-12", purpose: "transfer", bank: "TBC", reason: "unknown", suggestion: null, rsName: "" },
       ] },
       options: suppliers.map(s => ({ id: s.id, name: s.name })),
       linkedTins: [{ tin: "206000111", to: "ignore", name: "" }],
