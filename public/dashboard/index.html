@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ka">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <!-- Login -->
+  <section id="login" class="login" hidden>
+    <form id="loginForm" class="login-card">
+      <h1 data-t="dashboard">Dashboard</h1>
+      <label>
+        <span data-t="password">Password</span>
+        <input type="password" id="loginPass" autocomplete="current-password" required>
+      </label>
+      <p id="loginErr" class="err" hidden></p>
+      <button type="submit" class="btn primary" data-t="login">Log in</button>
+    </form>
+  </section>
+
+  <!-- App -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="/" class="back" data-t="home">← Home</a>
+        <h1 data-t="dashboard">Dashboard</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="lang" id="langBtn" type="button">EN</button>
+        <button class="btn ghost small" id="logoutBtn" type="button" data-t="logout">Log out</button>
+      </div>
+    </header>
+
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+
+    <main id="view" class="view"></main>
+  </div>
+
+  <div id="tooltip" class="tooltip" hidden></div>
+  <div id="toast" class="toast" hidden></div>
+</body>
+</html>

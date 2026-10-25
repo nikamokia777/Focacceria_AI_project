@@ -15,6 +15,7 @@
 //   GET/POST /api/order        the current order (POST { ops: [...] })
 //   GET      /api/log          History + Mistakes records
 //   POST     /api/log/action   { token, action: "resolve" | "reopen" }
+//   *        /api/dash/...     the Dashboard (costs, ratings, tasks, Syrve data) — see dashboard.js
 //
 // Everything else is served from the static files in /public.
 
@@ -25,6 +26,7 @@ import {
 } from "./store.js";
 import { isLoggedIn, login, logout, passwordIsSet } from "./auth.js";
 import { handleUpdate, handleWhatsAppLink, setupWebhook, webhookSecret } from "./telegram.js";
+import { handleDashboard } from "./dashboard.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 
@@ -203,6 +205,13 @@ export default {
         return json({ error: err.message || "Unknown server error" }, 500);
       }
     }
+    // Dashboard — same password as PriceCheck
+    if (path.startsWith("/api/dash/")) {
+      if (!env.STORE) return json({ error: "Shared storage is not connected (KV binding STORE is missing)." }, 503);
+      if (!(await isLoggedIn(env, request))) return json({ error: "unauthorized" }, 401);
+      return handleDashboard(request, env, path.slice("/api/dash/".length));
+    }
+
     if (path.startsWith("/api/")) return json({ error: "Not found" }, 404);
 
     // Everything else (index.html, etc.) is served by the static assets binding
