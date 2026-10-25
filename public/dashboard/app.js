@@ -71,7 +71,7 @@ const T = {
     invoices: "ზედნადებები (Syrve)", paid_bank: "გადახდილი (ბანკი)", tax_id: "ს/კ", to_review: "გადასამოწმებელი",
     review_sub: "გადახდები, რომლებიც ავტომატურად ვერ დავაკავშირე მომწოდებელს", recipient: "მიმღები", why: "მიზეზი",
     why_name_differs: "ს/კ ემთხვევა, სახელი განსხვავდება", why_several_matches: "რამდენიმე შესაძლო მომწოდებელი",
-    why_not_in_syrve: "rs.ge-ზეა, Syrve-ში ვერ ვიპოვე", why_name_only: "მხოლოდ სახელი ემთხვევა", why_unknown: "უცნობი მიმღები",
+    why_not_in_syrve: "rs.ge-ზეა, Syrve-ში ვერ ვიპოვე", why_name_only: "მხოლოდ სახელი ემთხვევა", why_unknown: "უცნობი მიმღები", why_tin_differs: "სახელი ემთხვევა, ს/კ განსხვავდება",
     choose_supplier: "აირჩიეთ მომწოდებელი", all_with_tin: "ამ ს/კ-ის ყველა გადახდა", confirm: "დადასტურება",
     not_supplier: "არ არის მომწოდებელი", showing_of: "ნაჩვენებია {a} / {b}", bank: "ბანკი", last_sync: "ბოლო სინქრ.",
     bank_settings: "ბანკის პარამეტრები", history_from: "ისტორია თარიღიდან", bog_accounts: "BOG ანგარიშები (IBAN, თითო ხაზზე)",
@@ -133,7 +133,7 @@ const T = {
     invoices: "Invoices (Syrve)", paid_bank: "Paid (bank)", tax_id: "Tax ID", to_review: "To review",
     review_sub: "Payments the app couldn't match to a supplier on its own", recipient: "Recipient", why: "Why",
     why_name_differs: "Tax ID matches, name differs", why_several_matches: "Several possible suppliers",
-    why_not_in_syrve: "On rs.ge, not found in Syrve", why_name_only: "Only the name matches", why_unknown: "Unknown recipient",
+    why_not_in_syrve: "On rs.ge, not found in Syrve", why_name_only: "Only the name matches", why_unknown: "Unknown recipient", why_tin_differs: "Name matches, tax ID differs",
     choose_supplier: "Choose supplier", all_with_tin: "All payments with this tax ID", confirm: "Confirm",
     not_supplier: "Not a supplier", showing_of: "Showing {a} of {b}", bank: "Bank", last_sync: "Last sync",
     bank_settings: "Bank settings", history_from: "History from", bog_accounts: "BOG accounts (IBAN, one per line)",
@@ -805,8 +805,8 @@ async function renderDebts(view, demo, fresh = false) {
         <tbody>${rev.items.map(x => `<tr data-tx="${esc(x.id)}" data-tin="${esc(x.tin)}">
           <td class="nowrap">${esc(x.date)}<div class="muted small">${esc(x.bank)}</div></td>
           <td><b>${esc(x.name || "—")}</b><div class="muted small">${x.tin ? esc(t("tax_id")) + " " + esc(x.tin) : ""}${x.rsName ? " · rs.ge: " + esc(x.rsName) : ""}</div><div class="muted small clip" title="${esc(x.purpose)}">${esc(x.purpose)}</div></td>
-          <td class="r num"><b>${money(x.amount)}</b></td>
-          <td><span class="pill ${x.reason === "name_differs" || x.reason === "name_only" ? "warn" : "neutral"}">${esc(t("why_" + x.reason))}</span></td>
+          <td class="r num nowrap"><b>${money(x.amount)}</b></td>
+          <td><span class="pill ${["name_differs", "name_only", "tin_differs"].includes(x.reason) ? "warn" : "neutral"}">${esc(t("why_" + x.reason))}</span></td>
           <td>${supplierSelect(x.suggestion, 'class="rv-sup"')}
             ${x.tin ? `<label class="tiny"><input type="checkbox" class="rv-all" checked> ${esc(t("all_with_tin"))}</label>` : ""}</td>
           <td class="r nowrap"><button class="btn small primary rv-ok">${esc(t("confirm"))}</button>

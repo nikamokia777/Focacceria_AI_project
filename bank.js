@@ -100,6 +100,7 @@ const num = v => Number(v) || 0;
 // ── tokens ───────────────────────────────────────────────────────────────────
 
 async function clientToken(url, id, secret, extraBody = "") {
+  id = String(id || "").trim(); secret = String(secret || "").trim(); // copy-paste often adds spaces or a line break
   const res = await fetch(url, {
     method: "POST",
     headers: {

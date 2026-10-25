@@ -274,13 +274,19 @@ async function syrveDebts(env) {
 const LEGAL = new Set(["შპს", "სს", "იმ", "ltd", "llc", "jsc", "inc", "co", "company", "კომპანია"]);
 function norm(name) {
   return String(name || "").toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")            // punctuation → space ("შ.პ.ს." → "შ პ ს")
+    .replace(/\./g, "")                           // "ა.მ.გ." → "ამგ", "შ.პ.ს." → "შპს"
+    .replace(/[^\p{L}\p{N}]+/gu, " ")            // other punctuation → space
     .split(" ").filter(w => w.length > 1 && !LEGAL.has(w)) // drop legal forms and single letters
     .join(" ");
 }
 // Georgian → Latin, so "ნიკორა" and "Nikora" compare equal
 const KA = { ა:"a",ბ:"b",გ:"g",დ:"d",ე:"e",ვ:"v",ზ:"z",თ:"t",ი:"i",კ:"k",ლ:"l",მ:"m",ნ:"n",ო:"o",პ:"p",ჟ:"zh",რ:"r",ს:"s",ტ:"t",უ:"u",ფ:"p",ქ:"k",ღ:"gh",ყ:"k",შ:"sh",ჩ:"ch",ც:"ts",ძ:"dz",წ:"ts",ჭ:"ch",ხ:"kh",ჯ:"j",ჰ:"h" };
 const latin = s => s.replace(/[ა-ჰ]/g, c => KA[c] || c).replace(/kh/g, "k").replace(/ts/g, "c").replace(/[wq]/g, "k").replace(/x/g, "ks");
+// strict: the same name after removing legal forms (Georgian or Latin spelling)
+function sameName(a, b) {
+  const x = norm(a), y = norm(b);
+  return !!x && !!y && (x === y || latin(x) === latin(y));
+}
 function similar(a, b) {
   return similarRaw(a, b) || similarRaw(latin(norm(a)), latin(norm(b)));
 }
@@ -347,13 +353,20 @@ async function buildDebts(env, syrve) {
       if (!tx.name || similar(tx.name, s.name) || (rsName[tx.tin] && similar(rsName[tx.tin], s.name))) { supplierId = s.id; how = "tax_id"; }
       else { reason = "name_differs"; suggestion = s.id; }
     } else if (tx.tin && rsName[tx.tin]) {
-      const c = syrve.suppliers.filter(s => similar(s.name, rsName[tx.tin]) || similar(s.name, tx.name));
+      const c = syrve.suppliers.filter(s => (similar(s.name, rsName[tx.tin]) || similar(s.name, tx.name)) && (!s.tin || s.tin === tx.tin));
       if (c.length === 1) { supplierId = c[0].id; how = "rs_ge"; }
       else { reason = c.length ? "several_matches" : "not_in_syrve"; suggestion = c[0]?.id || null; }
     } else {
-      const c = syrve.suppliers.filter(s => similar(s.name, tx.name));
-      reason = c.length ? "name_only" : "unknown";
-      suggestion = c[0]?.id || null;
+      // no tax ID link anywhere: accept only an exact name match with a supplier that has no other tax ID
+      const exact = syrve.suppliers.filter(s => sameName(s.name, tx.name));
+      const free = exact.filter(s => !s.tin || s.tin === tx.tin);
+      if (free.length === 1 && exact.length === 1) { supplierId = free[0].id; how = "name"; }
+      else if (exact.length && !free.length) { reason = "tin_differs"; suggestion = exact[0].id; }
+      else {
+        const c = syrve.suppliers.filter(s => similar(s.name, tx.name));
+        reason = c.length > 1 || exact.length > 1 ? "several_matches" : c.length ? "name_only" : "unknown";
+        suggestion = (exact[0] || c[0])?.id || null;
+      }
     }
     if (supplierId) { paid[supplierId] = (paid[supplierId] || 0) + tx.amount; matched++; }
     else review.push({ ...tx, reason, suggestion, rsName: rsName[tx.tin] || "" });
