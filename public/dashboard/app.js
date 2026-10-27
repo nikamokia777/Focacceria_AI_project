@@ -872,7 +872,7 @@ async function renderPayDetail(view, range, fresh = false) {
 
   const multiDay = range.from !== range.to;
   const withCustomer = d.orders.filter(o => o.customer);
-  const showWb = withCustomer.length > 0;
+  const showWb = /b2b/i.test(name) && withCustomer.length > 0; // waybills matter only for B2B sales
   const wbCell = o => {
     if (!o.customer) return "";
     if (d.waybillError) return `<span class="muted small">—</span>`;
@@ -926,7 +926,8 @@ async function renderPayDetail(view, range, fresh = false) {
   $("#payExport", box).addEventListener("click", () => {
     const out = [[t("date"), t("time"), t("order_no"), t("customer"), t("cashier"), t("amount"), t("products"), t("waybill")]];
     d.orders.forEach(o => out.push([o.day, o.time, o.num, o.customer, o.cashier, o.sum,
-      o.items.map(i => `${i.name} × ${i.qty}`).join("; "), o.waybill ? o.waybill.number : o.customer && !d.waybillError ? t("wb_missing") : ""]));
+      o.items.map(i => `${i.name} × ${i.qty}`).join("; "), !showWb ? "" : o.waybill ? o.waybill.number : o.customer && !d.waybillError ? t("wb_missing") : ""]));
+    if (!showWb) out.forEach(row => row.pop());
     exportXlsx(`${name}-${range.from}_${range.to}.xlsx`, String(name).slice(0, 30), out);
   });
 }
