@@ -329,6 +329,7 @@ export async function syncStep(env) {
   const budget = { used: 0 };
   const tokens = {};
   const collected = [];
+  const before = JSON.stringify([state.errors, state.notes]);
   state.errors = {};
   state.notes = {};
 
@@ -366,5 +367,7 @@ export async function syncStep(env) {
   const done = sources.every(s => (state.cursors[s.key] || "") >= addDays(end, -OVERLAP_DAYS)) || Object.keys(state.errors).length > 0;
   state.lastSyncAt = new Date().toISOString();
   await env.STORE.put(STATE_KEY, JSON.stringify(state));
+  // a fixed key or a new error must reach the Debts page even when no new payments arrived
+  if (JSON.stringify([state.errors, state.notes]) !== before) await bumpVersion(env);
   return { done, configured: cfg, state, saved: collected.length, behind: sources.filter(s => (state.cursors[s.key] || "") < addDays(end, -OVERLAP_DAYS)).map(s => ({ source: s.key, at: state.cursors[s.key] })) };
 }
