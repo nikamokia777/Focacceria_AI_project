@@ -61,7 +61,7 @@ const T = {
     months: ["იანვარი", "თებერვალი", "მარტი", "აპრილი", "მაისი", "ივნისი", "ივლისი", "აგვისტო", "სექტემბერი", "ოქტომბერი", "ნოემბერი", "დეკემბერი"],
     daily_tasks: "ყოველდღიური დავალებები", overall_tasks: "ზოგადი დავალებები", task: "დავალება",
     assignee: "პასუხისმგებელი", due: "ვადა", done_today: "შესრულებულია დღეს", tasks_sub: "ყოველდღიური სია ყოველ დღე თავიდან იწყება.",
-    open_tasks: "ღია დავალებები", done: "შესრულებული", no_tasks: "დავალებები ჯერ არ არის",
+    needs_check: "შესამოწმებელი", open_tasks: "ღია დავალებები", done: "შესრულებული", no_tasks: "დავალებები ჯერ არ არის",
     syrve_error: "Syrve-დან მონაცემები ვერ მივიღე", loading: "იტვირთება…",
     demo: "დემო რეჟიმი — ნიმუშის მონაცემები, არაფერი ინახება.",
     main: "მთავარი", app_name: "Focacceria", open: "გახსნა", profit_month: "მოგება ამ თვეში",
@@ -130,7 +130,7 @@ const T = {
     months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
     daily_tasks: "Daily tasks", overall_tasks: "Overall tasks", task: "Task",
     assignee: "Assignee", due: "Due", done_today: "Done today", tasks_sub: "The daily list starts over every day.",
-    open_tasks: "Open tasks", done: "Done", no_tasks: "No tasks yet",
+    needs_check: "Needs to check", open_tasks: "Open tasks", done: "Done", no_tasks: "No tasks yet",
     syrve_error: "Couldn't get data from Syrve", loading: "Loading…",
     demo: "Demo mode — sample data, nothing is saved.",
     main: "Main", app_name: "Focacceria", open: "Open", profit_month: "Profit this month",
@@ -171,6 +171,8 @@ const S = {
   lang: store.get("dash_lang") || "ka",
   tab: null,
   data: {},          // fixed, variable, ratings, tasks
+  dataAt: {},        // when each was loaded (browser time)
+  loadedAt: {},      // … and the server time of that load (keeps bot-added tasks on save)
   syrve: {},         // live, monthly, debts, employees:<month>
   varMonth: ymNow(),
   empMonth: ymNow(),
@@ -248,9 +250,13 @@ const DEFAULTS = {
 };
 
 async function loadData(key) {
-  if (S.data[key]) return S.data[key];
+  // tasks also come from the Telegram bot, so re-read them when no edit is waiting to be saved
+  const stale = key === "tasks" && !saveTimers[key] && Date.now() - (S.dataAt[key] || 0) > 30000;
+  if (S.data[key] && !stale) return S.data[key];
   const r = await api("/data/" + key);
   S.data[key] = r.value || DEFAULTS[key]();
+  S.dataAt[key] = Date.now();
+  S.loadedAt[key] = r.at || "";
   return S.data[key];
 }
 
@@ -258,7 +264,8 @@ const saveTimers = {};
 function saveData(key) {
   clearTimeout(saveTimers[key]);
   saveTimers[key] = setTimeout(async () => {
-    try { await api("/data/" + key, { method: "PUT", body: { value: S.data[key] } }); toast(t("saved")); }
+    delete saveTimers[key];
+    try { await api("/data/" + key, { method: "PUT", body: { value: S.data[key], loadedAt: S.loadedAt[key] || "" } }); toast(t("saved")); }
     catch (e) { toast(t("save_failed") + ": " + e.message); }
   }, 500);
 }
@@ -1089,7 +1096,7 @@ async function renderTasks(view, demo) {
   const overallHtml = overall.length ? `<ul class="task-list">${overall.map(x => {
     const late = !x.done && x.due && x.due < today;
     return `<li class="task ${x.done ? "done" : ""}"><input type="checkbox" data-kind="overall" data-id="${x.id}" ${x.done ? "checked" : ""}>
-      <span class="title">${esc(x.title)}${x.assignee ? ` <span class="muted small">· ${esc(x.assignee)}</span>` : ""}</span>
+      <span class="title">${x.label === "check" ? `<span class="pill warn">${esc(t("needs_check"))}</span> ` : ""}${esc(x.title)}${x.assignee ? ` <span class="muted small">· ${esc(x.assignee)}</span>` : ""}${x.note ? `<div class="muted small">${esc(x.note)}</div>` : ""}</span>
       <span class="meta ${late ? "late" : ""}">${x.due ? (late ? "! " : "") + esc(x.due) : ""}</span>
       <button class="icon-btn" data-del="overall" data-id="${x.id}" title="${esc(t("delete"))}">✕</button></li>`;
   }).join("")}</ul>` : `<div class="empty">${esc(t("no_tasks"))}</div>`;

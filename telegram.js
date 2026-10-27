@@ -10,6 +10,8 @@
 //     Either way the CEO gets a short notice in his private chat.
 //   • A shopping list, one product per line ("რუკოლა 2კგ") → the products are
 //     ticked in the Orders tab.
+//   • Storage alarms (stock.js): a product fell to its minimum → Approve ticks it in
+//     the order; Disapprove asks for a comment and adds a "needs to check" task.
 //
 // In the CEO's private chat:
 //   /start               register as the CEO (first person only)
@@ -19,8 +21,9 @@
 import { lookupWaybill, normalizeWaybillNumber } from "./rsge.js";
 import {
   loadBasePrices, loadSettings, toWhatsAppNumber, upsertLog, patchLog, getLogRecord,
-  applyOrderOps, receiveOrderItems,
+  applyOrderOps, receiveOrderItems, loadOrder,
 } from "./store.js";
+import { setAlarmState, addCheckTask, setTaskNote } from "./stock.js";
 import { parseOrderMessage, matchProduct } from "./orders.js";
 import { setPassword } from "./auth.js";
 
@@ -83,6 +86,21 @@ const TEXTS = {
     laterAccountant: "📤 ბუღალტერთან გაგზავნა",
     notSent: "⏸ არ გაიგზავნა. მოგვიანებით გასაგზავნად დააჭირეთ ღილაკს.",
     waOpened: "📲 WhatsApp გაიხსნა",
+    stockAlarm: "🔔 მარაგი იწურება",
+    stockLeft: "დარჩა",
+    stockMin: "მინიმუმი",
+    prio: { red: "🔴 მაღალი პრიორიტეტი", yellow: "🟡 საშუალო პრიორიტეტი", cyan: "🔵 დაბალი პრიორიტეტი" },
+    stockApprove: "✅ შეკვეთაში დამატება",
+    stockReject: "❌ არ ვუკვეთავთ",
+    stockOrdered: (n) => `✅ ${n}: შეკვეთაში დაემატა`,
+    stockInOrder: (n) => `✅ ${n}: დადასტურდა (უკვე შეკვეთაშია)`,
+    stockNoLink: (n) => `✅ ${n}: დადასტურდა\n⚠️ PriceCheck-ის პროდუქტთან დაკავშირებული არ არის — შეკვეთაში ხელით დაამატეთ ან დააკავშირეთ „საწყობის“ ჩანართში.`,
+    stockRejectedBy: (n) => `❌ ${n}: არ ვუკვეთავთ`,
+    askStockReason: (n, p) => `${n}, დაწერეთ კომენტარი ერთ შეტყობინებაში (${p}) — დავალებებში დაემატება „შესამოწმებელი“ ნიშნით.`,
+    stockReasonSaved: "კომენტარი დავალებას დაემატა.",
+    stockTask: (p) => `📦 ${p}: მარაგი იწურება — შეკვეთა არ დადასტურდა`,
+    stockAlready: "ეს შეტყობინება უკვე დამუშავებულია.",
+    comment: "კომენტარი",
   },
   en: {
     noNumber: "I couldn't read a waybill number from the photo. Take a clearer photo or type the number.",
@@ -132,6 +150,21 @@ const TEXTS = {
     laterAccountant: "📤 Send to accountant",
     notSent: "⏸ Not sent. Tap the button below to send it later.",
     waOpened: "📲 WhatsApp opened",
+    stockAlarm: "🔔 Running low",
+    stockLeft: "Left",
+    stockMin: "minimum",
+    prio: { red: "🔴 High priority", yellow: "🟡 Moderate priority", cyan: "🔵 Low priority" },
+    stockApprove: "✅ Add to order",
+    stockReject: "❌ Don't order",
+    stockOrdered: (n) => `✅ ${n}: added to the order`,
+    stockInOrder: (n) => `✅ ${n}: approved (already in the order)`,
+    stockNoLink: (n) => `✅ ${n}: approved\n⚠️ Not linked to a PriceCheck product — add it to the order by hand or link it in the Storage tab.`,
+    stockRejectedBy: (n) => `❌ ${n}: not ordering`,
+    askStockReason: (n, p) => `${n}, write a comment in one message (${p}) — it will be added to Tasks as "needs to check".`,
+    stockReasonSaved: "The comment was added to the task.",
+    stockTask: (p) => `📦 ${p}: running low — order not approved`,
+    stockAlready: "This alarm has already been handled.",
+    comment: "Comment",
   },
 };
 
@@ -555,6 +588,7 @@ async function handleCallback(env, cq) {
   const t = texts(env);
   const [action, token] = String(cq.data || "").split(":");
   if (action === "an" || action === "dn") return handleCeoNo(env, cq, action[0], token);
+  if (action === "sa" || action === "sr") return handleStockCallback(env, cq, action === "sa", token);
 
   const key = `pending:${token}`;
   const raw = token ? await env.STORE.get(key) : null;
@@ -629,12 +663,113 @@ async function handleCallback(env, cq) {
   await tg(env, "answerCallbackQuery", { callback_query_id: cq.id });
 }
 
+// ── Storage alarms ───────────────────────────────────────────────────────────
+
+const STOCK_TTL = 60 * 60 * 24 * 30;
+const amountStr = (n, unit) => `${qty(n)}${unit ? " " + unit : ""}`;
+
+function stockSummary(t, a) {
+  return [
+    `<b>${t.stockAlarm}</b>`,
+    `<b>${esc(a.name)}</b>`,
+    `${t.stockLeft}: <b>${esc(amountStr(a.live, a.unit))}</b> · ${t.stockMin}: ${esc(amountStr(a.min, a.unit))}`,
+    a.prio && t.prio[a.prio] ? t.prio[a.prio] : "",
+  ].filter(Boolean).join("\n");
+}
+
+// Post one alarm to the group; returns its token, or "" if Telegram refused.
+export async function sendStockAlarm(env, chatId, item) {
+  const t = texts(env);
+  const token = newToken();
+  const a = {
+    id: item.id, name: item.name, unit: item.unit, live: item.live, min: item.min, prio: item.prio,
+    link: item.link?.id || null, chatId, status: "open",
+  };
+  const r = await send(env, chatId, stockSummary(t, a), {
+    reply_markup: { inline_keyboard: [[
+      { text: t.stockApprove, callback_data: `sa:${token}` },
+      { text: t.stockReject, callback_data: `sr:${token}` },
+    ]] },
+  });
+  if (!r.ok) {
+    console.error("stock alarm not sent:", r.description);
+    return "";
+  }
+  a.messageId = r.result.message_id;
+  await env.STORE.put(`stockalarm:${token}`, JSON.stringify(a), { expirationTtl: STOCK_TTL });
+  return token;
+}
+
+async function handleStockCallback(env, cq, approve, token) {
+  const t = texts(env);
+  const key = `stockalarm:${token}`;
+  const a = token ? await env.STORE.get(key, "json") : null;
+  if (!a || a.status !== "open") {
+    await tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: a ? t.stockAlready : t.linkExpired, show_alert: true });
+    return;
+  }
+  const name = displayName(cq.from);
+  a.by = name;
+  await tg(env, "answerCallbackQuery", { callback_query_id: cq.id });
+  const edit = (line) => tg(env, "editMessageText", {
+    chat_id: a.chatId, message_id: a.messageId, parse_mode: "HTML", disable_web_page_preview: true,
+    text: `${stockSummary(t, a)}\n\n<b>${esc(line)}</b>`,
+  });
+
+  if (approve) {
+    a.status = "approved";
+    await env.STORE.put(key, JSON.stringify(a), { expirationTtl: STOCK_TTL });
+    await setAlarmState(env, a.id, token, "approved");
+    if (!a.link) return edit(t.stockNoLink(name));
+    const order = await loadOrder(env);
+    if (order.items.some((it) => it.productId === a.link)) return edit(t.stockInOrder(name));
+    // enough to get back to the minimum (at least 1); the amount can be changed in Orders
+    const need = Math.max(Math.round((a.min - a.live) * 100) / 100, 1);
+    await applyOrderOps(env, [{ op: "set", productId: a.link, qty: need, unit: a.unit, by: name, source: "telegram",
+      comment: `${t.stockLeft}: ${amountStr(a.live, a.unit)} / ${t.stockMin}: ${amountStr(a.min, a.unit)}` }]);
+    return edit(t.stockOrdered(name));
+  }
+
+  a.status = "rejected";
+  a.taskId = await addCheckTask(env, t.stockTask(a.name), name);
+  await env.STORE.put(key, JSON.stringify(a), { expirationTtl: STOCK_TTL });
+  await setAlarmState(env, a.id, token, "rejected");
+  await env.STORE.put(`await:${a.chatId}:${cq.from.id}`, `s:${token}`, { expirationTtl: COMMENT_TTL });
+  await edit(t.stockRejectedBy(name));
+  await send(env, a.chatId, esc(t.askStockReason(name, a.name)), {
+    reply_to_message_id: a.messageId,
+    allow_sending_without_reply: true,
+    reply_markup: { force_reply: true, selective: true },
+  });
+}
+
+async function consumeStockComment(env, msg, token) {
+  const t = texts(env);
+  const key = `stockalarm:${token}`;
+  const a = await env.STORE.get(key, "json");
+  if (!a || !a.taskId) return false;
+  const comment = msg.text.trim().slice(0, 500);
+  a.comment = comment;
+  await env.STORE.put(key, JSON.stringify(a), { expirationTtl: STOCK_TTL });
+  await setTaskNote(env, a.taskId, `${comment} — ${a.by}`);
+  await tg(env, "editMessageText", {
+    chat_id: a.chatId, message_id: a.messageId, parse_mode: "HTML", disable_web_page_preview: true,
+    text: `${stockSummary(t, a)}\n\n<b>${esc(t.stockRejectedBy(a.by))}</b>\n${t.comment}: ${esc(comment)}`,
+  });
+  await send(env, msg.chat.id, t.stockReasonSaved, { reply_to_message_id: msg.message_id, allow_sending_without_reply: true });
+  return true;
+}
+
 // If this user owes us a rejection reason, take this message as the reason.
 async function tryConsumeComment(env, msg) {
   const t = texts(env);
   const awaitKey = `await:${msg.chat.id}:${msg.from?.id}`;
   const token = await env.STORE.get(awaitKey);
   if (!token) return false;
+  if (token.startsWith("s:")) {
+    await env.STORE.delete(awaitKey);
+    return consumeStockComment(env, msg, token.slice(2));
+  }
 
   const key = `pending:${token}`;
   const raw = await env.STORE.get(key);
@@ -741,6 +876,10 @@ async function handleMessage(env, msg) {
   const command = text.startsWith("/") ? text.split(/[\s@]/)[0].toLowerCase() : "";
 
   if (isPrivate && command && (await handlePrivateCommand(env, msg, command))) return;
+  // remember the employees' group, so Storage alarms know where to go
+  if (!isPrivate && !env.GROUP_CHAT_ID && String(msg.chat.id) !== (await env.STORE.get("group_chat_id"))) {
+    await env.STORE.put("group_chat_id", String(msg.chat.id));
+  }
   if (command === "/chatid") {
     await send(env, msg.chat.id, `Chat ID: <code>${msg.chat.id}</code>`);
     return;

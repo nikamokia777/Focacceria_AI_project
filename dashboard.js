@@ -24,10 +24,11 @@ export async function handleDashboard(request, env, path) {
     // typed data
     if (parts[0] === "data" && DATA_KEYS.includes(parts[1])) {
       const kvKey = "dash:data:" + parts[1];
-      if (request.method === "GET") return json({ value: await env.STORE.get(kvKey, "json") });
+      if (request.method === "GET") return json({ value: await env.STORE.get(kvKey, "json"), at: new Date().toISOString() });
       if (request.method === "PUT") {
         const body = await request.json().catch(() => null);
         if (!body || !("value" in body)) return json({ error: "Expected { value }" }, 400);
+        if (parts[1] === "tasks") await keepBotTasks(env, kvKey, body);
         const text = JSON.stringify(body.value ?? null);
         if (text.length > 1_000_000) return json({ error: "Too much data" }, 400);
         await env.STORE.put(kvKey, text);
@@ -81,6 +82,22 @@ export async function handleDashboard(request, env, path) {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+// The Telegram bot adds tasks (Storage alarms) while a Dashboard page may be open with an
+// older list. Keep what the bot added or changed after that page loaded (body.loadedAt).
+async function keepBotTasks(env, kvKey, body) {
+  const list = body.value?.overall;
+  const since = String(body.loadedAt || "");
+  if (!Array.isArray(list) || !since) return;
+  const current = (await env.STORE.get(kvKey, "json"))?.overall || [];
+  const byId = new Map(list.map(x => [x.id, x]));
+  for (const c of current) {
+    if (!c.botAt || c.botAt <= since) continue;
+    const mine = byId.get(c.id);
+    if (!mine) list.push(c);
+    else if (c.botAt > (mine.botAt || "")) { mine.note = c.note; mine.botAt = c.botAt; }
+  }
+}
+
 async function sha1(text) {
   const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
@@ -100,14 +117,14 @@ async function cached(env, name, ttl, fresh, fn) {
 }
 
 // Local (restaurant) date/time helpers
-function nowLocal(env) {
+export function nowLocal(env) {
   const off = Number(env.TZ_OFFSET ?? 4);
   return new Date(Date.now() + off * 3600000); // read with getUTC* methods
 }
-function localDate(env, d = nowLocal(env)) {
+export function localDate(env, d = nowLocal(env)) {
   return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
-function ddmmyyyy(iso) {
+export function ddmmyyyy(iso) {
   const [y, m, d] = iso.split("-");
   return `${d}.${m}.${y}`;
 }
@@ -118,7 +135,7 @@ function decode(s) {
     .replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 }
 // Returns an array of {child: text} objects for every <tag>...</tag> record.
-function xmlRecords(xml, tag) {
+export function xmlRecords(xml, tag) {
   const out = [];
   const re = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "g");
   let m;
@@ -137,7 +154,7 @@ function xmlRecords(xml, tag) {
 }
 
 // ---------- Syrve session ----------
-async function withSyrve(env, fn) {
+export async function withSyrve(env, fn) {
   if (!env.SYRVE_URL || !env.SYRVE_LOGIN || !env.SYRVE_PASSWORD) {
     throw new Error("Syrve is not configured (SYRVE_URL / SYRVE_LOGIN / SYRVE_PASSWORD)");
   }

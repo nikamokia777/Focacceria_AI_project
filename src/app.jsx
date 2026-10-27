@@ -8,7 +8,7 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 const T = {
   ka: {
     appSub: "PriceCheck",
-    tabs: { products: "პროდუქტები", distributors: "დისტრიბუცია", bazaar: "ბაზარი", orders: "შეკვეთები", mistakes: "შეცდომები", debts: "ვალები", history: "ისტორია" },
+    tabs: { products: "პროდუქტები", distributors: "დისტრიბუცია", bazaar: "ბაზარი", orders: "შეკვეთები", storage: "საწყობი", mistakes: "შეცდომები", debts: "ვალები", history: "ისტორია" },
     sync: { ok: "✓ სინქრ.", saving: "ინახება…", error: "⚠ კავშირი" },
     search: "ძებნა…",
     searchProduct: "პროდუქტის ძებნა…",
@@ -119,10 +119,31 @@ const T = {
     notSet: "პაროლი ჯერ არ არის დაყენებული. დირექტორმა ბოტს პირად ჩატში უნდა გაუგზავნოს: /password ახალი_პაროლი",
     connError: "კავშირის შეცდომა — სცადეთ თავიდან",
     loading: "იტვირთება…",
+    stock: {
+      search: "პროდუქტის ძებნა…",
+      all: "ყველა", low: "იწურება", withMin: "მინიმუმით", allStores: "ყველა საწყობი",
+      prioNames: { red: "მაღალი პრიორიტეტი", yellow: "საშუალო პრიორიტეტი", cyan: "დაბალი პრიორიტეტი" },
+      refresh: "↻ განახლება",
+      col: { prio: "პრიორიტეტი", name: "პროდუქტი", syrve: "Syrve", live: "რეალური", min: "მინიმუმი", inv: "ინვენტ. სხვაობა", status: "სტატუსი" },
+      kpi: { products: "პროდუქტი", low: "იწურება", lastInv: "ბოლო ინვენტარიზაცია", asOf: "Syrve განახლდა" },
+      noInv: "2 თვეში არ ყოფილა",
+      invDoc: (n, c) => `${n ? "№ " + n + " · " : ""}${c} პოზიციაში სხვაობა`,
+      manual: "ხელით", resetCorr: "Syrve-ს რიცხვზე დაბრუნება",
+      corrHint: "ხელით ცვლილება Syrve-ზე არ მოქმედებს და ახალი ინვენტარიზაციისას თავისით უქმდება.",
+      minHint: "როცა რეალური რაოდენობა მინიმუმამდე ჩამოვა, ბოტი Telegram-ის ჯგუფში შეტყობინებას გაგზავნის.",
+      alarm: { open: "🔔 გაგზავნილია", approved: "✅ შეკვეთილი", rejected: "❌ უარყოფილი", low: "იწურება" },
+      linked: "შეკვეთაში:", autoLinked: "ავტომ.", noLink: "PriceCheck-თან არ არის დაკავშირებული",
+      autoOpt: "— ავტომატურად —", unlinkOpt: "— არ დაკავშირდეს —", changeLink: "შეცვლა",
+      noGroup: "Telegram-ის ჯგუფი ჯერ უცნობია — დაწერეთ ნებისმიერი შეტყობინება თანამშრომლების ჯგუფში, რომ ბოტმა დაიმახსოვროს.",
+      invError: "ინვენტარიზაციის მონაცემი ვერ წავიკითხე: ",
+      error: "Syrve-დან მონაცემი ვერ მივიღე: ",
+      showing: (a, b) => `ნაჩვენებია ${a} / ${b} — დააზუსტეთ ძებნა`,
+      empty: "პროდუქტები არ მოიძებნა",
+    },
   },
   en: {
     appSub: "PriceCheck",
-    tabs: { products: "Products", distributors: "Distributors", bazaar: "Bazaar", orders: "Orders", mistakes: "Mistakes", debts: "Debts", history: "History" },
+    tabs: { products: "Products", distributors: "Distributors", bazaar: "Bazaar", orders: "Orders", storage: "Storage", mistakes: "Mistakes", debts: "Debts", history: "History" },
     sync: { ok: "✓ Synced", saving: "Saving…", error: "⚠ Offline" },
     search: "Search…",
     searchProduct: "Search products…",
@@ -227,10 +248,31 @@ const T = {
     notSet: "No password set yet. The CEO should send the bot (in a private chat): /password new_password",
     connError: "Connection error — please try again",
     loading: "Loading…",
+    stock: {
+      search: "Search products…",
+      all: "All", low: "Running low", withMin: "With minimum", allStores: "All stores",
+      prioNames: { red: "High priority", yellow: "Moderate priority", cyan: "Low priority" },
+      refresh: "↻ Refresh",
+      col: { prio: "Priority", name: "Product", syrve: "Syrve", live: "Real", min: "Minimum", inv: "Reconciliation Δ", status: "Status" },
+      kpi: { products: "Products", low: "Running low", lastInv: "Last reconciliation", asOf: "Syrve updated" },
+      noInv: "none in 2 months",
+      invDoc: (n, c) => `${n ? "№ " + n + " · " : ""}${c} item(s) differed`,
+      manual: "manual", resetCorr: "Back to the Syrve number",
+      corrHint: "A manual change does not touch Syrve and is cleared automatically by the next reconciliation.",
+      minHint: "When the real amount falls to the minimum, the bot posts an alarm in the Telegram group.",
+      alarm: { open: "🔔 Sent", approved: "✅ Ordered", rejected: "❌ Not ordered", low: "Running low" },
+      linked: "Orders as:", autoLinked: "auto", noLink: "Not linked to PriceCheck",
+      autoOpt: "— automatic —", unlinkOpt: "— don't link —", changeLink: "change",
+      noGroup: "The Telegram group is not known yet — write any message in the employees' group so the bot remembers it.",
+      invError: "Could not read reconciliations: ",
+      error: "Could not get data from Syrve: ",
+      showing: (a, b) => `Showing ${a} of ${b} — narrow the search`,
+      empty: "No products found",
+    },
   },
 };
 
-const TABS = ["products", "distributors", "bazaar", "orders", "mistakes", "debts", "history"];
+const TABS = ["products", "distributors", "bazaar", "orders", "storage", "mistakes", "debts", "history"];
 
 // ── Categories ───────────────────────────────────────────────────────────────
 
@@ -875,6 +917,182 @@ function DebtsTab({ t }) {
   );
 }
 
+// ── Storage (Syrve stock) ────────────────────────────────────────────────────
+
+const PRIORITIES = ["red", "yellow", "cyan"];
+const PRIO_RANK = { red: 0, yellow: 1, cyan: 2 };
+const MAX_STOCK_ROWS = 300;
+const isLow = (it) => it.min !== null && it.live <= it.min;
+
+function PrioPicker({ t, value, onChange }) {
+  return (
+    <div className="prio-pick">
+      {PRIORITIES.map((p) => (
+        <button key={p} className={"prio-dot p-" + p + (value === p ? " on" : "")} title={t.stock.prioNames[p]}
+          aria-label={t.stock.prioNames[p]} aria-pressed={value === p} onClick={() => onChange(value === p ? "" : p)} />
+      ))}
+    </div>
+  );
+}
+
+// A number that saves when you leave the field or press Enter.
+function NumInput({ value, placeholder, title, onSave }) {
+  const shown = value === null || value === undefined ? "" : qtyStr(value);
+  const [v, setV] = useState(shown);
+  useEffect(() => setV(shown), [shown]);
+  const commit = () => { if (v.trim() !== shown) onSave(v.trim()); };
+  return (
+    <input className="input num-input mono" inputMode="decimal" value={v} placeholder={placeholder} title={title}
+      onChange={(e) => setV(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { setV(shown); } }} />
+  );
+}
+
+function StockLink({ t, item, products, onSave }) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    const value = item.noLink ? "none" : item.link && !item.link.auto ? String(item.link.id) : "";
+    return (
+      <select className="input link-select" autoFocus value={value} onBlur={() => setEditing(false)}
+        onChange={(e) => { setEditing(false); onSave(e.target.value); }}>
+        <option value="">{t.stock.autoOpt}</option>
+        <option value="none">{t.stock.unlinkOpt}</option>
+        {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+    );
+  }
+  return (
+    <div className="muted small">
+      {item.link ? <>{t.stock.linked} {item.link.name}{item.link.auto && <span className="tag">{t.stock.autoLinked}</span>}</> : t.stock.noLink}
+      {" "}<button className="link-btn" onClick={() => setEditing(true)}>{t.stock.changeLink}</button>
+    </div>
+  );
+}
+
+function StorageTab({ t, guard }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async (fresh) => {
+    setBusy(true);
+    try { setData(await guard(() => api("/api/stock" + (fresh ? "?fresh=1" : "")))); setErr(""); }
+    catch (e) { setErr(e.message); }
+    setBusy(false);
+  }, [guard]);
+  useEffect(() => {
+    load(false);
+    // Syrve numbers change with every sale; the server reuses them for a minute
+    const id = setInterval(() => { if (document.visibilityState === "visible") load(false); }, 60000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  const save = async (body) => {
+    try { setData(await guard(() => api("/api/stock", body))); setErr(""); }
+    catch (e) { setErr(e.message); }
+  };
+
+  if (!data) {
+    return <div className="card">{err ? <div className="empty error-text">{t.stock.error}{err}</div> : <Empty>{t.loading}</Empty>}</div>;
+  }
+
+  const qn = norm(q);
+  const rows = data.items
+    .filter((it) => !qn || norm(it.name).includes(qn) || norm(it.group).includes(qn) || norm(it.link?.name).includes(qn))
+    .filter((it) => !filter || (filter === "low" ? isLow(it) : filter === "min" ? it.min !== null : it.prio === filter))
+    .sort((a, b) => (isLow(b) - isLow(a)) || ((PRIO_RANK[a.prio] ?? 3) - (PRIO_RANK[b.prio] ?? 3)) || a.name.localeCompare(b.name));
+  const lowCount = data.items.filter(isLow).length;
+  const inv = data.inventory;
+
+  return (
+    <>
+      <div className="kpis">
+        <div className="card kpi"><div className="kpi-label">{t.stock.kpi.products}</div><div className="kpi-value">{data.items.length}</div></div>
+        <div className="card kpi"><div className="kpi-label">{t.stock.kpi.low}</div><div className={"kpi-value" + (lowCount ? " red-text" : "")}>{lowCount}</div></div>
+        <div className="card kpi">
+          <div className="kpi-label">{t.stock.kpi.lastInv}</div>
+          <div className="kpi-value">{inv ? fmtDate(inv.date, true).slice(0, 10) : "—"}</div>
+          <div className="muted small">{inv ? t.stock.invDoc(inv.num, inv.count) : t.stock.noInv}</div>
+        </div>
+        <div className="card kpi"><div className="kpi-label">{t.stock.kpi.asOf}</div><div className="kpi-value">{fmtDate(data.asOf).slice(6)}</div></div>
+      </div>
+
+      {err && <div className="card notice error-text">{t.stock.error}{err}</div>}
+      {data.alarmProblem === "no_group" && <div className="card notice">{t.stock.noGroup}</div>}
+      {data.inventoryError && <div className="card notice muted small">{t.stock.invError}{data.inventoryError}</div>}
+
+      <div className="card table-card">
+        <div className="toolbar inner">
+          <input className="input grow" placeholder={t.stock.search} value={q} onChange={(e) => setQ(e.target.value)} />
+          <select className="input" value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="">{t.stock.all}</option>
+            <option value="low">{t.stock.low}</option>
+            <option value="min">{t.stock.withMin}</option>
+            {PRIORITIES.map((p) => <option key={p} value={p}>{t.stock.prioNames[p]}</option>)}
+          </select>
+          {data.stores.length > 1 && (
+            <select className="input" value={data.store} onChange={(e) => save({ store: e.target.value })}>
+              <option value="">{t.stock.allStores}</option>
+              {data.stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+          <button className="btn-outline" disabled={busy} onClick={() => load(true)}>{t.stock.refresh}</button>
+        </div>
+        <div className="table-scroll">
+          <table className="table stock-table">
+            <thead>
+              <tr>
+                <th>{t.stock.col.prio}</th><th>{t.stock.col.name}</th>
+                <th className="r">{t.stock.col.syrve}</th><th className="r" title={t.stock.corrHint}>{t.stock.col.live}</th>
+                <th className="r" title={t.stock.minHint}>{t.stock.col.min}</th>
+                <th className="r">{t.stock.col.inv}</th><th>{t.stock.col.status}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, MAX_STOCK_ROWS).map((it) => {
+                const low = isLow(it);
+                return (
+                  <tr key={it.id} className={low ? "row-low" : ""}>
+                    <td><PrioPicker t={t} value={it.prio} onChange={(prio) => save({ id: it.id, prio })} /></td>
+                    <td>
+                      <div className="strong">{it.name}{it.group && <span className="tag">{it.group}</span>}</div>
+                      <StockLink t={t} item={it} products={data.products} onSave={(link) => save({ id: it.id, link })} />
+                    </td>
+                    <td className="r mono muted nowrap">{qtyStr(it.syrve)} {it.unit}</td>
+                    <td className="r nowrap">
+                      <NumInput value={it.live} title={t.stock.corrHint} onSave={(live) => save({ id: it.id, live })} />
+                      <span className="unit-label">{it.unit}</span>
+                      {it.corr !== 0 && (
+                        <div className="small corr-note" title={t.stock.corrHint}>
+                          ✎ {t.stock.manual} {it.corr > 0 ? "+" : ""}{qtyStr(it.corr)}
+                          {" "}<button className="link-btn" title={t.stock.resetCorr} onClick={() => save({ id: it.id, clearCorr: true })}>↺</button>
+                        </div>
+                      )}
+                    </td>
+                    <td className="r nowrap">
+                      <NumInput value={it.min} placeholder="—" title={t.stock.minHint} onSave={(min) => save({ id: it.id, min })} />
+                      <span className="unit-label">{it.unit}</span>
+                    </td>
+                    <td className="r mono nowrap">{it.inv === null ? <span className="muted">—</span> : <span className={it.inv < 0 ? "red-text" : ""}>{it.inv > 0 ? "+" : ""}{qtyStr(it.inv)}</span>}</td>
+                    <td className="nowrap">
+                      {it.alarm ? <span className={"pill alarm-" + it.alarm}>{t.stock.alarm[it.alarm]}</span>
+                        : low ? <span className="pill alarm-low">{t.stock.alarm.low}</span> : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {!rows.length && <Empty>{t.stock.empty}</Empty>}
+        {rows.length > MAX_STOCK_ROWS && <div className="muted small table-foot">{t.stock.showing(MAX_STOCK_ROWS, rows.length)}</div>}
+      </div>
+    </>
+  );
+}
+
 // ── Product form ─────────────────────────────────────────────────────────────
 
 function ProductModal({ t, lang, draft, products, onSave, onDelete, onClose }) {
@@ -1195,6 +1413,7 @@ function App() {
             {tab === "distributors" && <DistributorsTab t={t} products={products} />}
             {tab === "bazaar" && <BazaarTab t={t} lang={lang} products={products} onEdit={(p) => setModal({ ...p })} onAdd={newProduct} />}
             {tab === "orders" && <OrdersTab t={t} lang={lang} products={products} order={order} orderOps={orderOps} />}
+            {tab === "storage" && <StorageTab t={t} guard={guard} />}
             {tab === "mistakes" && <MistakesTab t={t} log={log} logAction={logAction} refresh={refresh} />}
             {tab === "debts" && <DebtsTab t={t} />}
             {tab === "history" && <HistoryTab t={t} log={log} logAction={logAction} refresh={refresh} />}
