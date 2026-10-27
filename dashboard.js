@@ -8,6 +8,7 @@
 //   SYRVE_PASSWORD  that user's password (plain — it is hashed here)
 // Optional secrets: TZ_OFFSET (hours from UTC, default 4), DEBT_SIGN (default -1)
 
+import { listOutgoingWaybills } from "./rsge.js";
 import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadBankData, loadRecipientPayments, syncStep, bumpVersion, loadVersion } from "./bank.js";
 import { loadLog } from "./store.js";
 
@@ -40,7 +41,19 @@ export async function handleDashboard(request, env, path) {
     // Syrve
     if (parts[0] === "syrve" && request.method === "GET") {
       const fresh = url.searchParams.get("fresh") === "1";
-      if (parts[1] === "live") return json(await cached(env, "live", 60, fresh, () => syrveLive(env)));
+      if (parts[1] === "live" || parts[1] === "paytype") {
+        // a date range (inclusive); today by default. Ranges that include today are refreshed every minute.
+        const today = localDate(env);
+        const day = v => (/^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : "");
+        const from = day(url.searchParams.get("from")) || today;
+        const to = [day(url.searchParams.get("to")) || from, today].sort()[0];
+        if (from > to) return json({ error: "bad range" }, 400);
+        const ttl = to >= today ? 60 : 3600;
+        if (parts[1] === "live") return json(await cached(env, `live:${from}:${to}`, ttl, fresh, () => syrveLive(env, from, to)));
+        const name = String(url.searchParams.get("name") || "").slice(0, 100);
+        if (!name) return json({ error: "name required" }, 400);
+        return json(await cached(env, `pay:${from}:${to}:${name}`, ttl, fresh, () => syrvePayType(env, from, to, name)));
+      }
       if (parts[1] === "monthly") return json(await cached(env, "monthly", 3600, fresh, () => syrveMonthly(env)));
       if (parts[1] === "debts") {
         const syrve = await cached(env, "debts-syrve", 900, fresh, () => syrveDebts(env));
@@ -177,8 +190,18 @@ export async function withSyrve(env, fn) {
     return text;
   };
 
+  // OLAP v2 takes a JSON body
+  const post = async (path, body) => {
+    const res = await fetch(`${base}${path}?key=${encodeURIComponent(key)}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Syrve ${path} → ${res.status}: ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  };
+
   try {
-    return await fn(get);
+    return await fn(get, post);
   } finally {
     // Always log out so the API license is freed.
     try { await fetch(`${base}/logout?key=${key}`); } catch (_) {}
@@ -187,19 +210,19 @@ export async function withSyrve(env, fn) {
 
 const num = v => (v === undefined || v === null || v === "" ? 0 : Number(v) || 0);
 
-// ---------- LIVE: today's sales ----------
-async function syrveLive(env) {
-  const today = localDate(env);
-  const tomorrowD = nowLocal(env); tomorrowD.setUTCDate(tomorrowD.getUTCDate() + 1);
-  const tomorrow = localDate(env, tomorrowD);
+// ---------- LIVE: sales for a day or a range of days (today by default) ----------
+const nextDay = day => { const d = new Date(day + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+
+async function syrveLive(env, from, to) {
+  const end = nextDay(to); // Syrve's "to" is exclusive
 
   return withSyrve(env, async get => {
-    const result = { date: today, total: 0, orders: 0, byPayType: [], byHour: [], source: "olap" };
+    const result = { date: from, from, to, total: 0, orders: 0, byPayType: [], byHour: [], byDay: [], source: "olap" };
 
     // 1) OLAP sales by payment type
     try {
       const xml = await get("/reports/olap", {
-        report: "SALES", from: ddmmyyyy(today), to: ddmmyyyy(tomorrow),
+        report: "SALES", from: ddmmyyyy(from), to: ddmmyyyy(end),
         groupRow: "PayTypes", agr: ["DishDiscountSumInt", "UniqOrderId.OrdersCount"],
       });
       const rows = xmlRecords(xml, "r");
@@ -209,22 +232,33 @@ async function syrveLive(env) {
         result.total += sum;
         result.orders += num(r["UniqOrderId.OrdersCount"]);
       }
-      // 2) by hour (optional — ignore if the field isn't supported)
+      // 2) by hour for one day, by day for a range (optional — ignore if the field isn't supported)
       try {
-        const xh = await get("/reports/olap", {
-          report: "SALES", from: ddmmyyyy(today), to: ddmmyyyy(tomorrow),
-          groupRow: "HourOpen", agr: "DishDiscountSumInt",
-        });
-        result.byHour = xmlRecords(xh, "r")
-          .map(r => ({ hour: Number(r.HourOpen), sum: num(r.DishDiscountSumInt) }))
-          .filter(r => !Number.isNaN(r.hour))
-          .sort((a, b) => a.hour - b.hour);
+        if (from === to) {
+          const xh = await get("/reports/olap", {
+            report: "SALES", from: ddmmyyyy(from), to: ddmmyyyy(end),
+            groupRow: "HourOpen", agr: "DishDiscountSumInt",
+          });
+          result.byHour = xmlRecords(xh, "r")
+            .map(r => ({ hour: Number(r.HourOpen), sum: num(r.DishDiscountSumInt) }))
+            .filter(r => !Number.isNaN(r.hour))
+            .sort((a, b) => a.hour - b.hour);
+        } else {
+          const xd = await get("/reports/olap", {
+            report: "SALES", from: ddmmyyyy(from), to: ddmmyyyy(end),
+            groupRow: "OpenDate.Typed", agr: "DishDiscountSumInt",
+          });
+          result.byDay = xmlRecords(xd, "r")
+            .map(r => ({ day: String(r["OpenDate.Typed"] || "").slice(0, 10), sum: num(r.DishDiscountSumInt) }))
+            .filter(r => r.day)
+            .sort((a, b) => a.day.localeCompare(b.day));
+        }
       } catch (_) {}
     } catch (e) {
-      // Fallback: cash shifts of today
+      // Fallback: cash shifts of those days
       result.source = "cashshifts";
       result.olapError = String(e.message || e);
-      const data = JSON.parse(await get("/v2/cashshifts/list", { openDateFrom: today, openDateTo: today, status: "ANY" }));
+      const data = JSON.parse(await get("/v2/cashshifts/list", { openDateFrom: from, openDateTo: to, status: "ANY" }));
       let cash = 0, card = 0, credit = 0;
       for (const s of data) { result.total += num(s.payOrders); cash += num(s.salesCash); card += num(s.salesCard); credit += num(s.salesCredit); }
       result.byPayType = [{ name: "Cash", sum: cash }, { name: "Card", sum: card }, { name: "Credit", sum: credit }].filter(x => x.sum);
@@ -232,6 +266,74 @@ async function syrveLive(env) {
     return result;
   });
 }
+
+// ---------- one payment type in detail (click on a row in Income now) ----------
+// Every order paid with it: when, order number, the customer (B2B buyer), cashier, amount,
+// the products sold — and for orders with a customer, our matching rs.ge waybill.
+async function syrvePayType(env, from, to, name) {
+  const filters = {
+    "OpenDate.Typed": { filterType: "DateRange", periodType: "CUSTOM", from, to: nextDay(to), includeLow: true, includeHigh: false },
+    PayTypes: { filterType: "IncludeValues", values: [name] },
+    OrderDeleted: { filterType: "IncludeValues", values: ["NOT_DELETED"] },
+  };
+  const KEY = ["OpenDate.Typed", "OrderNum"];
+  const keyOf = r => `${String(r["OpenDate.Typed"] || "").slice(0, 10)}#${r.OrderNum}`;
+
+  const out = await withSyrve(env, async (get, post) => {
+    const olap = (fields, aggregates = ["DishDiscountSumInt"]) =>
+      post("/v2/reports/olap", { reportType: "SALES", buildSummary: false, groupByRowFields: fields, aggregateFields: aggregates, filters })
+        .then(r => r.data || []);
+
+    const orders = new Map();
+    for (const r of await olap(KEY)) {
+      orders.set(keyOf(r), { day: String(r["OpenDate.Typed"] || "").slice(0, 10), num: String(r.OrderNum ?? ""), time: "", customer: "", cashier: "", sum: num(r.DishDiscountSumInt), items: [] });
+    }
+    // Field names differ between Syrve versions: each extra column is asked separately,
+    // so one the server doesn't know only leaves that column empty.
+    const extra = async (field, apply) => {
+      try { for (const r of await olap([...KEY, field])) { const o = orders.get(keyOf(r)); if (o && r[field] != null && r[field] !== "") apply(o, r[field]); } }
+      catch (_) {}
+    };
+    await extra("CloseTime", (o, v) => { o.time = String(v).slice(11, 16); });
+    await extra("Cashier", (o, v) => { o.cashier = String(v); });
+    await extra("CreditUser", (o, v) => { o.customer = String(v); });
+    await extra("Delivery.CustomerName", (o, v) => { o.customer = o.customer || String(v); });
+    let itemsError = "";
+    try {
+      for (const r of await olap([...KEY, "DishName"], ["DishAmountInt", "DishDiscountSumInt"])) {
+        orders.get(keyOf(r))?.items.push({ name: r.DishName || "—", qty: num(r.DishAmountInt), sum: num(r.DishDiscountSumInt) });
+      }
+    } catch (e) { itemsError = String(e.message || e).slice(0, 200); }
+    return { orders: [...orders.values()], itemsError };
+  });
+
+  const orders = out.orders.sort((a, b) => (b.day + b.time).localeCompare(a.day + a.time) || Number(b.num) - Number(a.num));
+  const result = { name, from, to, total: Math.round(orders.reduce((a, o) => a + o.sum, 0) * 100) / 100, orders, itemsError: out.itemsError, waybills: null, waybillError: "" };
+
+  // B2B: look for the waybill we issued to that buyer on rs.ge
+  if (orders.some(o => o.customer)) {
+    if (!env.RSGE_SERVICE_USER || !env.RSGE_SERVICE_PASSWORD) result.waybillError = "rs.ge is not configured";
+    else {
+      try {
+        const list = (await listOutgoingWaybills(env, addDaysIso(from, -1), [addDaysIso(to, 2), localDate(env)].sort()[0]))
+          .filter(w => w.status !== "-1" && w.status !== "-2"); // deleted / cancelled
+        const used = new Set();
+        result.waybills = list.length;
+        for (const o of orders.filter(x => x.customer).sort((a, b) => b.sum - a.sum)) {
+          const near = list.filter(w => !used.has(w.id) && similar(w.buyerName, o.customer)
+            && Math.abs(Date.parse(String(w.createDate || w.beginDate).slice(0, 10)) - Date.parse(o.day)) <= 2 * 86400000);
+          // the closest amount wins
+          near.sort((a, b) => Math.abs(a.fullAmount - o.sum) - Math.abs(b.fullAmount - o.sum));
+          const w = near[0];
+          if (w) { used.add(w.id); o.waybill = { number: w.number, amount: w.fullAmount, status: w.status, buyer: w.buyerName, date: String(w.createDate || "").slice(0, 10) }; }
+          else o.waybill = null;
+        }
+      } catch (e) { result.waybillError = String(e.message || e).slice(0, 200); }
+    }
+  }
+  return result;
+}
+const addDaysIso = (day, n) => { const d = new Date(day + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
 // ---------- MONTHLY: last 12 months from cash shifts ----------
 async function syrveMonthly(env) {
