@@ -15,9 +15,12 @@
 //   GET/POST /api/order        the current order (POST { ops: [...] })
 //   GET      /api/log          History + Mistakes records
 //   POST     /api/log/action   { token, action: "resolve" | "reopen" }
+//   GET/POST /api/stock        the Storage tab: Syrve stock, minimums, priorities (POST { id, ... })
 //   *        /api/dash/...     the Dashboard (costs, ratings, tasks, Syrve data) — see dashboard.js
 //
 // Everything else is served from the static files in /public.
+//
+// Every 15 minutes (cron in wrangler.jsonc) stock is checked against the minimums.
 
 import { checkServiceUser } from "./rsge.js";
 import {
@@ -27,6 +30,7 @@ import {
 import { isLoggedIn, login, logout, passwordIsSet } from "./auth.js";
 import { handleUpdate, handleWhatsAppLink, setupWebhook, webhookSecret } from "./telegram.js";
 import { handleDashboard } from "./dashboard.js";
+import { buildStock, updateStock, checkStockAlarms, scheduledStockCheck } from "./stock.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 
@@ -119,6 +123,20 @@ async function handleLogAction(request, env) {
   return json({ item: updated });
 }
 
+async function handleStock(request, env) {
+  let fresh = new URL(request.url).searchParams.get("fresh") === "1";
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    if (!body || typeof body !== "object") return json({ error: "Expected { id, ... }" }, 400);
+    await updateStock(env, body);
+  } else if (request.method !== "GET") {
+    return json({ error: "Method not allowed" }, 405);
+  }
+  const data = await buildStock(env, { fresh });
+  data.alarmProblem = await checkStockAlarms(env, data);
+  return json(data);
+}
+
 // ── Setup / health ───────────────────────────────────────────────────────────
 
 async function handleStatus(env) {
@@ -178,6 +196,7 @@ const PROTECTED = {
   "/api/order": handleOrder,
   "/api/log": handleLog,
   "/api/log/action": handleLogAction,
+  "/api/stock": handleStock,
 };
 
 export default {
@@ -216,5 +235,10 @@ export default {
 
     // Everything else (index.html, etc.) is served by the static assets binding
     return env.ASSETS.fetch(request);
+  },
+
+  async scheduled(event, env, ctx) {
+    if (!env.STORE || !env.SYRVE_URL) return;
+    ctx.waitUntil(scheduledStockCheck(env).catch((err) => console.error("stock check failed:", err?.stack || err)));
   },
 };

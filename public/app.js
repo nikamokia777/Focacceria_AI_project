@@ -14,6 +14,7 @@ const T = {
       distributors: "დისტრიბუცია",
       bazaar: "ბაზარი",
       orders: "შეკვეთები",
+      storage: "საწყობი",
       mistakes: "შეცდომები",
       debts: "ვალები",
       history: "ისტორია"
@@ -166,7 +167,58 @@ const T = {
     tooMany: "ძალიან ბევრი მცდელობა — სცადეთ 15 წუთში",
     notSet: "პაროლი ჯერ არ არის დაყენებული. დირექტორმა ბოტს პირად ჩატში უნდა გაუგზავნოს: /password ახალი_პაროლი",
     connError: "კავშირის შეცდომა — სცადეთ თავიდან",
-    loading: "იტვირთება…"
+    loading: "იტვირთება…",
+    stock: {
+      search: "პროდუქტის ძებნა…",
+      all: "ყველა",
+      low: "იწურება",
+      withMin: "მინიმუმით",
+      allStores: "ყველა საწყობი",
+      prioNames: {
+        red: "მაღალი პრიორიტეტი",
+        yellow: "საშუალო პრიორიტეტი",
+        cyan: "დაბალი პრიორიტეტი"
+      },
+      refresh: "↻ განახლება",
+      col: {
+        prio: "პრიორიტეტი",
+        name: "პროდუქტი",
+        syrve: "Syrve",
+        live: "რეალური",
+        min: "მინიმუმი",
+        inv: "ინვენტ. სხვაობა",
+        status: "სტატუსი"
+      },
+      kpi: {
+        products: "პროდუქტი",
+        low: "იწურება",
+        lastInv: "ბოლო ინვენტარიზაცია",
+        asOf: "Syrve განახლდა"
+      },
+      noInv: "2 თვეში არ ყოფილა",
+      invDoc: (n, c) => `${n ? "№ " + n + " · " : ""}${c} პოზიციაში სხვაობა`,
+      manual: "ხელით",
+      resetCorr: "Syrve-ს რიცხვზე დაბრუნება",
+      corrHint: "ხელით ცვლილება Syrve-ზე არ მოქმედებს და ახალი ინვენტარიზაციისას თავისით უქმდება.",
+      minHint: "როცა რეალური რაოდენობა მინიმუმამდე ჩამოვა, ბოტი Telegram-ის ჯგუფში შეტყობინებას გაგზავნის.",
+      alarm: {
+        open: "🔔 გაგზავნილია",
+        approved: "✅ შეკვეთილი",
+        rejected: "❌ უარყოფილი",
+        low: "იწურება"
+      },
+      linked: "შეკვეთაში:",
+      autoLinked: "ავტომ.",
+      noLink: "PriceCheck-თან არ არის დაკავშირებული",
+      autoOpt: "— ავტომატურად —",
+      unlinkOpt: "— არ დაკავშირდეს —",
+      changeLink: "შეცვლა",
+      noGroup: "Telegram-ის ჯგუფი ჯერ უცნობია — დაწერეთ ნებისმიერი შეტყობინება თანამშრომლების ჯგუფში, რომ ბოტმა დაიმახსოვროს.",
+      invError: "ინვენტარიზაციის მონაცემი ვერ წავიკითხე: ",
+      error: "Syrve-დან მონაცემი ვერ მივიღე: ",
+      showing: (a, b) => `ნაჩვენებია ${a} / ${b} — დააზუსტეთ ძებნა`,
+      empty: "პროდუქტები არ მოიძებნა"
+    }
   },
   en: {
     appSub: "PriceCheck",
@@ -175,6 +227,7 @@ const T = {
       distributors: "Distributors",
       bazaar: "Bazaar",
       orders: "Orders",
+      storage: "Storage",
       mistakes: "Mistakes",
       debts: "Debts",
       history: "History"
@@ -327,10 +380,61 @@ const T = {
     tooMany: "Too many attempts — try again in 15 minutes",
     notSet: "No password set yet. The CEO should send the bot (in a private chat): /password new_password",
     connError: "Connection error — please try again",
-    loading: "Loading…"
+    loading: "Loading…",
+    stock: {
+      search: "Search products…",
+      all: "All",
+      low: "Running low",
+      withMin: "With minimum",
+      allStores: "All stores",
+      prioNames: {
+        red: "High priority",
+        yellow: "Moderate priority",
+        cyan: "Low priority"
+      },
+      refresh: "↻ Refresh",
+      col: {
+        prio: "Priority",
+        name: "Product",
+        syrve: "Syrve",
+        live: "Real",
+        min: "Minimum",
+        inv: "Reconciliation Δ",
+        status: "Status"
+      },
+      kpi: {
+        products: "Products",
+        low: "Running low",
+        lastInv: "Last reconciliation",
+        asOf: "Syrve updated"
+      },
+      noInv: "none in 2 months",
+      invDoc: (n, c) => `${n ? "№ " + n + " · " : ""}${c} item(s) differed`,
+      manual: "manual",
+      resetCorr: "Back to the Syrve number",
+      corrHint: "A manual change does not touch Syrve and is cleared automatically by the next reconciliation.",
+      minHint: "When the real amount falls to the minimum, the bot posts an alarm in the Telegram group.",
+      alarm: {
+        open: "🔔 Sent",
+        approved: "✅ Ordered",
+        rejected: "❌ Not ordered",
+        low: "Running low"
+      },
+      linked: "Orders as:",
+      autoLinked: "auto",
+      noLink: "Not linked to PriceCheck",
+      autoOpt: "— automatic —",
+      unlinkOpt: "— don't link —",
+      changeLink: "change",
+      noGroup: "The Telegram group is not known yet — write any message in the employees' group so the bot remembers it.",
+      invError: "Could not read reconciliations: ",
+      error: "Could not get data from Syrve: ",
+      showing: (a, b) => `Showing ${a} of ${b} — narrow the search`,
+      empty: "No products found"
+    }
   }
 };
-const TABS = ["products", "distributors", "bazaar", "orders", "mistakes", "debts", "history"];
+const TABS = ["products", "distributors", "bazaar", "orders", "storage", "mistakes", "debts", "history"];
 const CATEGORIES = ["ხორცეული", "ყველი", "ზეთი", "პასტა", "ბოსტნეული", "რძის პროდუქტი", "ყავა", "თხილეული", "გაყინული", "სხვა"];
 const CAT_EN = {
   "ხორცეული": "Meat",
@@ -1207,6 +1311,300 @@ function DebtsTab({
     className: "muted"
   }, t.debtsSoon));
 }
+const PRIORITIES = ["red", "yellow", "cyan"];
+const PRIO_RANK = {
+  red: 0,
+  yellow: 1,
+  cyan: 2
+};
+const MAX_STOCK_ROWS = 300;
+const isLow = it => it.min !== null && it.live <= it.min;
+function PrioPicker({
+  t,
+  value,
+  onChange
+}) {
+  return React.createElement("div", {
+    className: "prio-pick"
+  }, PRIORITIES.map(p => React.createElement("button", {
+    key: p,
+    className: "prio-dot p-" + p + (value === p ? " on" : ""),
+    title: t.stock.prioNames[p],
+    "aria-label": t.stock.prioNames[p],
+    "aria-pressed": value === p,
+    onClick: () => onChange(value === p ? "" : p)
+  })));
+}
+function NumInput({
+  value,
+  placeholder,
+  title,
+  onSave
+}) {
+  const shown = value === null || value === undefined ? "" : qtyStr(value);
+  const [v, setV] = useState(shown);
+  useEffect(() => setV(shown), [shown]);
+  const commit = () => {
+    if (v.trim() !== shown) onSave(v.trim());
+  };
+  return React.createElement("input", {
+    className: "input num-input mono",
+    inputMode: "decimal",
+    value: v,
+    placeholder: placeholder,
+    title: title,
+    onChange: e => setV(e.target.value),
+    onBlur: commit,
+    onKeyDown: e => {
+      if (e.key === "Enter") e.target.blur();
+      if (e.key === "Escape") {
+        setV(shown);
+      }
+    }
+  });
+}
+function StockLink({
+  t,
+  item,
+  products,
+  onSave
+}) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    const value = item.noLink ? "none" : item.link && !item.link.auto ? String(item.link.id) : "";
+    return React.createElement("select", {
+      className: "input link-select",
+      autoFocus: true,
+      value: value,
+      onBlur: () => setEditing(false),
+      onChange: e => {
+        setEditing(false);
+        onSave(e.target.value);
+      }
+    }, React.createElement("option", {
+      value: ""
+    }, t.stock.autoOpt), React.createElement("option", {
+      value: "none"
+    }, t.stock.unlinkOpt), products.map(p => React.createElement("option", {
+      key: p.id,
+      value: p.id
+    }, p.name)));
+  }
+  return React.createElement("div", {
+    className: "muted small"
+  }, item.link ? React.createElement(React.Fragment, null, t.stock.linked, " ", item.link.name, item.link.auto && React.createElement("span", {
+    className: "tag"
+  }, t.stock.autoLinked)) : t.stock.noLink, " ", React.createElement("button", {
+    className: "link-btn",
+    onClick: () => setEditing(true)
+  }, t.stock.changeLink));
+}
+function StorageTab({
+  t,
+  guard
+}) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async fresh => {
+    setBusy(true);
+    try {
+      setData(await guard(() => api("/api/stock" + (fresh ? "?fresh=1" : ""))));
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  }, [guard]);
+  useEffect(() => {
+    load(false);
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") load(false);
+    }, 60000);
+    return () => clearInterval(id);
+  }, [load]);
+  const save = async body => {
+    try {
+      setData(await guard(() => api("/api/stock", body)));
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+  if (!data) {
+    return React.createElement("div", {
+      className: "card"
+    }, err ? React.createElement("div", {
+      className: "empty error-text"
+    }, t.stock.error, err) : React.createElement(Empty, null, t.loading));
+  }
+  const qn = norm(q);
+  const rows = data.items.filter(it => !qn || norm(it.name).includes(qn) || norm(it.group).includes(qn) || norm(it.link?.name).includes(qn)).filter(it => !filter || (filter === "low" ? isLow(it) : filter === "min" ? it.min !== null : it.prio === filter)).sort((a, b) => isLow(b) - isLow(a) || (PRIO_RANK[a.prio] ?? 3) - (PRIO_RANK[b.prio] ?? 3) || a.name.localeCompare(b.name));
+  const lowCount = data.items.filter(isLow).length;
+  const inv = data.inventory;
+  return React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "kpis"
+  }, React.createElement("div", {
+    className: "card kpi"
+  }, React.createElement("div", {
+    className: "kpi-label"
+  }, t.stock.kpi.products), React.createElement("div", {
+    className: "kpi-value"
+  }, data.items.length)), React.createElement("div", {
+    className: "card kpi"
+  }, React.createElement("div", {
+    className: "kpi-label"
+  }, t.stock.kpi.low), React.createElement("div", {
+    className: "kpi-value" + (lowCount ? " red-text" : "")
+  }, lowCount)), React.createElement("div", {
+    className: "card kpi"
+  }, React.createElement("div", {
+    className: "kpi-label"
+  }, t.stock.kpi.lastInv), React.createElement("div", {
+    className: "kpi-value"
+  }, inv ? fmtDate(inv.date, true).slice(0, 10) : "—"), React.createElement("div", {
+    className: "muted small"
+  }, inv ? t.stock.invDoc(inv.num, inv.count) : t.stock.noInv)), React.createElement("div", {
+    className: "card kpi"
+  }, React.createElement("div", {
+    className: "kpi-label"
+  }, t.stock.kpi.asOf), React.createElement("div", {
+    className: "kpi-value"
+  }, fmtDate(data.asOf).slice(6)))), err && React.createElement("div", {
+    className: "card notice error-text"
+  }, t.stock.error, err), data.alarmProblem === "no_group" && React.createElement("div", {
+    className: "card notice"
+  }, t.stock.noGroup), data.inventoryError && React.createElement("div", {
+    className: "card notice muted small"
+  }, t.stock.invError, data.inventoryError), React.createElement("div", {
+    className: "card table-card"
+  }, React.createElement("div", {
+    className: "toolbar inner"
+  }, React.createElement("input", {
+    className: "input grow",
+    placeholder: t.stock.search,
+    value: q,
+    onChange: e => setQ(e.target.value)
+  }), React.createElement("select", {
+    className: "input",
+    value: filter,
+    onChange: e => setFilter(e.target.value)
+  }, React.createElement("option", {
+    value: ""
+  }, t.stock.all), React.createElement("option", {
+    value: "low"
+  }, t.stock.low), React.createElement("option", {
+    value: "min"
+  }, t.stock.withMin), PRIORITIES.map(p => React.createElement("option", {
+    key: p,
+    value: p
+  }, t.stock.prioNames[p]))), data.stores.length > 1 && React.createElement("select", {
+    className: "input",
+    value: data.store,
+    onChange: e => save({
+      store: e.target.value
+    })
+  }, React.createElement("option", {
+    value: ""
+  }, t.stock.allStores), data.stores.map(s => React.createElement("option", {
+    key: s.id,
+    value: s.id
+  }, s.name))), React.createElement("button", {
+    className: "btn-outline",
+    disabled: busy,
+    onClick: () => load(true)
+  }, t.stock.refresh)), React.createElement("div", {
+    className: "table-scroll"
+  }, React.createElement("table", {
+    className: "table stock-table"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, t.stock.col.prio), React.createElement("th", null, t.stock.col.name), React.createElement("th", {
+    className: "r"
+  }, t.stock.col.syrve), React.createElement("th", {
+    className: "r",
+    title: t.stock.corrHint
+  }, t.stock.col.live), React.createElement("th", {
+    className: "r",
+    title: t.stock.minHint
+  }, t.stock.col.min), React.createElement("th", {
+    className: "r"
+  }, t.stock.col.inv), React.createElement("th", null, t.stock.col.status))), React.createElement("tbody", null, rows.slice(0, MAX_STOCK_ROWS).map(it => {
+    const low = isLow(it);
+    return React.createElement("tr", {
+      key: it.id,
+      className: low ? "row-low" : ""
+    }, React.createElement("td", null, React.createElement(PrioPicker, {
+      t: t,
+      value: it.prio,
+      onChange: prio => save({
+        id: it.id,
+        prio
+      })
+    })), React.createElement("td", null, React.createElement("div", {
+      className: "strong"
+    }, it.name, it.group && React.createElement("span", {
+      className: "tag"
+    }, it.group)), React.createElement(StockLink, {
+      t: t,
+      item: it,
+      products: data.products,
+      onSave: link => save({
+        id: it.id,
+        link
+      })
+    })), React.createElement("td", {
+      className: "r mono muted nowrap"
+    }, qtyStr(it.syrve), " ", it.unit), React.createElement("td", {
+      className: "r nowrap"
+    }, React.createElement(NumInput, {
+      value: it.live,
+      title: t.stock.corrHint,
+      onSave: live => save({
+        id: it.id,
+        live
+      })
+    }), React.createElement("span", {
+      className: "unit-label"
+    }, it.unit), it.corr !== 0 && React.createElement("div", {
+      className: "small corr-note",
+      title: t.stock.corrHint
+    }, "✎ ", t.stock.manual, " ", it.corr > 0 ? "+" : "", qtyStr(it.corr), " ", React.createElement("button", {
+      className: "link-btn",
+      title: t.stock.resetCorr,
+      onClick: () => save({
+        id: it.id,
+        clearCorr: true
+      })
+    }, "↺"))), React.createElement("td", {
+      className: "r nowrap"
+    }, React.createElement(NumInput, {
+      value: it.min,
+      placeholder: "—",
+      title: t.stock.minHint,
+      onSave: min => save({
+        id: it.id,
+        min
+      })
+    }), React.createElement("span", {
+      className: "unit-label"
+    }, it.unit)), React.createElement("td", {
+      className: "r mono nowrap"
+    }, it.inv === null ? React.createElement("span", {
+      className: "muted"
+    }, "—") : React.createElement("span", {
+      className: it.inv < 0 ? "red-text" : ""
+    }, it.inv > 0 ? "+" : "", qtyStr(it.inv))), React.createElement("td", {
+      className: "nowrap"
+    }, it.alarm ? React.createElement("span", {
+      className: "pill alarm-" + it.alarm
+    }, t.stock.alarm[it.alarm]) : low ? React.createElement("span", {
+      className: "pill alarm-low"
+    }, t.stock.alarm.low) : null));
+  })))), !rows.length && React.createElement(Empty, null, t.stock.empty), rows.length > MAX_STOCK_ROWS && React.createElement("div", {
+    className: "muted small table-foot"
+  }, t.stock.showing(MAX_STOCK_ROWS, rows.length))));
+}
 function ProductModal({
   t,
   lang,
@@ -1719,6 +2117,9 @@ function App() {
     products: products,
     order: order,
     orderOps: orderOps
+  }), tab === "storage" && React.createElement(StorageTab, {
+    t: t,
+    guard: guard
   }), tab === "mistakes" && React.createElement(MistakesTab, {
     t: t,
     log: log,

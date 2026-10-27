@@ -236,6 +236,29 @@
     .login-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 10px; }
     .login .input { width: 100%; }
 
+    /* storage (Syrve stock) */
+    .notice { padding: 10px 14px; margin-bottom: 12px; }
+    .red-text { color: var(--red); }
+    .table .r { text-align: right; }
+    .table-card .table.stock-table { min-width: 980px; }
+    .stock-table .row-low td { background: var(--red-soft); }
+    .prio-pick { display: inline-flex; gap: 6px; }
+    .prio-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; opacity: .28; padding: 0; }
+    .prio-dot:hover { opacity: .6; }
+    .prio-dot.on { opacity: 1; border-color: var(--dark); }
+    .p-red { background: #e5484d; }
+    .p-yellow { background: #f5c518; }
+    .p-cyan { background: #22c3d6; }
+    .num-input { width: 82px; height: 32px; text-align: right; }
+    .unit-label { display: inline-block; min-width: 26px; margin-left: 5px; text-align: left; color: var(--muted); font-size: 11.5px; }
+    .corr-note { color: #9a6a00; margin-top: 3px; }
+    .link-btn { border: 0; background: none; padding: 0; color: #2f6fd6; font-size: inherit; text-decoration: underline; }
+    .link-select { height: 30px; max-width: 280px; margin-top: 4px; }
+    .alarm-open, .alarm-low { background: #fde4e2; color: var(--red); }
+    .alarm-approved { background: var(--green-soft); color: var(--green-dark); }
+    .alarm-rejected { background: #f0eee9; color: var(--muted); }
+    .table-foot { padding: 10px 14px; border-top: 1px solid var(--line-soft); }
+
     /* phones & tablets */
     @media (max-width: 1000px) {
       .supplier-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
