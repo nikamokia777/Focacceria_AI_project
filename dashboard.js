@@ -310,8 +310,8 @@ async function syrvePayType(env, from, to, name) {
   const orders = out.orders.sort((a, b) => (b.day + b.time).localeCompare(a.day + a.time) || Number(b.num) - Number(a.num));
   const result = { name, from, to, total: Math.round(orders.reduce((a, o) => a + o.sum, 0) * 100) / 100, orders, itemsError: out.itemsError, waybills: null, waybillError: "" };
 
-  // B2B: look for the waybill we issued to that buyer on rs.ge
-  if (orders.some(o => o.customer)) {
+  // B2B only: look for the waybill we issued to that buyer on rs.ge
+  if (isB2B(name) && orders.some(o => o.customer)) {
     if (!env.RSGE_SERVICE_USER || !env.RSGE_SERVICE_PASSWORD) result.waybillError = "rs.ge is not configured";
     else {
       try {
@@ -333,6 +333,7 @@ async function syrvePayType(env, from, to, name) {
   }
   return result;
 }
+const isB2B = name => /b2b/i.test(name);
 const addDaysIso = (day, n) => { const d = new Date(day + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
 // ---------- MONTHLY: last 12 months from cash shifts ----------
