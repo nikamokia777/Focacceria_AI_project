@@ -223,15 +223,20 @@ async function syrveLive(env, from, to) {
     try {
       const xml = await get("/reports/olap", {
         report: "SALES", from: ddmmyyyy(from), to: ddmmyyyy(end),
-        groupRow: "PayTypes", agr: ["DishDiscountSumInt", "UniqOrderId.OrdersCount"],
+        groupRow: "PayTypes", agr: ["DishDiscountSumInt", "DishSumInt", "UniqOrderId.OrdersCount"],
       });
       const rows = xmlRecords(xml, "r");
       for (const r of rows) {
+        const name = r.PayTypes || "—";
+        // Marketing (food given away) is shown at menu price but is not income
+        if (isMarketing(name)) { result.byPayType.push({ name, sum: num(r.DishSumInt), notIncome: true }); continue; }
         const sum = num(r.DishDiscountSumInt);
-        result.byPayType.push({ name: r.PayTypes || "—", sum });
+        result.byPayType.push({ name, sum });
         result.total += sum;
         result.orders += num(r["UniqOrderId.OrdersCount"]);
       }
+      // always list marketing, even on days without it
+      if (!result.byPayType.some(p => p.notIncome)) result.byPayType.push({ name: "მარკეტინგი", sum: 0, notIncome: true });
       // 2) by hour for one day, by day for a range (optional — ignore if the field isn't supported)
       try {
         if (from === to) {
@@ -280,13 +285,14 @@ async function syrvePayType(env, from, to, name) {
   const keyOf = r => `${String(r["OpenDate.Typed"] || "").slice(0, 10)}#${r.OrderNum}`;
 
   const out = await withSyrve(env, async (get, post) => {
-    const olap = (fields, aggregates = ["DishDiscountSumInt"]) =>
+    const SUM = isMarketing(name) ? "DishSumInt" : "DishDiscountSumInt"; // marketing at menu price
+    const olap = (fields, aggregates = [SUM]) =>
       post("/v2/reports/olap", { reportType: "SALES", buildSummary: false, groupByRowFields: fields, aggregateFields: aggregates, filters })
         .then(r => r.data || []);
 
     const orders = new Map();
     for (const r of await olap(KEY)) {
-      orders.set(keyOf(r), { day: String(r["OpenDate.Typed"] || "").slice(0, 10), num: String(r.OrderNum ?? ""), time: "", customer: "", cashier: "", sum: num(r.DishDiscountSumInt), items: [] });
+      orders.set(keyOf(r), { day: String(r["OpenDate.Typed"] || "").slice(0, 10), num: String(r.OrderNum ?? ""), time: "", customer: "", cashier: "", sum: num(r[SUM]), items: [] });
     }
     // Field names differ between Syrve versions: each extra column is asked separately,
     // so one the server doesn't know only leaves that column empty.
@@ -299,16 +305,18 @@ async function syrvePayType(env, from, to, name) {
     await extra("CreditUser", (o, v) => { o.customer = String(v); });
     await extra("Delivery.CustomerName", (o, v) => { o.customer = o.customer || String(v); });
     let itemsError = "";
-    try {
-      for (const r of await olap([...KEY, "DishName"], ["DishAmountInt", "DishDiscountSumInt"])) {
-        orders.get(keyOf(r))?.items.push({ name: r.DishName || "—", qty: num(r.DishAmountInt), sum: num(r.DishDiscountSumInt) });
-      }
-    } catch (e) { itemsError = String(e.message || e).slice(0, 200); }
+    if (!isB2B(name)) { // B2B shows only orders and their waybills
+      try {
+        for (const r of await olap([...KEY, "DishName"], ["DishAmountInt", SUM])) {
+          orders.get(keyOf(r))?.items.push({ name: r.DishName || "—", qty: num(r.DishAmountInt), sum: num(r[SUM]) });
+        }
+      } catch (e) { itemsError = String(e.message || e).slice(0, 200); }
+    }
     return { orders: [...orders.values()], itemsError };
   });
 
   const orders = out.orders.sort((a, b) => (b.day + b.time).localeCompare(a.day + a.time) || Number(b.num) - Number(a.num));
-  const result = { name, from, to, total: Math.round(orders.reduce((a, o) => a + o.sum, 0) * 100) / 100, orders, itemsError: out.itemsError, waybills: null, waybillError: "" };
+  const result = { name, from, to, b2b: isB2B(name), total: Math.round(orders.reduce((a, o) => a + o.sum, 0) * 100) / 100, orders, itemsError: out.itemsError, waybills: null, waybillError: "" };
 
   // B2B only: look for the waybill we issued to that buyer on rs.ge
   if (isB2B(name) && orders.some(o => o.customer)) {
@@ -334,6 +342,7 @@ async function syrvePayType(env, from, to, name) {
   return result;
 }
 const isB2B = name => /b2b/i.test(name);
+const isMarketing = name => /მარკეტ|market|маркет/i.test(name);
 const addDaysIso = (day, n) => { const d = new Date(day + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
 // ---------- MONTHLY: last 12 months from cash shifts ----------
