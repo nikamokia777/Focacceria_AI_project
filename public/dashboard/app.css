@@ -354,3 +354,5 @@ details.bank-settings textarea { width: 100%; resize: vertical; font-family: inh
 .items-line { color: var(--ink-2); margin-top: 2px; }
 table.pay-orders { min-width: 760px; }
 @media (max-width: 640px) { .rc-pop { position: fixed; left: 16px; right: 16px; width: auto; top: 120px; } }
+.pay-row.not-income .bar-fill { background: var(--line-strong); }
+.pay-row.not-income { border-top: 1px dashed var(--line); border-radius: 0 0 8px 8px; }

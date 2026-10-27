@@ -48,7 +48,8 @@ const T = {
     pay_click: "დააჭირეთ ტიპს — ნახავთ ყველა გადახდას", order_no: "შეკვ. №", customer: "კლიენტი", cashier: "მოლარე",
     products: "პროდუქტები", waybill: "ზედნადები (rs.ge)", by_customer: "კლიენტების მიხედვით", close: "დახურვა",
     wb_found: "ზედნადები", wb_missing: "rs.ge-ზე ვერ მოიძებნა", wb_diff: "თანხა განსხვავდება", wb_none: "ზედნადები",
-    wb_of: "{a} / {b} ზედნადებით", no_orders: "გადახდები არ არის", time: "დრო", more_items: "კიდევ {n}",
+    wb_of: "{a} / {b} ზედნადებით", no_orders: "გადახდები არ არის", not_income: "შემოსავალში არ ითვლება · მენიუს ფასით",
+    wb_uploaded: "ატვირთულია", wb_not_uploaded: "არ არის ატვირთული", time: "დრო", more_items: "კიდევ {n}",
     cash: "ნაღდი", card: "ბარათი", credit: "კრედიტი",
     income: "შემოსავალი", fixed: "ფიქსირებული", variable: "ცვლადი", profit: "მოგება",
     this_month: "ეს თვე", last_month: "წინა თვე", profit_this_month: "მოგება ამ თვეში",
@@ -124,7 +125,8 @@ const T = {
     pay_click: "Click a type to see every payment", order_no: "Order #", customer: "Customer", cashier: "Cashier",
     products: "Products", waybill: "Waybill (rs.ge)", by_customer: "By customer", close: "Close",
     wb_found: "Waybill", wb_missing: "Not found on rs.ge", wb_diff: "amount differs", wb_none: "Waybill",
-    wb_of: "{a} of {b} with a waybill", no_orders: "No payments", time: "Time", more_items: "{n} more",
+    wb_of: "{a} of {b} with a waybill", no_orders: "No payments", not_income: "Not counted in income · at menu price",
+    wb_uploaded: "Uploaded", wb_not_uploaded: "Not uploaded", time: "Time", more_items: "{n} more",
     cash: "Cash", card: "Card", credit: "Credit",
     income: "Income", fixed: "Fixed", variable: "Variable", profit: "Profit",
     this_month: "This month", last_month: "Last month", profit_this_month: "Profit this month",
@@ -807,6 +809,7 @@ async function renderLive(view, demo, fresh = false) {
   if (!S.syrve["live" + q]) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
   const r = await loadSyrve("live", q, fresh);
   const maxPay = Math.max(1, ...r.byPayType.map(p => p.sum));
+  const payRows = r.byPayType.slice().sort((a, b) => (!!a.notIncome - !!b.notIncome) || b.sum - a.sum);
   const avg = r.orders ? r.total / r.orders : 0;
   let chart = [], chartTitle = t("by_hour");
   if (range.from === range.to && r.byHour && r.byHour.length) {
@@ -835,9 +838,10 @@ async function renderLive(view, demo, fresh = false) {
     </div>
     <div class="grid-2">
       <div class="panel"><div class="panel-head"><h3>${esc(t("by_payment"))}</h3>${r.byPayType.length && r.source !== "cashshifts" ? `<span class="muted small">${esc(t("pay_click"))}</span>` : ""}</div><div class="panel-body">
-        ${r.byPayType.length ? `<div class="split">${r.byPayType.sort((a, b) => b.sum - a.sum).map(p => `
-          <button type="button" class="split-row pay-row ${S.livePay === p.name ? "on" : ""}" data-pay="${esc(p.name)}" ${r.source === "cashshifts" ? "disabled" : ""}>
-          <span>${esc(payName(p.name))} <span class="chev">›</span></span><span class="num"><b>${money(p.sum)}</b> <span class="muted small">${r.total ? Math.round(p.sum / r.total * 100) : 0}%</span></span>
+        ${payRows.length ? `<div class="split">${payRows.map(p => `
+          <button type="button" class="split-row pay-row ${p.notIncome ? "not-income" : ""} ${S.livePay === p.name ? "on" : ""}" data-pay="${esc(p.name)}" ${r.source === "cashshifts" ? "disabled" : ""}>
+          <span>${esc(payName(p.name))} <span class="chev">›</span>${p.notIncome ? `<div class="muted small">${esc(t("not_income"))}</div>` : ""}</span>
+          <span class="num"><b>${money(p.sum)}</b>${p.notIncome ? "" : ` <span class="muted small">${r.total ? Math.round(p.sum / r.total * 100) : 0}%</span>`}</span>
           <div class="bar-track"><div class="bar-fill" style="width:${(p.sum / maxPay * 100).toFixed(1)}%"></div></div></button>`).join("")}</div>`
         : `<div class="empty">${esc(t("no_entries"))}</div>`}
       </div></div>
@@ -859,6 +863,39 @@ async function renderLive(view, demo, fresh = false) {
   if (range.to === todayISO()) S.liveTimer = setInterval(() => { if (S.tab === "live" && !document.hidden && !S.calPick && $("#calPop")?.hidden !== false) renderLive(view, demo, true).catch(() => {}); }, LIVE_REFRESH_MS);
 }
 
+// B2B: only the orders and whether we uploaded a waybill for each on rs.ge.
+function renderB2B(box, view, d, range) {
+  const multiDay = range.from !== range.to;
+  const status = o => {
+    if (d.waybillError || !o.customer) return "";
+    return o.waybill ? t("wb_uploaded") + " · № " + o.waybill.number : t("wb_not_uploaded");
+  };
+  const cell = o => {
+    if (d.waybillError || !o.customer) return `<span class="muted">—</span>`;
+    return o.waybill ? `<span class="pill good">✓ ${esc(t("wb_uploaded"))}</span> <span class="muted small num">№ ${esc(o.waybill.number)}</span>`
+      : `<span class="pill bad">✗ ${esc(t("wb_not_uploaded"))}</span>`;
+  };
+  const withWb = d.orders.filter(o => o.waybill).length;
+  box.innerHTML = `<div class="panel pay-detail">
+    <div class="panel-head"><h3>${esc(d.name)} · ${esc(rangeLabel(range))}</h3>
+      <div class="actions"><span class="num"><b>${money(d.total)}</b> · ${esc(t("wb_of").replace("{a}", withWb).replace("{b}", d.orders.length))}</span>
+      <button class="btn small" id="payExport">${esc(t("export"))}</button><button class="btn small ghost" id="payClose">✕ ${esc(t("close"))}</button></div></div>
+    ${d.waybillError ? `<div class="notice bad" style="margin:12px 16px 0">rs.ge: ${esc(d.waybillError)}</div>` : ""}
+    <div class="table-wrap"><table>
+      <thead><tr><th>${esc(multiDay ? t("date") : t("time"))}</th><th>${esc(t("order_no"))}</th><th>${esc(t("customer"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("waybill"))}</th></tr></thead>
+      <tbody>${d.orders.length ? d.orders.map(o => `<tr>
+        <td class="nowrap num">${multiDay ? esc(dm(o.day)) + " " : ""}${esc(o.time)}</td><td class="num">${esc(o.num)}</td>
+        <td><b>${esc(o.customer || "—")}</b></td><td class="r num nowrap"><b>${money(o.sum)}</b></td><td class="nowrap">${cell(o)}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">${esc(t("no_orders"))}</td></tr>`}</tbody>
+    </table></div></div>`;
+  $("#payClose", box).addEventListener("click", () => { S.livePay = null; $$(".pay-row", view).forEach(x => x.classList.remove("on")); box.innerHTML = ""; });
+  $("#payExport", box).addEventListener("click", () => {
+    const out = [[t("date"), t("time"), t("order_no"), t("customer"), t("amount"), t("waybill")]];
+    d.orders.forEach(o => out.push([o.day, o.time, o.num, o.customer, o.sum, status(o)]));
+    exportXlsx(`${d.name}-${range.from}_${range.to}.xlsx`, String(d.name).slice(0, 30), out);
+  });
+}
+
 async function renderPayDetail(view, range, fresh = false) {
   const box = $("#payDetail", view);
   if (!box) return;
@@ -869,6 +906,7 @@ async function renderPayDetail(view, range, fresh = false) {
   try { d = await loadSyrve("paytype", `${rangeQuery(range)}&name=${encodeURIComponent(name)}`, fresh); }
   catch (e) { box.innerHTML = `<div class="notice bad">${esc(t("syrve_error"))}: ${esc(e.message)}</div>`; return; }
   if (S.livePay !== name) return; // another type was clicked meanwhile
+  if (d.b2b) return renderB2B(box, view, d, range);
 
   const multiDay = range.from !== range.to;
   const withCustomer = d.orders.filter(o => o.customer);
@@ -1365,12 +1403,12 @@ function demoApi(path, opts) {
       customer: b2b ? ["შპს კაფე ლილა", "შპს მზიური", "შპს კაფე ლილა", "შპს ბარი 12"][i] : "", cashier: ["ნინო", "გიორგი"][i % 2],
       sum: b2b ? [420, 186, 260, 95][i] : 20 + i * 7, items: b2b ? [{ name: "ფოკაჩა კლასიკური", qty: 12 - i * 2, sum: 120 }, { name: "ფოკაჩა როზმარინით", qty: 6, sum: 66 }] : [{ name: "ფოკაჩა", qty: 1, sum: 12 }],
       waybill: b2b ? [{ number: "0988938607", amount: 420 }, null, { number: "0988938655", amount: 250 }, { number: "0988938700", amount: 95 }][i] : undefined }));
-    return { name, total: orders.reduce((a, o) => a + o.sum, 0), orders, waybillError: "", itemsError: "" };
+    return { name, b2b, total: orders.reduce((a, o) => a + o.sum, 0), orders, waybillError: "", itemsError: "" };
   }
   if (path.startsWith("/syrve/live")) {
     const hrs = []; for (let h = 9; h <= Math.max(10, now.getHours()); h++) hrs.push({ hour: h, sum: Math.round(300 + Math.random() * 900 + (h >= 12 && h <= 14 ? 800 : 0) + (h >= 19 ? 900 : 0)) });
     const total = hrs.reduce((a, h) => a + h.sum, 0);
-    return { date: todayISO(), total, orders: Math.round(total / 38), byPayType: [{ name: "Card", sum: Math.round(total * 0.6) }, { name: "Cash", sum: Math.round(total * 0.25) }, { name: "გადარიცხვები", sum: Math.round(total * 0.1) }, { name: "B2B", sum: total - Math.round(total * 0.6) - Math.round(total * 0.25) - Math.round(total * 0.1) }], byHour: hrs,
+    return { date: todayISO(), total, orders: Math.round(total / 38), byPayType: [{ name: "Card", sum: Math.round(total * 0.6) }, { name: "Cash", sum: Math.round(total * 0.25) }, { name: "გადარიცხვები", sum: Math.round(total * 0.1) }, { name: "B2B", sum: total - Math.round(total * 0.6) - Math.round(total * 0.25) - Math.round(total * 0.1) }, { name: "მარკეტინგი", sum: 64, notIncome: true }], byHour: hrs,
       byDay: Array.from({ length: 27 }, (_, i) => ({ day: shiftDay(todayISO(), -i), sum: 1500 + Math.round(Math.sin(i) * 500 + 600) })), _at: Date.now() };
   }
   if (path.startsWith("/syrve/monthly")) {
