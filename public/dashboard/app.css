@@ -323,3 +323,34 @@ details.bank-settings textarea { width: 100%; resize: vertical; font-family: inh
 .remember .rm-cancel { align-self: flex-end; padding: 2px 8px; }
 .remember .btn { white-space: normal; text-align: center; }
 .remember .q { font-size: 12px; font-weight: 600; line-height: 1.35; }
+
+/* ---------- Income now: date range + payment details ---------- */
+.range-pick { position: relative; }
+.range-btn { font-variant-numeric: tabular-nums; }
+.rc-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 320px; padding: 14px; margin: 0; box-shadow: 0 12px 32px rgba(0,0,0,.16); }
+.rc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.rc-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; }
+.rc-wd { text-align: center; font-size: 11px; color: var(--ink-3); padding: 4px 0; }
+.rc-day { height: 36px; border: 0; background: none; cursor: pointer; font-variant-numeric: tabular-nums; border-radius: 0; }
+.rc-day.out { color: var(--ink-3); }
+.rc-day:disabled { color: var(--line-strong); cursor: default; }
+.rc-day.in { background: var(--accent-soft); }
+.rc-day.lo { border-top-left-radius: 18px; border-bottom-left-radius: 18px; }
+.rc-day.hi { border-top-right-radius: 18px; border-bottom-right-radius: 18px; }
+.rc-day.lo, .rc-day.hi { background: var(--accent); color: #fff; font-weight: 600; }
+.rc-day.today:not(.lo):not(.hi) { font-weight: 700; text-decoration: underline; }
+.rc-day:not(:disabled):not(.lo):not(.hi):hover { background: var(--surface-2); }
+.rc-note { text-align: center; margin-top: 6px; }
+.rc-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.rc-quick .btn { flex: 1 1 30%; }
+.pay-row { width: 100%; border: 0; background: none; text-align: left; padding: 8px; margin: -8px; border-radius: 8px; cursor: pointer; font: inherit; color: inherit; }
+.pay-row:not(:disabled):hover { background: var(--surface-2); }
+.pay-row.on { background: var(--accent-soft); }
+.pay-row:disabled { cursor: default; }
+.pay-row .chev { color: var(--ink-3); }
+.pay-row:disabled .chev { display: none; }
+.split .pay-row + .pay-row { margin-top: 2px; }
+.pay-detail .sub-h { margin: 0 0 8px; font-size: 13px; }
+.items-line { color: var(--ink-2); margin-top: 2px; }
+table.pay-orders { min-width: 760px; }
+@media (max-width: 640px) { .rc-pop { position: fixed; left: 16px; right: 16px; width: auto; top: 120px; } }

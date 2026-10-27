@@ -197,6 +197,16 @@ async function listByNumber(env, method, waybillNumber) {
   return childrenOf(list, "WAYBILL").map(mapWaybillHeader);
 }
 
+// Waybills we issued (we are the seller), created between two days (YYYY-MM-DD, inclusive).
+export async function listOutgoingWaybills(env, fromDay, toDay) {
+  const response = await soapCall(env, "get_waybills", [
+    ["create_date_s", `${fromDay}T00:00:00`],
+    ["create_date_e", `${toDay}T23:59:59`],
+  ]);
+  const list = resultDocument(response, "get_waybills", "WAYBILL_LIST");
+  return childrenOf(list, "WAYBILL").map(mapWaybillHeader);
+}
+
 // Full waybill, including the goods lines.
 export async function getWaybill(env, waybillId) {
   const response = await soapCall(env, "get_waybill", [["waybill_id", waybillId]]);

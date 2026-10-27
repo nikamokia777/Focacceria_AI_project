@@ -42,6 +42,13 @@ const T = {
     today_income: "დღევანდელი შემოსავალი", orders: "შეკვეთები", avg_check: "საშუალო ჩეკი",
     by_payment: "გადახდის ტიპის მიხედვით", by_hour: "საათების მიხედვით", refresh: "განახლება",
     updated: "განახლდა", live_sub: "მონაცემები Syrve-დან, ახლდება ყოველ 2 წუთში.",
+    range_sub: "მონაცემები Syrve-დან არჩეული პერიოდისთვის.", income_range: "შემოსავალი", by_day: "დღეების მიხედვით",
+    pick_today: "დღეს", pick_yesterday: "გუშინ", pick_week: "ეს კვირა", pick_month: "ეს თვე", pick_last_month: "წინა თვე",
+    pick_end: "აირჩიეთ ბოლო დღე", wdays: ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვ"],
+    pay_click: "დააჭირეთ ტიპს — ნახავთ ყველა გადახდას", order_no: "შეკვ. №", customer: "კლიენტი", cashier: "მოლარე",
+    products: "პროდუქტები", waybill: "ზედნადები (rs.ge)", by_customer: "კლიენტების მიხედვით", close: "დახურვა",
+    wb_found: "ზედნადები", wb_missing: "rs.ge-ზე ვერ მოიძებნა", wb_diff: "თანხა განსხვავდება", wb_none: "ზედნადები",
+    wb_of: "{a} / {b} ზედნადებით", no_orders: "გადახდები არ არის", time: "დრო", more_items: "კიდევ {n}",
     cash: "ნაღდი", card: "ბარათი", credit: "კრედიტი",
     income: "შემოსავალი", fixed: "ფიქსირებული", variable: "ცვლადი", profit: "მოგება",
     this_month: "ეს თვე", last_month: "წინა თვე", profit_this_month: "მოგება ამ თვეში",
@@ -111,6 +118,13 @@ const T = {
     today_income: "Today's income", orders: "Orders", avg_check: "Average check",
     by_payment: "By payment type", by_hour: "By hour", refresh: "Refresh",
     updated: "Updated", live_sub: "Data from Syrve, refreshes every 2 minutes.",
+    range_sub: "Data from Syrve for the chosen dates.", income_range: "Income", by_day: "By day",
+    pick_today: "Today", pick_yesterday: "Yesterday", pick_week: "This week", pick_month: "This month", pick_last_month: "Last month",
+    pick_end: "Choose the last day", wdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    pay_click: "Click a type to see every payment", order_no: "Order #", customer: "Customer", cashier: "Cashier",
+    products: "Products", waybill: "Waybill (rs.ge)", by_customer: "By customer", close: "Close",
+    wb_found: "Waybill", wb_missing: "Not found on rs.ge", wb_diff: "amount differs", wb_none: "Waybill",
+    wb_of: "{a} of {b} with a waybill", no_orders: "No payments", time: "Time", more_items: "{n} more",
     cash: "Cash", card: "Card", credit: "Credit",
     income: "Income", fixed: "Fixed", variable: "Variable", profit: "Profit",
     this_month: "This month", last_month: "Last month", profit_this_month: "Profit this month",
@@ -711,50 +725,210 @@ async function renderVariable(view, demo) {
 }
 
 // ====================== 3. LIVE INCOME ======================
+// One day or a range of days. Today (the default) refreshes itself; any other range is fixed.
+// Clicking a payment type opens every payment of that type: customer, products, and for B2B
+// customers whether we issued them a waybill on rs.ge.
+const isoDay = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const shiftDay = (day, k) => { const d = new Date(day + "T12:00:00"); d.setDate(d.getDate() + k); return isoDay(d); };
+const dm = day => `${day.slice(8, 10)}.${day.slice(5, 7)}`;
+const dmy = day => `${dm(day)}.${day.slice(0, 4)}`;
+function liveRange() { const today = todayISO(); return S.liveRange && S.liveRange.to <= today ? S.liveRange : { from: today, to: today }; }
+const rangeQuery = r => `?from=${r.from}&to=${r.to}`;
+const rangeLabel = r => (r.from === r.to ? dmy(r.from) : `${dmy(r.from)} – ${dmy(r.to)}`);
+
+function calendarHtml() {
+  const r = liveRange(), today = todayISO();
+  const ym = S.calMonth || r.to.slice(0, 7);
+  const [y, m] = ym.split("-").map(Number);
+  const first = new Date(y, m - 1, 1);
+  const start = shiftDay(isoDay(first), -((first.getDay() + 6) % 7)); // back to Monday
+  const pick = S.calPick; // first click of a new range
+  const lo = pick || r.from, hi = pick || r.to;
+  let cells = "";
+  for (let i = 0; i < 42; i++) {
+    const day = shiftDay(start, i);
+    const cls = ["rc-day",
+      day.slice(0, 7) !== ym ? "out" : "",
+      day >= lo && day <= hi ? "in" : "", day === lo ? "lo" : "", day === hi ? "hi" : "",
+      day === today ? "today" : ""].filter(Boolean).join(" ");
+    cells += `<button type="button" class="${cls}" data-day="${day}" ${day > today ? "disabled" : ""}>${Number(day.slice(8))}</button>`;
+  }
+  const quick = [["pick_today", "today"], ["pick_yesterday", "yesterday"], ["pick_week", "week"], ["pick_month", "month"], ["pick_last_month", "lastmonth"]];
+  return `<div class="rc-head"><button type="button" class="btn small" data-cal="-1">‹</button>
+      <b>${esc(monthLabel(ym))}</b><button type="button" class="btn small" data-cal="1" ${ym >= today.slice(0, 7) ? "disabled" : ""}>›</button></div>
+    <div class="rc-grid">${t("wdays").map(w => `<span class="rc-wd">${esc(w)}</span>`).join("")}${cells}</div>
+    ${pick ? `<div class="muted small rc-note">${esc(t("pick_end"))}</div>` : ""}
+    <div class="rc-quick">${quick.map(([k, v]) => `<button type="button" class="btn small" data-quick="${v}">${esc(t(k))}</button>`).join("")}</div>`;
+}
+
+function quickRange(kind) {
+  const today = todayISO();
+  if (kind === "yesterday") { const y = shiftDay(today, -1); return { from: y, to: y }; }
+  if (kind === "week") { const d = new Date(today + "T12:00:00"); return { from: shiftDay(today, -((d.getDay() + 6) % 7)), to: today }; }
+  if (kind === "month") return { from: today.slice(0, 8) + "01", to: today };
+  if (kind === "lastmonth") { const ym = ymShift(today.slice(0, 7), -1); return { from: ym + "-01", to: shiftDay(today.slice(0, 8) + "01", -1) }; }
+  return { from: today, to: today };
+}
+
+function wireCalendar(view, demo) {
+  const pop = $("#calPop", view);
+  const setRange = r => { S.liveRange = r; S.calPick = null; S.calMonth = null; S.livePay = null; renderLive(view, demo).catch(e => toast(e.message)); };
+  $("#rangeBtn", view).addEventListener("click", e => { e.stopPropagation(); pop.hidden = !pop.hidden; if (!pop.hidden) { pop.innerHTML = calendarHtml(); } });
+  pop.addEventListener("click", e => {
+    e.stopPropagation();
+    const b = e.target.closest("button"); if (!b || b.disabled) return;
+    if (b.dataset.cal) { S.calMonth = ymShift(S.calMonth || liveRange().to.slice(0, 7), Number(b.dataset.cal)); pop.innerHTML = calendarHtml(); return; }
+    if (b.dataset.quick) return setRange(quickRange(b.dataset.quick));
+    const day = b.dataset.day; if (!day) return;
+    if (!S.calPick) { S.calPick = day; pop.innerHTML = calendarHtml(); return; }
+    setRange({ from: [S.calPick, day].sort()[0], to: [S.calPick, day].sort()[1] });
+  });
+  if (!S.calBound) { // once: a click anywhere else closes the calendar
+    S.calBound = true;
+    document.addEventListener("click", () => {
+      const p = $("#calPop");
+      if (p && !p.hidden) { p.hidden = true; S.calPick = null; S.calMonth = null; }
+    });
+  }
+}
+
+function payName(s) {
+  const k = String(s || "").toLowerCase();
+  if (/cash|нал|ნაღდ/.test(k)) return t("cash");
+  if (/card|карт|ბარათ|visa|master/.test(k)) return t("card");
+  if (/credit|кредит/.test(k)) return t("credit");
+  return s;
+}
+
 async function renderLive(view, demo, fresh = false) {
-  if (!S.syrve.live) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
-  const r = await loadSyrve("live", "", fresh);
-  const payName = s => {
-    const k = String(s || "").toLowerCase();
-    if (/cash|нал|ნაღდ/.test(k)) return t("cash");
-    if (/card|карт|ბარათ|visa|master/.test(k)) return t("card");
-    if (/credit|кредит/.test(k)) return t("credit");
-    return s;
-  };
+  const range = liveRange();
+  const isToday = range.from === todayISO() && range.to === range.from;
+  const q = rangeQuery(range);
+  if (!S.syrve["live" + q]) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
+  const r = await loadSyrve("live", q, fresh);
   const maxPay = Math.max(1, ...r.byPayType.map(p => p.sum));
   const avg = r.orders ? r.total / r.orders : 0;
-  const hours = [];
-  if (r.byHour && r.byHour.length) {
+  let chart = [], chartTitle = t("by_hour");
+  if (range.from === range.to && r.byHour && r.byHour.length) {
     const lo = Math.min(...r.byHour.map(h => h.hour)), hi = Math.max(...r.byHour.map(h => h.hour));
     for (let h = lo; h <= hi; h++) {
       const v = (r.byHour.find(x => x.hour === h) || {}).sum || 0;
-      hours.push({ label: pad(h) + ":00", value: v, tip: `${pad(h)}:00–${pad(h + 1)}:00: ${money(v)}` });
+      chart.push({ label: pad(h) + ":00", value: v, tip: `${pad(h)}:00–${pad(h + 1)}:00: ${money(v)}` });
+    }
+  } else if (range.from !== range.to) {
+    chartTitle = t("by_day");
+    for (let d = range.from; d <= range.to; d = shiftDay(d, 1)) {
+      const v = ((r.byDay || []).find(x => x.day === d) || {}).sum || 0;
+      chart.push({ label: dm(d), value: v, tip: `${dmy(d)}: ${money(v)}` });
     }
   }
   const upd = new Date(r._at || Date.now());
+  if (S.livePay && !r.byPayType.some(p => p.name === S.livePay)) S.livePay = null;
 
-  view.innerHTML = demo + head(t("tab_live"), t("live_sub"),
-    `<span class="muted small">${esc(t("updated"))} ${pad(upd.getHours())}:${pad(upd.getMinutes())}</span><button class="btn" id="liveRefresh">${esc(t("refresh"))}</button>`) +
+  view.innerHTML = demo + head(t("tab_live"), isToday ? t("live_sub") : t("range_sub"),
+    `<div class="range-pick"><button class="btn range-btn" id="rangeBtn" type="button">📅 ${esc(rangeLabel(range))}</button><div class="rc-pop panel" id="calPop" hidden></div></div>
+     <span class="muted small">${esc(t("updated"))} ${pad(upd.getHours())}:${pad(upd.getMinutes())}</span><button class="btn" id="liveRefresh">${esc(t("refresh"))}</button>`) +
     `<div class="cards">
-      ${card(t("today_income"), money(r.total), esc(r.date || ""), "hero")}
+      ${card(isToday ? t("today_income") : t("income_range"), money(r.total), esc(rangeLabel(range)), "hero")}
       ${card(t("orders"), r.orders ? String(r.orders) : t("none"))}
       ${card(t("avg_check"), r.orders ? money(avg) : t("none"))}
     </div>
     <div class="grid-2">
-      <div class="panel"><div class="panel-head"><h3>${esc(t("by_payment"))}</h3></div><div class="panel-body">
+      <div class="panel"><div class="panel-head"><h3>${esc(t("by_payment"))}</h3>${r.byPayType.length && r.source !== "cashshifts" ? `<span class="muted small">${esc(t("pay_click"))}</span>` : ""}</div><div class="panel-body">
         ${r.byPayType.length ? `<div class="split">${r.byPayType.sort((a, b) => b.sum - a.sum).map(p => `
-          <div class="split-row"><span>${esc(payName(p.name))}</span><span class="num"><b>${money(p.sum)}</b> <span class="muted small">${r.total ? Math.round(p.sum / r.total * 100) : 0}%</span></span>
-          <div class="bar-track"><div class="bar-fill" style="width:${(p.sum / maxPay * 100).toFixed(1)}%"></div></div></div>`).join("")}</div>`
+          <button type="button" class="split-row pay-row ${S.livePay === p.name ? "on" : ""}" data-pay="${esc(p.name)}" ${r.source === "cashshifts" ? "disabled" : ""}>
+          <span>${esc(payName(p.name))} <span class="chev">›</span></span><span class="num"><b>${money(p.sum)}</b> <span class="muted small">${r.total ? Math.round(p.sum / r.total * 100) : 0}%</span></span>
+          <div class="bar-track"><div class="bar-fill" style="width:${(p.sum / maxPay * 100).toFixed(1)}%"></div></div></button>`).join("")}</div>`
         : `<div class="empty">${esc(t("no_entries"))}</div>`}
       </div></div>
-      <div class="panel"><div class="panel-head"><h3>${esc(t("by_hour"))}</h3></div><div class="panel-body">
-        ${hours.length ? barChart(hours, { height: 200, width: panelWidth(true) }) : `<div class="empty">${esc(t("no_entries"))}</div>`}
+      <div class="panel"><div class="panel-head"><h3>${esc(chartTitle)}</h3></div><div class="panel-body">
+        ${chart.length ? barChart(chart, { height: 200, width: panelWidth(true) }) : `<div class="empty">${esc(t("no_entries"))}</div>`}
       </div></div>
-    </div>`;
+    </div>
+    <div id="payDetail"></div>`;
   wireChartHover(view);
+  wireCalendar(view, demo);
   $("#liveRefresh", view).addEventListener("click", () => renderLive(view, demo, true).catch(e => toast(e.message)));
+  $$(".pay-row", view).forEach(b => b.addEventListener("click", () => {
+    S.livePay = S.livePay === b.dataset.pay ? null : b.dataset.pay;
+    $$(".pay-row", view).forEach(x => x.classList.toggle("on", x.dataset.pay === S.livePay));
+    renderPayDetail(view, range, fresh);
+  }));
+  if (S.livePay) renderPayDetail(view, range, fresh);
   clearInterval(S.liveTimer);
-  S.liveTimer = setInterval(() => { if (S.tab === "live" && !document.hidden) renderLive(view, demo, true).catch(() => {}); }, LIVE_REFRESH_MS);
+  if (range.to === todayISO()) S.liveTimer = setInterval(() => { if (S.tab === "live" && !document.hidden && !S.calPick && $("#calPop")?.hidden !== false) renderLive(view, demo, true).catch(() => {}); }, LIVE_REFRESH_MS);
+}
+
+async function renderPayDetail(view, range, fresh = false) {
+  const box = $("#payDetail", view);
+  if (!box) return;
+  const name = S.livePay;
+  if (!name) { box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="panel"><div class="loading">${esc(t("loading"))}</div></div>`;
+  let d;
+  try { d = await loadSyrve("paytype", `${rangeQuery(range)}&name=${encodeURIComponent(name)}`, fresh); }
+  catch (e) { box.innerHTML = `<div class="notice bad">${esc(t("syrve_error"))}: ${esc(e.message)}</div>`; return; }
+  if (S.livePay !== name) return; // another type was clicked meanwhile
+
+  const multiDay = range.from !== range.to;
+  const withCustomer = d.orders.filter(o => o.customer);
+  const showWb = withCustomer.length > 0;
+  const wbCell = o => {
+    if (!o.customer) return "";
+    if (d.waybillError) return `<span class="muted small">—</span>`;
+    if (!o.waybill) return `<span class="pill bad">✗ ${esc(t("wb_missing"))}</span>`;
+    const diff = Math.abs(o.waybill.amount - o.sum) > 1;
+    return `<span class="pill ${diff ? "warn" : "good"}">✓ № ${esc(o.waybill.number)}</span>
+      <div class="muted small">${money(o.waybill.amount)}${diff ? " · " + esc(t("wb_diff")) : ""}</div>`;
+  };
+  const itemsLine = o => {
+    if (!o.items.length) return "";
+    const shown = o.items.slice(0, 8).map(i => `${esc(i.name)} × ${i.qty % 1 ? i.qty.toFixed(2) : i.qty} <span class="muted">(${money(i.sum)})</span>`).join(" · ");
+    return `<div class="items-line small">${shown}${o.items.length > 8 ? " · " + esc(t("more_items").replace("{n}", o.items.length - 8)) : ""}</div>`;
+  };
+
+  // per customer: what each buyer took in total
+  let customersHtml = "";
+  if (withCustomer.length) {
+    const by = new Map();
+    for (const o of withCustomer) {
+      const c = by.get(o.customer) || { name: o.customer, orders: 0, sum: 0, wb: 0, items: new Map() };
+      c.orders++; c.sum += o.sum; if (o.waybill) c.wb++;
+      for (const i of o.items) { const x = c.items.get(i.name) || { qty: 0, sum: 0 }; x.qty += i.qty; x.sum += i.sum; c.items.set(i.name, x); }
+      by.set(o.customer, c);
+    }
+    customersHtml = `<div class="panel-body"><h4 class="sub-h">${esc(t("by_customer"))}</h4><div class="table-wrap"><table>
+      <thead><tr><th>${esc(t("customer"))}</th><th>${esc(t("products"))}</th><th class="r">${esc(t("orders"))}</th><th class="r">${esc(t("amount"))}</th>${showWb ? `<th>${esc(t("waybill"))}</th>` : ""}</tr></thead>
+      <tbody>${[...by.values()].sort((a, b) => b.sum - a.sum).map(c => `<tr><td><b>${esc(c.name)}</b></td>
+        <td class="small">${[...c.items].sort((a, b) => b[1].sum - a[1].sum).map(([nm, x]) => `${esc(nm)} × ${Math.round(x.qty * 100) / 100}`).join(" · ") || "—"}</td>
+        <td class="r num">${c.orders}</td><td class="r num nowrap"><b>${money(c.sum)}</b></td>
+        ${showWb ? `<td class="nowrap"><span class="pill ${d.waybillError ? "neutral" : c.wb === c.orders ? "good" : "bad"}">${esc(t("wb_of").replace("{a}", c.wb).replace("{b}", c.orders))}</span></td>` : ""}</tr>`).join("")}</tbody>
+    </table></div></div>`;
+  }
+
+  box.innerHTML = `<div class="panel pay-detail">
+    <div class="panel-head"><h3>${esc(payName(name))} · ${esc(rangeLabel(range))}</h3>
+      <div class="actions"><span class="num"><b>${money(d.total)}</b> · ${d.orders.length} ${esc(t("orders").toLowerCase())}</span>
+      <button class="btn small" id="payExport">${esc(t("export"))}</button><button class="btn small ghost" id="payClose">✕ ${esc(t("close"))}</button></div></div>
+    ${d.waybillError ? `<div class="notice bad" style="margin:12px 16px 0">rs.ge: ${esc(d.waybillError)}</div>` : ""}
+    ${d.itemsError ? `<div class="notice" style="margin:12px 16px 0">${esc(d.itemsError)}</div>` : ""}
+    ${customersHtml}
+    <div class="table-wrap"><table class="pay-orders">
+      <thead><tr><th>${esc(multiDay ? t("date") : t("time"))}</th><th>${esc(t("order_no"))}</th><th>${esc(t("customer"))} / ${esc(t("products"))}</th><th>${esc(t("cashier"))}</th><th class="r">${esc(t("amount"))}</th>${showWb ? `<th>${esc(t("waybill"))}</th>` : ""}</tr></thead>
+      <tbody>${d.orders.length ? d.orders.map(o => `<tr>
+        <td class="nowrap num">${multiDay ? esc(dm(o.day)) + " " : ""}${esc(o.time)}</td><td class="num">${esc(o.num)}</td>
+        <td>${o.customer ? `<b>${esc(o.customer)}</b>` : ""}${itemsLine(o)}</td>
+        <td class="small">${esc(o.cashier)}</td><td class="r num nowrap"><b>${money(o.sum)}</b></td>
+        ${showWb ? `<td class="nowrap">${wbCell(o)}</td>` : ""}</tr>`).join("")
+      : `<tr><td colspan="6" class="empty">${esc(t("no_orders"))}</td></tr>`}</tbody>
+    </table></div></div>`;
+  $("#payClose", box).addEventListener("click", () => { S.livePay = null; $$(".pay-row", view).forEach(x => x.classList.remove("on")); box.innerHTML = ""; });
+  $("#payExport", box).addEventListener("click", () => {
+    const out = [[t("date"), t("time"), t("order_no"), t("customer"), t("cashier"), t("amount"), t("products"), t("waybill")]];
+    d.orders.forEach(o => out.push([o.day, o.time, o.num, o.customer, o.cashier, o.sum,
+      o.items.map(i => `${i.name} × ${i.qty}`).join("; "), o.waybill ? o.waybill.number : o.customer && !d.waybillError ? t("wb_missing") : ""]));
+    exportXlsx(`${name}-${range.from}_${range.to}.xlsx`, String(name).slice(0, 30), out);
+  });
 }
 
 // ====================== 4. MONTHLY INCOME ======================
@@ -1183,10 +1357,20 @@ function demoApi(path, opts) {
     };
     return { value: samples[key] };
   }
+  if (path.startsWith("/syrve/paytype")) {
+    const name = decodeURIComponent((path.match(/name=([^&]*)/) || [])[1] || "");
+    const b2b = name === "B2B";
+    const orders = Array.from({ length: b2b ? 4 : 9 }, (_, i) => ({ day: todayISO(), num: String(120 - i), time: `${pad(20 - i)}:${pad((i * 13) % 60)}`,
+      customer: b2b ? ["შპს კაფე ლილა", "შპს მზიური", "შპს კაფე ლილა", "შპს ბარი 12"][i] : "", cashier: ["ნინო", "გიორგი"][i % 2],
+      sum: b2b ? [420, 186, 260, 95][i] : 20 + i * 7, items: b2b ? [{ name: "ფოკაჩა კლასიკური", qty: 12 - i * 2, sum: 120 }, { name: "ფოკაჩა როზმარინით", qty: 6, sum: 66 }] : [{ name: "ფოკაჩა", qty: 1, sum: 12 }],
+      waybill: b2b ? [{ number: "0988938607", amount: 420 }, null, { number: "0988938655", amount: 250 }, { number: "0988938700", amount: 95 }][i] : undefined }));
+    return { name, total: orders.reduce((a, o) => a + o.sum, 0), orders, waybillError: "", itemsError: "" };
+  }
   if (path.startsWith("/syrve/live")) {
     const hrs = []; for (let h = 9; h <= Math.max(10, now.getHours()); h++) hrs.push({ hour: h, sum: Math.round(300 + Math.random() * 900 + (h >= 12 && h <= 14 ? 800 : 0) + (h >= 19 ? 900 : 0)) });
     const total = hrs.reduce((a, h) => a + h.sum, 0);
-    return { date: todayISO(), total, orders: Math.round(total / 38), byPayType: [{ name: "Card", sum: Math.round(total * 0.68) }, { name: "Cash", sum: total - Math.round(total * 0.68) }], byHour: hrs, _at: Date.now() };
+    return { date: todayISO(), total, orders: Math.round(total / 38), byPayType: [{ name: "Card", sum: Math.round(total * 0.6) }, { name: "Cash", sum: Math.round(total * 0.25) }, { name: "გადარიცხვები", sum: Math.round(total * 0.1) }, { name: "B2B", sum: total - Math.round(total * 0.6) - Math.round(total * 0.25) - Math.round(total * 0.1) }], byHour: hrs,
+      byDay: Array.from({ length: 27 }, (_, i) => ({ day: shiftDay(todayISO(), -i), sum: 1500 + Math.round(Math.sin(i) * 500 + 600) })), _at: Date.now() };
   }
   if (path.startsWith("/syrve/monthly")) {
     const months = []; for (let i = 11; i >= 0; i--) { const m = ymShift(ymNow(), -i); const inc = 52000 + Math.round(Math.sin(i) * 9000 + (11 - i) * 900); months.push({ month: m, income: i === 0 ? Math.round(inc * now.getDate() / 30) : inc, cash: Math.round(inc * 0.3), card: Math.round(inc * 0.7), credit: 0 }); }
