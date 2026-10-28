@@ -282,6 +282,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft
 .box .empty { padding: 18px 0 6px; }
 .main-progress { margin-top: 10px; }
 .bad-text { color: var(--bad); }
+.good-text { color: var(--good); }
 .nav-btns { display: flex; gap: 8px; }
 .nav-btn {
   display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--ink);

@@ -314,6 +314,14 @@ async function tbcChunk(env, token, from, to, budget) {
 // Reads up to ~30 bank requests' worth of history, saves it, and remembers where it stopped.
 // Call again until { done: true } — the Debts tab does this automatically.
 
+// Cron (every 15 minutes): one sync step, so the Debts page finds the bank already up to date.
+export async function scheduledBankSync(env) {
+  const cfg = bankConfigured(env);
+  if (!cfg.bog && !cfg.tbc) return;
+  if (!(await loadBankSettings(env)).historyFrom) return;
+  await syncStep(env);
+}
+
 export async function syncStep(env) {
   const cfg = bankConfigured(env);
   const settings = await loadBankSettings(env);
