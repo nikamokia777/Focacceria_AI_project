@@ -55,18 +55,23 @@ export async function handleDashboard(request, env, path) {
         if (!name) return json({ error: "name required" }, 400);
         return json(await cached(env, `pay:${from}:${to}:${name}`, ttl, fresh, () => syrvePayType(env, from, to, name)));
       }
-      if (parts[1] === "monthly") return json(await cached(env, "monthly", 3600, fresh, () => syrveMonthly(env)));
+      if (parts[1] === "monthly") return json(await cached(env, "monthly2", 900, fresh, () => syrveMonthly(env)));
       if (parts[1] === "debts") {
         const syrve = await cached(env, "debts-syrve", 900, fresh, () => syrveDebts(env));
         // reuse the last result until something changes (bank sync, a CEO decision, Syrve refresh)
         const version = `${syrve._at}|${await loadVersion(env)}`;
         const saved = await env.STORE.get("dash:cache:debts-result");
-        if (saved && saved.startsWith(version + "\n")) {
-          return new Response(saved.slice(version.length + 1), { headers: JSON_HEADERS });
+        let result;
+        if (saved && saved.startsWith(version + "\n")) result = JSON.parse(saved.slice(version.length + 1));
+        else {
+          result = await buildDebts(env, syrve);
+          await env.STORE.put("dash:cache:debts-result", version + "\n" + JSON.stringify(result));
         }
-        const body = JSON.stringify(await buildDebts(env, syrve));
-        await env.STORE.put("dash:cache:debts-result", version + "\n" + body);
-        return new Response(body, { headers: JSON_HEADERS });
+        // The sync state changes on every bank sync, even when the debts don't: always send the
+        // current one. (A stale copy made the page think the bank was behind and sync forever.)
+        const state = await loadBankState(env);
+        Object.assign(result.bank, { lastSyncAt: state.lastSyncAt, errors: state.errors, notes: state.notes, cursors: state.cursors });
+        return json(result);
       }
       if (parts[1] === "employees") {
         const month = url.searchParams.get("month") || localDate(env).slice(0, 7);
@@ -381,30 +386,67 @@ const isB2B = name => /b2b/i.test(name);
 const isMarketing = name => /მარკეტ|market|маркет/i.test(name);
 const addDaysIso = (day, n) => { const d = new Date(day + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
-// ---------- MONTHLY: last 12 months from cash shifts ----------
+// ---------- MONTHLY: last 12 months — income and the cost of the food sold ----------
+// Same basis as Income now (Syrve sales without deleted orders, marketing not counted as income).
+// cost = Syrve's cost price of everything sold, marketing included (that food was used too).
+// Older Syrve versions fall back to cash shifts (income only, no cost).
 async function syrveMonthly(env) {
   const now = nowLocal(env);
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1));
   const from = start.toISOString().slice(0, 10);
   const to = localDate(env);
-
-  return withSyrve(env, async get => {
-    const shifts = JSON.parse(await get("/v2/cashshifts/list", { openDateFrom: from, openDateTo: to, status: "ANY" }));
+  const fresh = () => {
     const months = {};
     for (let i = 0; i < 12; i++) {
       const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1));
-      months[d.toISOString().slice(0, 7)] = { month: d.toISOString().slice(0, 7), income: 0, cash: 0, card: 0, credit: 0, shifts: 0 };
+      months[d.toISOString().slice(0, 7)] = { month: d.toISOString().slice(0, 7), income: 0, cash: 0, card: 0, credit: 0, shifts: 0, cost: null };
     }
-    for (const s of shifts) {
-      const m = String(s.openDate || "").slice(0, 7);
-      if (!months[m]) continue;
-      months[m].income += num(s.payOrders);
-      months[m].cash += num(s.salesCash);
-      months[m].card += num(s.salesCard);
-      months[m].credit += num(s.salesCredit);
-      months[m].shifts += 1;
+    return months;
+  };
+
+  return withSyrve(env, async (get, post) => {
+    let months = fresh();
+    try {
+      const filters = {
+        "OpenDate.Typed": { filterType: "DateRange", periodType: "CUSTOM", from, to: nextDay(to), includeLow: true, includeHigh: false },
+        OrderDeleted: { filterType: "IncludeValues", values: ["NOT_DELETED"] },
+      };
+      const olap = (fields, aggregates) => post("/v2/reports/olap", { reportType: "SALES", buildSummary: false, groupByRowFields: fields, aggregateFields: aggregates, filters })
+        .then(r => r.data || []);
+      for (const r of await olap(["OpenDate.Typed", "PayTypes"], ["DishDiscountSumInt"])) {
+        const m = months[String(r["OpenDate.Typed"] || "").slice(0, 7)];
+        const pay = String(r.PayTypes || "");
+        if (!m || isMarketing(pay)) continue;
+        const sum = num(r.DishDiscountSumInt);
+        m.income += sum;
+        if (/cash|нал|ნაღდ/i.test(pay)) m.cash += sum;
+        else if (/card|карт|ბარათ|visa|master/i.test(pay)) m.card += sum;
+        else m.credit += sum;
+      }
+      let costError = "";
+      try {
+        const rows = await olap(["OpenDate.Typed"], ["ProductCostBase.ProductCost"]);
+        for (const m of Object.values(months)) m.cost = 0;
+        for (const r of rows) {
+          const m = months[String(r["OpenDate.Typed"] || "").slice(0, 7)];
+          if (m) m.cost += num(r["ProductCostBase.ProductCost"]);
+        }
+      } catch (e) { costError = String(e.message || e).slice(0, 200); }
+      return { months: Object.values(months), source: "olap2", costError };
+    } catch (e) {
+      months = fresh();
+      const shifts = JSON.parse(await get("/v2/cashshifts/list", { openDateFrom: from, openDateTo: to, status: "ANY" }));
+      for (const s of shifts) {
+        const m = months[String(s.openDate || "").slice(0, 7)];
+        if (!m) continue;
+        m.income += num(s.payOrders);
+        m.cash += num(s.salesCash);
+        m.card += num(s.salesCard);
+        m.credit += num(s.salesCredit);
+        m.shifts += 1;
+      }
+      return { months: Object.values(months), source: "cashshifts", olap2Error: String(e.message || e).slice(0, 200), costError: "Syrve cost price is not available" };
     }
-    return { months: Object.values(months) };
   });
 }
 

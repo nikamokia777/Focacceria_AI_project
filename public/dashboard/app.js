@@ -54,7 +54,9 @@ const T = {
     income: "შემოსავალი", fixed: "ფიქსირებული", variable: "ცვლადი", profit: "მოგება",
     this_month: "ეს თვე", last_month: "წინა თვე", profit_this_month: "მოგება ამ თვეში",
     monthly_sub: "შემოსავალი Syrve-ს სალაროს ცვლებიდან. მოგება = შემოსავალი − ფიქსირებული − ცვლადი.",
-    monthly_note: "ფიქსირებული ხარჯი ყველა თვისთვის მიმდინარე სიიდან ითვლება.",
+    monthly_note: "მოგება = შემოსავალი − საკვების თვითღირებულება (Syrve) − ფიქსირებული − ცვლადი ხარჯები. ცვლადი ხარჯების „საქონელი“ აქ აღარ აკლდება — ის უკვე თვითღირებულებაშია. ფიქსირებული ხარჯი ყველა თვისთვის მიმდინარე სიიდან ითვლება.",
+    food_cost: "საკვების თვითღირებულება", after_debts: "ყველა ვალის გადახდის შემდეგ",
+    cost_fallback: "Syrve-ს თვითღირებულება მიუწვდომელია — ნაცვლად ცვლადი ხარჯების „საქონელი“ აკლდება.",
     income_by_month: "შემოსავალი თვეების მიხედვით",
     total_owed: "სულ გადასახდელი", suppliers: "მომწოდებლები", supplier: "მომწოდებელი", owed: "გადასახდელი",
     debts_sub: "რამდენი გვმართებს მომწოდებლებს, Syrve-ს ბალანსის მიხედვით.", search: "ძებნა",
@@ -131,7 +133,9 @@ const T = {
     income: "Income", fixed: "Fixed", variable: "Variable", profit: "Profit",
     this_month: "This month", last_month: "Last month", profit_this_month: "Profit this month",
     monthly_sub: "Income from Syrve cash shifts. Profit = income − fixed − variable.",
-    monthly_note: "Fixed cost for every month uses the current fixed cost list.",
+    monthly_note: "Profit = income − food cost (Syrve cost price) − fixed − variable costs. 'Goods' in Variable costs is not subtracted again — it is already in the food cost. Fixed cost for every month uses the current fixed cost list.",
+    food_cost: "Food cost", after_debts: "After paying all debts",
+    cost_fallback: "Syrve's cost price isn't available — 'goods' from Variable costs is subtracted instead.",
     income_by_month: "Income by month",
     total_owed: "Total owed", suppliers: "Suppliers", supplier: "Supplier", owed: "Owed",
     debts_sub: "What we owe suppliers, from Syrve balances.", search: "Search",
@@ -460,6 +464,18 @@ function variableTotals(vr, ym = ymNow()) {
   return { month, unpaid };
 }
 
+// Profit for one month = income − food cost (Syrve's cost price of what was sold) − fixed − variable.
+// Supplier goods typed into Variable costs are left out when Syrve's food cost is known:
+// that food is already in the food cost and would otherwise count twice.
+function monthProfit(m, fixedTotal, vr) {
+  const inMonth = vr.entries.filter(e => (e.date || "").startsWith(m.month));
+  const goods = inMonth.filter(e => e.type === "goods").reduce((a, e) => a + n(e.amount), 0);
+  const other = inMonth.filter(e => e.type !== "goods").reduce((a, e) => a + n(e.amount), 0);
+  const fromSyrve = m.cost !== null && m.cost !== undefined;
+  const food = fromSyrve ? n(m.cost) : goods;
+  return { food, fromSyrve, fixed: fixedTotal, variable: fromSyrve ? other : 0, profit: n(m.income) - food - fixedTotal - (fromSyrve ? other : 0) };
+}
+
 // ====================== MAIN (overview at "/") ======================
 async function renderMain(view, demo, fresh = false) {
   if (!view.dataset.loaded) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
@@ -483,14 +499,15 @@ async function renderMain(view, demo, fresh = false) {
   const cur = months[months.length - 1], prev = months[months.length - 2];
   const income = cur ? n(cur.income) : null;
 
-  // 1. Profit = monthly income − fixed − variable (this month) − supplier debts
+  // 1. Profit = income − food cost − fixed − variable (this month); then what is left after all supplier debts
   let profitBox;
-  if (income !== null && F && V && D !== null) {
-    const exp = F.total + V.month + D;
-    const profit = income - exp;
-    profitBox = `<div class="value num ${profit >= 0 ? "good" : "bad"}">${money(profit)}</div>
-      <div class="hint">${esc(t("income"))} ${money(income)} − ${esc(t("expenses"))} ${money(exp)}</div>
-      <div class="hint">${esc(t("fixed_short"))} ${money(F.total)} · ${esc(t("variable_short"))} ${money(V.month)} · ${esc(t("debts_short"))} ${money(D)}</div>`;
+  if (income !== null && F && ok(vr) && D !== null) {
+    const P = monthProfit(cur, F.total, vr.value);
+    const after = P.profit - D;
+    profitBox = `<div class="value num ${P.profit >= 0 ? "good" : "bad"}">${money(P.profit)}</div>
+      <div class="hint">${esc(t("income"))} ${money(income)} − ${esc(t("food_cost"))} ${money(P.food)} − ${esc(t("fixed_short"))} ${money(F.total)}${P.fromSyrve ? ` − ${esc(t("variable_short"))} ${money(P.variable)}` : ""}</div>
+      ${P.fromSyrve ? "" : `<div class="hint">${esc(t("cost_fallback"))}</div>`}
+      <div class="hint">${esc(t("after_debts"))}: <b class="${after >= 0 ? "good" : "bad"}-text">${money(after)}</b> <span class="muted">(${esc(t("debts_short"))} ${money(D)})</span></div>`;
   } else profitBox = failed([monthly, fx, vr, debts].find(r => !ok(r)) || {});
 
   // 2. Fixed costs
@@ -975,10 +992,7 @@ async function renderMonthly(view, demo) {
   view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
   const [r, fx, vr] = await Promise.all([loadSyrve("monthly"), loadData("fixed"), loadData("variable")]);
   const fixedTotal = fx.categories.reduce((a, c) => a + n(c.amount), 0);
-  const rows = r.months.map(m => {
-    const variable = vr.entries.filter(e => (e.date || "").startsWith(m.month)).reduce((a, e) => a + n(e.amount), 0);
-    return { ...m, fixed: fixedTotal, variable, profit: m.income - fixedTotal - variable };
-  });
+  const rows = r.months.map(m => ({ ...m, ...monthProfit(m, fixedTotal, vr) }));
   const cur = rows[rows.length - 1] || { income: 0, profit: 0 };
   const prev = rows[rows.length - 2] || { income: 0 };
   const change = prev.income ? Math.round((cur.income - prev.income) / prev.income * 100) : null;
@@ -993,17 +1007,18 @@ async function renderMonthly(view, demo) {
       ${barChart(rows.map(m => ({ label: monthLabel(m.month, true), value: m.income, tip: `${monthLabel(m.month)}: ${money(m.income)}` })), { height: 240, width: panelWidth(false) })}
     </div></div>
     <div class="panel"><div class="table-wrap"><table class="edit">
-      <thead><tr><th>${esc(t("month"))}</th><th class="r">${esc(t("income"))}</th><th class="r">${esc(t("cash"))}</th><th class="r">${esc(t("card"))}</th><th class="r">${esc(t("fixed"))}</th><th class="r">${esc(t("variable"))}</th><th class="r">${esc(t("profit"))}</th></tr></thead>
+      <thead><tr><th>${esc(t("month"))}</th><th class="r">${esc(t("income"))}</th><th class="r">${esc(t("cash"))}</th><th class="r">${esc(t("card"))}</th><th class="r">${esc(t("food_cost"))}</th><th class="r">${esc(t("fixed"))}</th><th class="r">${esc(t("variable"))}</th><th class="r">${esc(t("profit"))}</th></tr></thead>
       <tbody>${rows.slice().reverse().map(m => `<tr>
         <td>${esc(monthLabel(m.month))}</td><td class="r num"><b>${money(m.income)}</b></td><td class="r num">${money(m.cash)}</td><td class="r num">${money(m.card)}</td>
-        <td class="r num">${money(m.fixed)}</td><td class="r num">${money(m.variable)}</td>
+        <td class="r num">${money(m.food)}</td><td class="r num">${money(m.fixed)}</td><td class="r num">${money(m.variable)}</td>
         <td class="r num"><b style="color:var(${m.profit >= 0 ? "--good" : "--bad"})">${money(m.profit)}</b></td></tr>`).join("")}</tbody>
     </table></div></div>
+    ${r.costError ? `<p class="notice">${esc(t("cost_fallback"))}</p>` : ""}
     <p class="muted small">${esc(t("monthly_note"))}</p>`;
   wireChartHover(view);
   $("#moExport", view).addEventListener("click", () => {
-    const out = [[t("month"), t("income"), t("cash"), t("card"), t("fixed"), t("variable"), t("profit")]];
-    rows.forEach(m => out.push([monthLabel(m.month), m.income, m.cash, m.card, m.fixed, m.variable, m.profit]));
+    const out = [[t("month"), t("income"), t("cash"), t("card"), t("food_cost"), t("fixed"), t("variable"), t("profit")]];
+    rows.forEach(m => out.push([monthLabel(m.month), m.income, m.cash, m.card, m.food, m.fixed, m.variable, m.profit]));
     exportXlsx(`monthly-income.xlsx`, t("tab_monthly"), out);
   });
 }
@@ -1011,8 +1026,8 @@ async function renderMonthly(view, demo) {
 // ====================== 5. DEBTS ======================
 // Debt per supplier = Syrve invoices − payments from BOG / TBC matched by tax ID.
 // Payments the app can't match safely wait in "To review" until the CEO assigns them.
-async function renderDebts(view, demo, fresh = false) {
-  if (!S.syrve.debts) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
+async function renderDebts(view, demo, fresh = false, quiet = false) {
+  if (!S.syrve.debts && !quiet) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
   const r = await loadSyrve("debts", "", fresh);
   const q = S.debtQuery.toLowerCase();
   const list = r.suppliers.filter(s => !q || String(s.name).toLowerCase().includes(q) || String(s.tin || "").includes(q));
@@ -1103,7 +1118,7 @@ async function renderDebts(view, demo, fresh = false) {
     exportXlsx(`debts-${todayISO()}.xlsx`, t("tab_debts"), out);
   });
 
-  const reload = async () => { S.syrve.debts = null; await renderDebts(view, demo); };
+  const reload = async () => { S.syrve.debts = null; await renderDebts(view, demo, false, true); };
 
   // review actions
   // after Confirm / Not a supplier the row asks: remember for this recipient's future payments too, or only these?
@@ -1158,9 +1173,11 @@ async function renderDebts(view, demo, fresh = false) {
     const recent = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
     return need.some(k => !(bank.cursors || {})[k] || bank.cursors[k] < recent);
   })();
-  // keep the bank fresh: sync when the last sync is older than 10 minutes (runs separately, page stays fast)
-  const stale = connected && bank.settings.historyFrom && (!bank.lastSyncAt || Date.now() - Date.parse(bank.lastSyncAt) > 10 * 60 * 1000);
-  if ((behind || stale) && !S.bankSyncing && !DEMO) loadBankHistory(view, demo);
+  // The server syncs the bank every 15 minutes. The page only helps when that is clearly behind
+  // (first load of a history, or no sync for 30 minutes) — and at most once every 10 minutes.
+  const stale = connected && bank.settings.historyFrom && (!bank.lastSyncAt || Date.now() - Date.parse(bank.lastSyncAt) > 30 * 60 * 1000);
+  const recentlyTried = S.bankAutoAt && Date.now() - S.bankAutoAt < 10 * 60 * 1000;
+  if ((behind || stale) && !S.bankSyncing && !recentlyTried && !DEMO) { S.bankAutoAt = Date.now(); loadBankHistory(view, demo); }
 }
 
 async function loadBankHistory(view, demo) {
@@ -1176,7 +1193,8 @@ async function loadBankHistory(view, demo) {
   } catch (e) { toast(e.message); }
   S.bankSyncing = false;
   S.syrve.debts = null;
-  if (S.tab === "debts") renderDebts(view, demo).catch(() => {});
+  // refresh in place — the page stays visible instead of flashing "loading…"
+  if (S.tab === "debts") renderDebts(view, demo, false, true).catch(() => {});
 }
 
 // ====================== 6. RATINGS ======================
@@ -1412,7 +1430,7 @@ function demoApi(path, opts) {
       byDay: Array.from({ length: 27 }, (_, i) => ({ day: shiftDay(todayISO(), -i), sum: 1500 + Math.round(Math.sin(i) * 500 + 600) })), _at: Date.now() };
   }
   if (path.startsWith("/syrve/monthly")) {
-    const months = []; for (let i = 11; i >= 0; i--) { const m = ymShift(ymNow(), -i); const inc = 52000 + Math.round(Math.sin(i) * 9000 + (11 - i) * 900); months.push({ month: m, income: i === 0 ? Math.round(inc * now.getDate() / 30) : inc, cash: Math.round(inc * 0.3), card: Math.round(inc * 0.7), credit: 0 }); }
+    const months = []; for (let i = 11; i >= 0; i--) { const m = ymShift(ymNow(), -i); const inc = 52000 + Math.round(Math.sin(i) * 9000 + (11 - i) * 900); months.push({ month: m, income: i === 0 ? Math.round(inc * now.getDate() / 30) : inc, cash: Math.round(inc * 0.3), card: Math.round(inc * 0.7), credit: 0, cost: Math.round((i === 0 ? inc * now.getDate() / 30 : inc) * 0.31) }); }
     return { months };
   }
   if (path.startsWith("/syrve/debts")) {
