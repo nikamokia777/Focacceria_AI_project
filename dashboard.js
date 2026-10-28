@@ -6,7 +6,8 @@
 //   SYRVE_URL       https://focacceria.syrve.online
 //   SYRVE_LOGIN     Syrve Office user
 //   SYRVE_PASSWORD  that user's password (plain — it is hashed here)
-// Optional secrets: TZ_OFFSET (hours from UTC, default 4), DEBT_SIGN (default -1)
+// Optional secrets: TZ_OFFSET (hours from UTC, default 4), DEBT_SIGN (default -1),
+//   COMPANY_TIN (our tax ID — transfers to it are between our own accounts, not supplier payments)
 
 import { listOutgoingWaybills } from "./rsge.js";
 import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadBankData, loadRecipientPayments, syncStep, bumpVersion, loadVersion } from "./bank.js";
@@ -216,10 +217,45 @@ const nextDay = day => { const d = new Date(day + "T00:00:00Z"); d.setUTCDate(d.
 async function syrveLive(env, from, to) {
   const end = nextDay(to); // Syrve's "to" is exclusive
 
-  return withSyrve(env, async get => {
+  return withSyrve(env, async (get, post) => {
     const result = { date: from, from, to, total: 0, orders: 0, byPayType: [], byHour: [], byDay: [], source: "olap" };
 
-    // 1) OLAP sales by payment type
+    // 0) Preferred: OLAP v2 without deleted orders — the same basis as the payment-type details.
+    //    Orders are counted per day, so an order paid two ways (card + cash) counts once.
+    try {
+      const filters = {
+        "OpenDate.Typed": { filterType: "DateRange", periodType: "CUSTOM", from, to: end, includeLow: true, includeHigh: false },
+        OrderDeleted: { filterType: "IncludeValues", values: ["NOT_DELETED"] },
+      };
+      const olap = (fields, aggregates) => post("/v2/reports/olap", { reportType: "SALES", buildSummary: false, groupByRowFields: fields, aggregateFields: aggregates, filters })
+        .then(r => r.data || []);
+      let marketingOrders = 0;
+      for (const r of await olap(["PayTypes"], ["DishDiscountSumInt", "DishSumInt", "UniqOrderId.OrdersCount"])) {
+        const name = r.PayTypes || "—";
+        if (isMarketing(name)) { result.byPayType.push({ name, sum: num(r.DishSumInt), notIncome: true }); marketingOrders += num(r["UniqOrderId.OrdersCount"]); continue; }
+        result.byPayType.push({ name, sum: num(r.DishDiscountSumInt) });
+        result.total += num(r.DishDiscountSumInt);
+      }
+      const days = await olap(["OpenDate.Typed"], ["DishDiscountSumInt", "UniqOrderId.OrdersCount"]);
+      result.orders = Math.max(0, days.reduce((a, r) => a + num(r["UniqOrderId.OrdersCount"]), 0) - marketingOrders);
+      if (from !== to) {
+        result.byDay = days.map(r => ({ day: String(r["OpenDate.Typed"] || "").slice(0, 10), sum: num(r.DishDiscountSumInt) }))
+          .filter(r => r.day).sort((a, b) => a.day.localeCompare(b.day));
+      } else {
+        try {
+          result.byHour = (await olap(["HourOpen"], ["DishDiscountSumInt"]))
+            .map(r => ({ hour: Number(r.HourOpen), sum: num(r.DishDiscountSumInt) }))
+            .filter(r => !Number.isNaN(r.hour)).sort((a, b) => a.hour - b.hour);
+        } catch (_) {}
+      }
+      if (!result.byPayType.some(p => p.notIncome)) result.byPayType.push({ name: "მარკეტინგი", sum: 0, notIncome: true });
+      result.source = "olap2";
+      return result;
+    } catch (e) {
+      Object.assign(result, { total: 0, orders: 0, byPayType: [], byHour: [], byDay: [], olap2Error: String(e.message || e).slice(0, 200) });
+    }
+
+    // 1) Older Syrve versions: OLAP v1 sales by payment type
     try {
       const xml = await get("/reports/olap", {
         report: "SALES", from: ddmmyyyy(from), to: ddmmyyyy(end),
@@ -495,8 +531,13 @@ async function buildDebts(env, syrve) {
   const rsName = {};
   try { for (const r of await loadLog(env)) if (r.sellerTin && r.seller) rsName[r.sellerTin] = r.seller; } catch (_) {}
 
+  // our own company: TBC doesn't flag transfers between our accounts, so recognise them by
+  // our tax ID (seen as the sender on BOG, or COMPANY_TIN) and by our BOG account numbers
+  const ownTins = new Set([String(env.COMPANY_TIN || "").trim(), ...Object.values(recipients).filter(r => r[4] && r[1]).map(r => r[1])].filter(Boolean));
+  const ownIbans = new Set((settings.bogAccounts || []).map(x => x.toUpperCase()));
   const decide = rk => {
-    const [name = "", tin = "", iban = "", bankCode = "", own = 0] = recipients[rk] || [];
+    const [name = "", tin = "", iban = "", bankCode = "", ownFlag = 0] = recipients[rk] || [];
+    const own = ownFlag || (tin && ownTins.has(tin)) || (iban && ownIbans.has(iban.toUpperCase()));
     const forced = (tin ? links.byTin[tin] : undefined) ?? (iban ? links.byIban[iban.toUpperCase()] : undefined);
     if (forced === "ignore") return { skip: true };
     if (forced && sup[forced]) return { supplierId: forced };

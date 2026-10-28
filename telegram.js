@@ -47,6 +47,7 @@ const TEXTS = {
     cancelled: "⚠️ ეს ზედნადები rs.ge-ზე გაუქმებულია/წაშლილია!",
     mismatches: "ფასის შეუსაბამობა",
     newItems: "ბაზაში არ არის",
+    noPriceItems: "ბაზაში ფასი არ არის მითითებული",
     okItems: "ფასი ემთხვევა",
     base: "ბაზა",
     more: (n) => `… და კიდევ ${n} პოზიცია`,
@@ -112,6 +113,7 @@ const TEXTS = {
     cancelled: "⚠️ This waybill is cancelled/deleted on rs.ge!",
     mismatches: "Price mismatch",
     newItems: "Not in base list",
+    noPriceItems: "No base price set",
     okItems: "Price matches",
     base: "base",
     more: (n) => `… and ${n} more lines`,
@@ -293,17 +295,26 @@ function findBase(basePrices, item) {
   }
   const name = norm(item.name);
   if (!name) return null;
-  return basePrices.find((b) => {
-    const candidates = [norm(b.name), norm(b.nameRs)].filter((n) => n.length >= 3);
-    return candidates.some((n) => n === name || n.includes(name) || name.includes(n));
-  }) || null;
+  // the same name wins; otherwise the closest name that contains the other one
+  // ("პომიდორი ჩერი" must not land on plain "პომიდორი" when both are in the list)
+  let best = null;
+  let bestScore = 0;
+  for (const b of basePrices) {
+    for (const n of [norm(b.name), norm(b.nameRs)]) {
+      if (n.length < 3) continue;
+      const score = n === name ? 1000 : n.includes(name) || name.includes(n) ? 500 - Math.abs(n.length - name.length) : 0;
+      if (score > bestScore) { best = b; bestScore = score; }
+    }
+  }
+  return best;
 }
 
 export function compareGoods(goods, basePrices) {
   return goods.map((g) => {
     const base = findBase(basePrices, g);
-    const basePrice = base ? Number(base.basePrice) : null;
-    let status = "unknown";
+    // a product whose price was never filled in (0) has nothing to compare with
+    const basePrice = base && Number(base.basePrice) > 0 ? Number(base.basePrice) : null;
+    let status = base ? "noprice" : "unknown";
     let diff = null;
     if (basePrice !== null && !Number.isNaN(basePrice)) {
       diff = g.price - basePrice;
@@ -329,6 +340,7 @@ function goodsLine(t, r) {
 export function buildSummary(t, waybill, rows) {
   const bad = rows.filter((r) => r.status === "high" || r.status === "low");
   const unknown = rows.filter((r) => r.status === "unknown");
+  const noPrice = rows.filter((r) => r.status === "noprice");
   const ok = rows.filter((r) => r.status === "ok");
 
   let out = `🧾 <b>${t.waybill} № ${esc(waybill.number)}</b>\n`;
@@ -348,9 +360,10 @@ export function buildSummary(t, waybill, rows) {
   };
   section(`⚠️ ${t.mismatches}`, bad);
   section(`❓ ${t.newItems}`, unknown);
+  section(`➖ ${t.noPriceItems}`, noPrice);
   section(`✅ ${t.okItems}`, ok);
 
-  out += `\n${bad.length ? t.hasIssues(bad.length) : unknown.length ? "" : t.allOk}`;
+  out += `\n${bad.length ? t.hasIssues(bad.length) : unknown.length || noPrice.length ? "" : t.allOk}`;
   return out.trim();
 }
 
