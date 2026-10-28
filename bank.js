@@ -254,7 +254,7 @@ async function bogChunk(env, token, iban, from, to, budget) {
   const body = await first.json();
   const records = [...(g(body, "records") || [])];
   const id = g(body, "id");
-  const total = num(g(body, "totalCount"));
+  const total = num(g(body, "totalCount") ?? g(body, "count")); // BOG names it "Count" in some API versions
   // more than 1,000 entries: fetch the next pages in order
   for (let page = 2; records.length < total && id != null; page++) {
     if (budget.used >= STEP_FETCH_BUDGET) throw new Error("budget");

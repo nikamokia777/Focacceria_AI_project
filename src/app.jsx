@@ -73,7 +73,7 @@ const T = {
     receivedFromOrder: "შეკვეთიდან მიღებული",
     distributorSent: (d) => `✓ მომწოდებელს გაეგზავნა ${d}`,
     accountantSent: (d) => `✓ ბუღალტერს გაეგზავნა ${d}`,
-    lineStatus: { ok: "ემთხვევა", high: "ძვირი", low: "იაფი", unknown: "ბაზაში არ არის" },
+    lineStatus: { ok: "ემთხვევა", high: "ძვირი", low: "იაფი", unknown: "ბაზაში არ არის", noprice: "ფასი არ არის" },
     base: "ბაზა",
     // debts
     debtsTitle: "ვალები",
@@ -206,7 +206,7 @@ const T = {
     receivedFromOrder: "Received from order",
     distributorSent: (d) => `✓ Sent to supplier ${d}`,
     accountantSent: (d) => `✓ Sent to accountant ${d}`,
-    lineStatus: { ok: "matches", high: "higher", low: "lower", unknown: "not in list" },
+    lineStatus: { ok: "matches", high: "higher", low: "lower", unknown: "not in list", noprice: "no base price" },
     base: "base",
     debtsTitle: "Debts",
     debtsSoon: "This section is coming soon.",

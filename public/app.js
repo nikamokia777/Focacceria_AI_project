@@ -114,7 +114,8 @@ const T = {
       ok: "ემთხვევა",
       high: "ძვირი",
       low: "იაფი",
-      unknown: "ბაზაში არ არის"
+      unknown: "ბაზაში არ არის",
+      noprice: "ფასი არ არის"
     },
     base: "ბაზა",
     debtsTitle: "ვალები",
@@ -327,7 +328,8 @@ const T = {
       ok: "matches",
       high: "higher",
       low: "lower",
-      unknown: "not in list"
+      unknown: "not in list",
+      noprice: "no base price"
     },
     base: "base",
     debtsTitle: "Debts",
