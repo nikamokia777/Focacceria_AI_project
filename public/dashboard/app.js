@@ -13,7 +13,7 @@ const SUBITEMS_ENABLED = false;          // turn on later to show sub-items insi
 const LIVE_REFRESH_MS = 2 * 60 * 1000;   // live income auto-refresh
 const CURRENCY = "₾";
 
-const TABS = ["fixed", "variable", "live", "monthly", "debts", "ratings", "employees", "tasks"];
+const TABS = ["fixed", "variable", "live", "monthly", "menu", "debts", "ratings", "employees", "tasks"];
 const FIXED_PRESETS = ["rent", "utilities", "internet", "salaries", "program", "cleaning", "outsourcing"];
 const VAR_TYPES = ["goods", "jars", "packaging", "other"];
 const PLATFORMS = ["wolt", "glovo", "bolt", "other"];
@@ -26,7 +26,17 @@ const T = {
     not_set: "პაროლი ჯერ არ არის დაყენებული — გაგზავნეთ /password ბოტთან", saved: "შენახულია", save_failed: "ვერ შეინახა",
     tab_fixed: "ფიქსირებული ხარჯები", tab_variable: "ცვლადი ხარჯები", tab_live: "შემოსავალი ახლა",
     tab_monthly: "თვიური შემოსავალი", tab_debts: "ვალები", tab_ratings: "რეიტინგები",
-    tab_employees: "თანამშრომლები", tab_tasks: "დავალებები",
+    tab_employees: "თანამშრომლები", tab_tasks: "დავალებები", tab_menu: "მენიუ",
+    menu_sub: "Syrve-დან: რა და რამდენი გაიყიდა, ფასი, რეცეპტის თვითღირებულება და მარჟა (დღგ-ს გარეშე). დააჭირეთ კერძს — გამოჩნდება რეცეპტი.",
+    dish: "კერძი", sold: "გაიყიდა", revenue: "ნავაჭრი", price: "ფასი", cost_short: "თვითღირ.", margin: "მარჟა", food_cost_pct: "Food cost",
+    items_sold: "გაყიდული ერთეული", avg_margin: "საშუალო მარჟა", best_seller: "ყველაზე გაყიდვადი",
+    all_groups: "ყველა ჯგუფი", only_sold: "მხოლოდ გაყიდული", sort_sold: "გაყიდვადობით", sort_revenue: "ნავაჭრით", sort_margin: "მარჟით",
+    no_recipe: "რეცეპტი არ არის", recipe_tree: "🌳 რეცეპტი (ხე)", recipe_flat: "🧺 ნედლეული (ჯამი)", ingredient: "ინგრედიენტი", raw: "ნედლეული",
+    qty: "რაოდენობა", unit_price: "ფასი / ერთ.", value: "ღირებულება", share: "წილი", semi: "ნახევარფაბრიკატი", total_cost: "სულ თვითღირებულება",
+    price_vat: "ფასი (დღგ-ით)", margin_novat: "მარჟა (დღგ-ს გარეშე)", one_unit: "ერთი ერთეული", rank: "რეიტინგი", sold_when: "როდის გაიყიდა",
+    missing_price: "⚠ ზოგ ინგრედიენტს Syrve-ში ფასი არ აქვს (მარაგში არ არის) — თვითღირებულება შეიძლება რეალურზე ნაკლები იყოს.",
+    recipes_err: "Syrve-დან რეცეპტები ვერ წამოვიდა", cost_err: "ინგრედიენტების ფასები ვერ წამოვიდა", no_dishes: "კერძები არ მოიძებნა",
+    flat_note: "ყველაფერი დაყვანილია ნედლეულამდე და შეჯამებულია. ყველაზე ძვირი ინგრედიენტი ზემოთაა.", tree_note: "▸ / ▾ — ნახევარფაბრიკატის გახსნა / დახურვა. ფასები: Syrve-ს თვითღირებულება.",
     rent: "ქირა", utilities: "კომუნალური", internet: "ინტერნეტი", salaries: "ხელფასები",
     program: "პროგრამის მომსახურება", cleaning: "დასუფთავება", outsourcing: "აუთსორსინგი",
     category: "კატეგორია", amount: "თანხა", due_day: "გადახდის დღე", status: "სტატუსი", comment: "კომენტარი",
@@ -105,7 +115,17 @@ const T = {
     not_set: "No password set yet — send /password to the bot", saved: "Saved", save_failed: "Could not save",
     tab_fixed: "Fixed costs", tab_variable: "Variable costs", tab_live: "Live income",
     tab_monthly: "Monthly income", tab_debts: "Debts", tab_ratings: "Ratings",
-    tab_employees: "Employees", tab_tasks: "Tasks",
+    tab_employees: "Employees", tab_tasks: "Tasks", tab_menu: "Menu",
+    menu_sub: "From Syrve: what sold and how much, price, recipe cost and margin (without VAT). Click a dish to see its recipe.",
+    dish: "Dish", sold: "Sold", revenue: "Revenue", price: "Price", cost_short: "Cost", margin: "Margin", food_cost_pct: "Food cost",
+    items_sold: "Items sold", avg_margin: "Average margin", best_seller: "Best seller",
+    all_groups: "All groups", only_sold: "Only sold", sort_sold: "By sales", sort_revenue: "By revenue", sort_margin: "By margin",
+    no_recipe: "no recipe", recipe_tree: "🌳 Recipe (tree)", recipe_flat: "🧺 Raw ingredients (total)", ingredient: "Ingredient", raw: "Raw ingredient",
+    qty: "Quantity", unit_price: "Price / unit", value: "Cost", share: "Share", semi: "semi-finished", total_cost: "Total cost",
+    price_vat: "Price (incl. VAT)", margin_novat: "Margin (excl. VAT)", one_unit: "one unit", rank: "rank", sold_when: "When it sold",
+    missing_price: "⚠ Some ingredients have no price in Syrve (none in stock) — the cost may be lower than it really is.",
+    recipes_err: "Could not read recipes from Syrve", cost_err: "Could not read ingredient prices", no_dishes: "No dishes found",
+    flat_note: "Everything reduced to raw ingredients and summed. The most expensive ingredient is on top.", tree_note: "▸ / ▾ — open / close a semi-finished product. Prices: Syrve cost price.",
     rent: "Rent", utilities: "Utilities", internet: "Internet", salaries: "Salaries",
     program: "Program service", cleaning: "Cleaning", outsourcing: "Outsourcing",
     category: "Category", amount: "Amount", due_day: "Due day", status: "Status", comment: "Comment",
@@ -411,7 +431,7 @@ function route() {
 async function render() {
   const view = $("#view");
   const renderers = { main: renderMain, fixed: renderFixed, variable: renderVariable, live: renderLive, monthly: renderMonthly,
-    debts: renderDebts, ratings: renderRatings, employees: renderEmployees, tasks: renderTasks };
+    menu: renderMenu, debts: renderDebts, ratings: renderRatings, employees: renderEmployees, tasks: renderTasks };
   const demo = DEMO ? `<div class="notice">${esc(t("demo"))}</div>` : "";
   try {
     await renderers[S.tab](view, demo);
@@ -751,12 +771,14 @@ const isoDay = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate
 const shiftDay = (day, k) => { const d = new Date(day + "T12:00:00"); d.setDate(d.getDate() + k); return isoDay(d); };
 const dm = day => `${day.slice(8, 10)}.${day.slice(5, 7)}`;
 const dmy = day => `${dm(day)}.${day.slice(0, 4)}`;
-function liveRange() { const today = todayISO(); return S.liveRange && S.liveRange.to <= today ? S.liveRange : { from: today, to: today }; }
+// date ranges per tab ("live", "menu"); today by default
+function rangeOf(key) { const today = todayISO(), r = (S.ranges || {})[key]; return r && r.to <= today ? r : { from: today, to: today }; }
+function liveRange() { return rangeOf("live"); }
 const rangeQuery = r => `?from=${r.from}&to=${r.to}`;
 const rangeLabel = r => (r.from === r.to ? dmy(r.from) : `${dmy(r.from)} – ${dmy(r.to)}`);
 
-function calendarHtml() {
-  const r = liveRange(), today = todayISO();
+function calendarHtml(key) {
+  const r = rangeOf(key), today = todayISO();
   const ym = S.calMonth || r.to.slice(0, 7);
   const [y, m] = ym.split("-").map(Number);
   const first = new Date(y, m - 1, 1);
@@ -789,17 +811,17 @@ function quickRange(kind) {
   return { from: today, to: today };
 }
 
-function wireCalendar(view, demo) {
+function wireCalendar(view, key, onChange) {
   const pop = $("#calPop", view);
-  const setRange = r => { S.liveRange = r; S.calPick = null; S.calMonth = null; S.livePay = null; renderLive(view, demo).catch(e => toast(e.message)); };
-  $("#rangeBtn", view).addEventListener("click", e => { e.stopPropagation(); pop.hidden = !pop.hidden; if (!pop.hidden) { pop.innerHTML = calendarHtml(); } });
+  const setRange = r => { S.ranges = { ...S.ranges, [key]: r }; S.calPick = null; S.calMonth = null; onChange(); };
+  $("#rangeBtn", view).addEventListener("click", e => { e.stopPropagation(); pop.hidden = !pop.hidden; if (!pop.hidden) { pop.innerHTML = calendarHtml(key); } });
   pop.addEventListener("click", e => {
     e.stopPropagation();
     const b = e.target.closest("button"); if (!b || b.disabled) return;
-    if (b.dataset.cal) { S.calMonth = ymShift(S.calMonth || liveRange().to.slice(0, 7), Number(b.dataset.cal)); pop.innerHTML = calendarHtml(); return; }
+    if (b.dataset.cal) { S.calMonth = ymShift(S.calMonth || rangeOf(key).to.slice(0, 7), Number(b.dataset.cal)); pop.innerHTML = calendarHtml(key); return; }
     if (b.dataset.quick) return setRange(quickRange(b.dataset.quick));
     const day = b.dataset.day; if (!day) return;
-    if (!S.calPick) { S.calPick = day; pop.innerHTML = calendarHtml(); return; }
+    if (!S.calPick) { S.calPick = day; pop.innerHTML = calendarHtml(key); return; }
     setRange({ from: [S.calPick, day].sort()[0], to: [S.calPick, day].sort()[1] });
   });
   if (!S.calBound) { // once: a click anywhere else closes the calendar
@@ -868,7 +890,7 @@ async function renderLive(view, demo, fresh = false) {
     </div>
     <div id="payDetail"></div>`;
   wireChartHover(view);
-  wireCalendar(view, demo);
+  wireCalendar(view, "live", () => { S.livePay = null; renderLive(view, demo).catch(e => toast(e.message)); });
   $("#liveRefresh", view).addEventListener("click", () => renderLive(view, demo, true).catch(e => toast(e.message)));
   $$(".pay-row", view).forEach(b => b.addEventListener("click", () => {
     S.livePay = S.livePay === b.dataset.pay ? null : b.dataset.pay;
@@ -1021,6 +1043,129 @@ async function renderMonthly(view, demo) {
     rows.forEach(m => out.push([monthLabel(m.month), m.income, m.cash, m.card, m.food, m.fixed, m.variable, m.profit]));
     exportXlsx(`monthly-income.xlsx`, t("tab_monthly"), out);
   });
+}
+
+// ====================== MENU ======================
+// What sold (ranked), price, recipe cost from Syrve and margin without VAT.
+// Clicking a dish opens its recipe: a tree (semi-finished products can be opened) or a flat list
+// of raw ingredients, plus a chart of when it sold.
+const m2 = v => (n(v) > 0 && n(v) < 0.1 ? n(v).toFixed(3) : n(v).toFixed(2)) + " " + CURRENCY; // 0.005 ₾ of salt isn't "0.00"
+const qtyFmt = v => String(Math.round(n(v) * 1000) / 1000);
+const marginCls = m => (m === null ? "neutral" : m >= 65 ? "good" : m >= 50 ? "warn" : "bad");
+
+async function renderMenu(view, demo, fresh = false) {
+  const range = rangeOf("menu");
+  const q = rangeQuery(range);
+  if (!S.syrve["menu" + q]) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
+  const r = await loadSyrve("menu", q, fresh);
+  const M = S.menu || (S.menu = { q: "", group: "", sort: "sold", soldOnly: false, open: null, view: "tree", closed: new Set() });
+
+  const groups = [...new Set(r.dishes.map(d => d.group).filter(Boolean))].sort();
+  const query = M.q.toLowerCase();
+  const list = r.dishes
+    .filter(d => (!query || d.name.toLowerCase().includes(query)) && (!M.group || d.group === M.group) && (!M.soldOnly || d.sold > 0))
+    .sort(M.sort === "revenue" ? (a, b) => b.revenue - a.revenue : M.sort === "margin" ? (a, b) => (b.margin ?? -1e9) - (a.margin ?? -1e9) : () => 0);
+  const withMargin = r.dishes.filter(d => d.margin !== null && d.revenue > 0);
+  const revM = withMargin.reduce((a, d) => a + d.revenue, 0);
+  const avgMargin = revM ? withMargin.reduce((a, d) => a + d.margin * d.revenue, 0) / revM : null;
+  const best = r.dishes.find(d => d.rank === 1);
+
+  view.innerHTML = demo + head(t("tab_menu"), t("menu_sub"),
+    `<div class="range-pick"><button class="btn range-btn" id="rangeBtn" type="button">📅 ${esc(rangeLabel(range))}</button><div class="rc-pop panel" id="calPop" hidden></div></div>
+     <button class="btn" id="menuRefresh">${esc(t("refresh"))}</button><button class="btn" id="menuExport">${esc(t("export"))}</button>`) +
+    (r.recipesError ? `<div class="notice bad">${esc(t("recipes_err"))}: ${esc(r.recipesError)}</div>` : "") +
+    (r.costError ? `<div class="notice bad">${esc(t("cost_err"))}: ${esc(r.costError)}</div>` : "") +
+    `<div class="cards">
+      ${card(t("items_sold"), qtyFmt(r.totals.sold), esc(rangeLabel(range)), "hero")}
+      ${card(t("revenue"), money(r.totals.revenue))}
+      ${card(t("avg_margin"), avgMargin === null ? "—" : avgMargin.toFixed(1) + "%", esc(t("margin_novat")))}
+      ${card(t("best_seller"), best ? esc(best.name) : "—", best ? `${qtyFmt(best.sold)} · ${money(best.revenue)}` : "")}
+    </div>
+    <div class="panel"><div class="form-row menu-filters">
+      <input type="text" id="menuSearch" placeholder="${esc(t("search"))}…" value="${esc(M.q)}">
+      <select id="menuGroup"><option value="">${esc(t("all_groups"))}</option>${groups.map(g => `<option ${g === M.group ? "selected" : ""}>${esc(g)}</option>`).join("")}</select>
+      <select id="menuSort">${[["sold", "sort_sold"], ["revenue", "sort_revenue"], ["margin", "sort_margin"]].map(([v, k]) => `<option value="${v}" ${v === M.sort ? "selected" : ""}>${esc(t(k))}</option>`).join("")}</select>
+      <label class="inline"><input type="checkbox" id="menuSold" ${M.soldOnly ? "checked" : ""}> ${esc(t("only_sold"))}</label>
+    </div>
+    <div class="table-wrap"><table class="menu-table">
+      <thead><tr><th class="r">#</th><th>${esc(t("dish"))}</th><th class="r">${esc(t("sold"))}</th><th class="r">${esc(t("revenue"))}</th><th class="r">${esc(t("price"))}</th><th class="r">${esc(t("cost_short"))}</th><th class="r">${esc(t("margin"))}</th><th class="r">${esc(t("food_cost_pct"))}</th></tr></thead>
+      <tbody>${list.length ? list.map(d => `<tr class="dish-row ${M.open === d.id ? "open" : ""}" data-id="${esc(d.id)}">
+        <td class="r num muted">${d.rank ?? ""}</td>
+        <td><b>${esc(d.name)}</b>${d.group ? ` <span class="tag">${esc(d.group)}</span>` : ""}${!d.hasRecipe && d.type === "DISH" ? ` <span class="pill warn">${esc(t("no_recipe"))}</span>` : ""}</td>
+        <td class="r num"><b>${qtyFmt(d.sold)}</b></td><td class="r num">${money(d.revenue)}</td>
+        <td class="r num">${d.price ? m2(d.price) : "—"}</td><td class="r num">${d.cost !== null ? m2(d.cost) + (d.costPartial ? " ⚠" : "") : "—"}</td>
+        <td class="r"><span class="pill ${marginCls(d.margin)}">${d.margin !== null ? d.margin.toFixed(1) + "%" : "—"}</span></td>
+        <td class="r num">${d.foodCostPct !== null ? d.foodCostPct.toFixed(1) + "%" : "—"}</td></tr>
+        ${M.open === d.id ? `<tr class="dish-detail-row"><td colspan="8"><div id="dishDetail" class="dish-detail"><div class="loading">${esc(t("loading"))}</div></div></td></tr>` : ""}`).join("")
+      : `<tr><td colspan="8" class="empty">${esc(t("no_dishes"))}</td></tr>`}</tbody>
+    </table></div></div>`;
+
+  wireCalendar(view, "menu", () => { M.open = null; renderMenu(view, demo).catch(e => toast(e.message)); });
+  $("#menuRefresh", view).addEventListener("click", () => renderMenu(view, demo, true).catch(e => toast(e.message)));
+  const rerender = () => renderMenu(view, demo).catch(e => toast(e.message));
+  const sEl = $("#menuSearch", view);
+  sEl.addEventListener("input", () => { M.q = sEl.value; rerender().then(() => { const x = $("#menuSearch"); x.focus(); x.setSelectionRange(x.value.length, x.value.length); }); });
+  $("#menuGroup", view).addEventListener("change", e => { M.group = e.target.value; rerender(); });
+  $("#menuSort", view).addEventListener("change", e => { M.sort = e.target.value; rerender(); });
+  $("#menuSold", view).addEventListener("change", e => { M.soldOnly = e.target.checked; rerender(); });
+  $$(".dish-row", view).forEach(tr => tr.addEventListener("click", () => { M.open = M.open === tr.dataset.id ? null : tr.dataset.id; M.closed = new Set(); rerender(); }));
+  $("#menuExport", view).addEventListener("click", () => {
+    const out = [["#", t("dish"), t("sold"), t("revenue"), t("price"), t("cost_short"), t("margin") + " %", t("food_cost_pct") + " %"]];
+    list.forEach(d => out.push([d.rank ?? "", d.name, d.sold, d.revenue, d.price ?? "", d.cost ?? "", d.margin ?? "", d.foodCostPct ?? ""]));
+    exportXlsx(`menu-${range.from}_${range.to}.xlsx`, t("tab_menu"), out);
+  });
+  if (M.open) renderDishDetail(view, M.open, range, fresh);
+}
+
+async function renderDishDetail(view, id, range, fresh) {
+  const box = $("#dishDetail", view);
+  if (!box) return;
+  let d;
+  try { d = await loadSyrve("menu/dish", `${rangeQuery(range)}&id=${encodeURIComponent(id)}`, fresh); }
+  catch (e) { box.innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; return; }
+  const M = S.menu;
+  if (M.open !== id) return;
+  const unitOf = u => (u ? "/" + esc(u) : "");
+  const anyMissing = d.tree.missing || d.flat.some(x => x.missing);
+
+  const treeRows = (nodes, level, parent) => nodes.map((x, i) => {
+    const key = parent + "/" + i, open = !M.closed.has(key);
+    return `<tr class="${x.semi ? "semi" : level ? "child" : ""}">
+      <td style="padding-left:${12 + level * 22}px">${x.semi ? `<button type="button" class="tw" data-toggle="${key}">${open ? "▾" : "▸"}</button>` : `<span class="tw"></span>`}${esc(x.name)}${x.semi ? ` <span class="tag">${esc(t("semi"))}</span>` : ""}</td>
+      <td class="r num">${qtyFmt(x.qty)} ${esc(x.unit)}</td>
+      <td class="r num">${x.unitCost !== null ? m2(x.unitCost) + unitOf(x.unit) : "—"}</td>
+      <td class="r num">${x.cost !== null ? m2(x.cost) : `<span class="bad-text">—</span>`}</td></tr>` + (x.semi && open ? treeRows(x.children, level + 1, key) : "");
+  }).join("");
+  const total = n(d.tree.cost);
+  const treeHtml = () => `<table class="rcp"><thead><tr><th>${esc(t("ingredient"))}</th><th class="r">${esc(t("qty"))}</th><th class="r">${esc(t("unit_price"))}</th><th class="r">${esc(t("value"))}</th></tr></thead>
+    <tbody>${treeRows(d.tree.children, 0, "")}</tbody><tfoot><tr><td colspan="3">${esc(t("total_cost"))}</td><td class="r num">${m2(total)}</td></tr></tfoot></table>
+    <div class="rcp-note">${esc(t("tree_note"))}</div>`;
+  const flatHtml = () => `<table class="rcp"><thead><tr><th>${esc(t("raw"))}</th><th class="r">${esc(t("qty"))}</th><th class="r">${esc(t("unit_price"))}</th><th class="r">${esc(t("value"))}</th><th>${esc(t("share"))}</th></tr></thead>
+    <tbody>${d.flat.map(x => { const pct = total ? Math.round(n(x.cost) / total * 100) : 0; return `<tr><td>${esc(x.name)}</td><td class="r num">${qtyFmt(x.qty)} ${esc(x.unit)}</td>
+      <td class="r num">${x.unitCost !== null ? m2(x.unitCost) + unitOf(x.unit) : "—"}</td><td class="r num">${x.missing ? `<span class="bad-text">—</span>` : m2(x.cost)}</td>
+      <td><span class="share"><i style="width:${pct}%"></i></span><span class="muted small">${pct}%</span></td></tr>`; }).join("")}</tbody>
+    <tfoot><tr><td colspan="3">${esc(t("total_cost"))}</td><td class="r num">${m2(total)}</td><td></td></tr></tfoot></table>
+    <div class="rcp-note">${esc(t("flat_note"))}</div>`;
+
+  const s = d.sales || {};
+  const chart = (range.from === range.to ? (s.byHour || []).map(h => ({ label: pad(h.hour) + ":00", value: h.qty, tip: `${pad(h.hour)}:00 — ${qtyFmt(h.qty)} · ${money(h.revenue)}` }))
+    : (() => { const pts = []; for (let day = range.from; day <= range.to; day = shiftDay(day, 1)) { const x = (s.byDay || []).find(v => v.day === day) || { qty: 0, revenue: 0 }; pts.push({ label: dm(day), value: x.qty, tip: `${dmy(day)} — ${qtyFmt(x.qty)} · ${money(x.revenue)}` }); } return pts; })());
+
+  const draw = () => {
+    box.innerHTML = `<div class="dish-head"><div><h3>${esc(d.name)}</h3>
+        <div class="muted small">${esc(t("one_unit"))}${d.unit ? " (" + esc(d.unit) + ")" : ""} · ${esc(t("sold"))}: <b>${qtyFmt(d.sold)}</b>${d.rank ? ` · ${esc(t("rank"))} #${d.rank}` : ""}</div>
+        <div class="seg">${["tree", "flat"].map(v => `<button type="button" data-view="${v}" class="${M.view === v ? "on" : ""}">${esc(t("recipe_" + v))}</button>`).join("")}</div></div>
+      <div class="dish-kpis"><div><b>${d.price ? m2(d.price) : "—"}</b><span>${esc(t("price_vat"))}</span></div><div><b>${d.cost !== null ? m2(d.cost) : "—"}</b><span>${esc(t("cost_short"))}</span></div>
+        <div><b class="${marginCls(d.margin)}-text">${d.margin !== null ? d.margin.toFixed(1) + "%" : "—"}</b><span>${esc(t("margin_novat"))}</span></div><div><b>${d.foodCostPct !== null ? d.foodCostPct.toFixed(1) + "%" : "—"}</b><span>${esc(t("food_cost_pct"))}</span></div></div></div>
+      ${anyMissing ? `<div class="notice">${esc(t("missing_price"))}</div>` : ""}
+      ${d.tree.children.length ? (M.view === "flat" ? flatHtml() : treeHtml()) : `<div class="empty">${esc(t("no_recipe"))}</div>`}
+      <div class="dish-sales"><h4>${esc(t("sold_when"))} · ${esc(rangeLabel(range))}</h4>
+        ${s.error ? `<div class="notice bad">${esc(s.error)}</div>` : chart.some(p => p.value) ? barChart(chart, { height: 170, width: Math.max(320, box.clientWidth - 32) }) : `<div class="empty">${esc(t("no_entries"))}</div>`}</div>`;
+    wireChartHover(box);
+    $$("[data-view]", box).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); M.view = b.dataset.view; draw(); }));
+    $$("[data-toggle]", box).forEach(b => b.addEventListener("click", e => { e.stopPropagation(); const k = b.dataset.toggle; if (M.closed.has(k)) M.closed.delete(k); else M.closed.add(k); draw(); }));
+  };
+  draw();
 }
 
 // ====================== 5. DEBTS ======================
@@ -1413,6 +1558,26 @@ function demoApi(path, opts) {
       ] },
     };
     return { value: samples[key] };
+  }
+  if (path.startsWith("/syrve/menu/dish")) {
+    const leaf = (name, unit, qty, price) => ({ id: name, name, unit, qty, semi: false, unitCost: price, cost: Math.round(qty * price * 10000) / 10000, missing: false, children: [] });
+    const semi = (name, unit, qty, children) => { const cost = children.reduce((a, c) => a + c.cost, 0); return { id: name, name, unit, qty, semi: true, unitCost: Math.round(cost / qty * 100) / 100, cost, missing: false, children }; };
+    const tree = { children: [
+      semi("ფოკაჩის ცომი", "კგ", 0.25, [leaf("ფქვილი 00", "კგ", 0.145, 2.8), leaf("წყალი", "ლ", 0.1, 0), leaf("ზეითუნის ზეთი", "ლ", 0.008, 18), leaf("საფუარი", "კგ", 0.002, 22), leaf("მარილი", "კგ", 0.004, 1.2)]),
+      semi("ტომატის სოუსი", "კგ", 0.08, [leaf("პომიდორი (კონსერვი)", "კგ", 0.07, 6.5), leaf("ზეითუნის ზეთი", "ლ", 0.005, 18), leaf("რეჰანი", "კგ", 0.002, 40), leaf("მარილი", "კგ", 0.001, 1.2)]),
+      leaf("მოცარელა", "კგ", 0.12, 20), leaf("რეჰანი", "კგ", 0.003, 40), leaf("ყუთი (შეფუთვა)", "ც", 1, 0.85)], missing: false };
+    tree.cost = tree.children.reduce((a, c) => a + c.cost, 0);
+    const by = new Map(); const walk = x => { if (x.semi) return x.children.forEach(walk); const y = by.get(x.name) || { name: x.name, unit: x.unit, qty: 0, cost: 0, missing: false }; y.qty += x.qty; y.cost += x.cost; by.set(x.name, y); }; tree.children.forEach(walk);
+    const flat = [...by.values()].map(y => ({ ...y, unitCost: y.qty ? Math.round(y.cost / y.qty * 100) / 100 : null })).sort((a, b) => b.cost - a.cost);
+    return { id: "d1", name: "ფოკაჩა მარგარიტა", unit: "ც", sold: 41, rank: 2, price: 18, cost: 4.6, margin: 69.8, foodCostPct: 30.2, tree, flat,
+      sales: { byHour: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((h, i) => ({ hour: h, qty: [1, 2, 3, 6, 7, 4, 2, 2, 3, 4, 5, 2][i], revenue: [1, 2, 3, 6, 7, 4, 2, 2, 3, 4, 5, 2][i] * 18 })), byDay: [] } };
+  }
+  if (path.startsWith("/syrve/menu")) {
+    const rows = [["ფოკაჩა კლასიკური", "ფოკაჩა", 58, 12, 2.9], ["ფოკაჩა მარგარიტა", "ფოკაჩა", 41, 18, 4.6], ["ფოკაჩა როზმარინით", "ფოკაჩა", 33, 13, 3.1],
+      ["ფოკაჩა პროშუტოთი", "ფოკაჩა", 21, 24, 8.9], ["ლიმონათი", "სასმელი", 19, 7, 1.4], ["ესპრესო", "ყავა", 16, 5, 0.9], ["ფოკაჩა ტრიუფელით", "ფოკაჩა", 6, 28, 13.5], ["ტირამისუ", "დესერტი", 0, 14, 4.2]];
+    const dishes = rows.map(([name, group, sold, price, cost], i) => { const nv = price / 1.18; return { id: "d" + i, name, group, unit: "ც", type: "DISH", sold, revenue: sold * price, cost, costPartial: false, hasRecipe: i !== 4,
+      price, priceNoVat: Math.round(nv * 100) / 100, margin: Math.round((nv - cost) / nv * 1000) / 10, foodCostPct: Math.round(cost / nv * 1000) / 10, rank: sold ? i + 1 : null }; });
+    return { dishes, totals: { sold: dishes.reduce((a, d) => a + d.sold, 0), revenue: dishes.reduce((a, d) => a + d.revenue, 0) }, recipesError: "", costError: "" };
   }
   if (path.startsWith("/syrve/paytype")) {
     const name = decodeURIComponent((path.match(/name=([^&]*)/) || [])[1] || "");
