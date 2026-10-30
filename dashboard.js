@@ -10,6 +10,7 @@
 //   COMPANY_TIN (our tax ID — transfers to it are between our own accounts, not supplier payments)
 
 import { listOutgoingWaybills } from "./rsge.js";
+import { buildMenu, buildDish } from "./menu.js";
 import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadBankData, loadRecipientPayments, syncStep, bumpVersion, loadVersion } from "./bank.js";
 import { loadLog } from "./store.js";
 
@@ -42,7 +43,7 @@ export async function handleDashboard(request, env, path) {
     // Syrve
     if (parts[0] === "syrve" && request.method === "GET") {
       const fresh = url.searchParams.get("fresh") === "1";
-      if (parts[1] === "live" || parts[1] === "paytype") {
+      if (parts[1] === "live" || parts[1] === "paytype" || parts[1] === "menu") {
         // a date range (inclusive); today by default. Ranges that include today are refreshed every minute.
         const today = localDate(env);
         const day = v => (/^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : "");
@@ -50,6 +51,15 @@ export async function handleDashboard(request, env, path) {
         const to = [day(url.searchParams.get("to")) || from, today].sort()[0];
         if (from > to) return json({ error: "bad range" }, 400);
         const ttl = to >= today ? 60 : 3600;
+        if (parts[1] === "menu") {
+          if (parts[2] === "dish") {
+            const id = String(url.searchParams.get("id") || "").toLowerCase().slice(0, 100);
+            if (!id) return json({ error: "id required" }, 400);
+            const d = await buildDish(env, id, from, to, fresh);
+            return d.error ? json(d, 404) : json(d);
+          }
+          return json(await buildMenu(env, from, to, fresh));
+        }
         if (parts[1] === "live") return json(await cached(env, `live:${from}:${to}`, ttl, fresh, () => syrveLive(env, from, to)));
         const name = String(url.searchParams.get("name") || "").slice(0, 100);
         if (!name) return json({ error: "name required" }, 400);
@@ -123,7 +133,7 @@ async function sha1(text) {
 }
 
 // Cache Syrve answers in KV so we don't log in (and take a license) on every refresh.
-async function cached(env, name, ttl, fresh, fn) {
+export async function cached(env, name, ttl, fresh, fn) {
   const key = "dash:cache:" + name;
   if (!fresh) {
     const hit = await env.STORE.get(key, "json");
