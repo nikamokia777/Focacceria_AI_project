@@ -32,6 +32,7 @@ const T = {
     items_sold: "გაყიდული ერთეული", avg_margin: "საშუალო მარჟა", best_seller: "ყველაზე გაყიდვადი",
     monthly_chart: "თვეების დიაგრამა", by_month: "თვეების მიხედვით",
     monthly_margin_note: "თვის მარჟა: Syrve-ის მიერ გაყიდვის დროს ჩაწერილი თვითღირებულებით, დღგ-ს გარეშე.",
+    avg_items_sold: "საშუალო გაყიდული ერთეული", avg_per_day: "დღეში · {n} დღე გაყიდვებით",
     all_groups: "ყველა ჯგუფი", only_sold: "მხოლოდ გაყიდული", sort_sold: "გაყიდვადობით", sort_revenue: "ნავაჭრით", sort_margin: "მარჟით",
     no_recipe: "რეცეპტი არ არის", recipe_tree: "🌳 რეცეპტი (ხე)", recipe_flat: "🧺 ნედლეული (ჯამი)", ingredient: "ინგრედიენტი", raw: "ნედლეული",
     qty: "რაოდენობა", unit_price: "ფასი / ერთ.", value: "ღირებულება", share: "წილი", semi: "ნახევარფაბრიკატი", total_cost: "სულ თვითღირებულება",
@@ -128,6 +129,7 @@ const T = {
     items_sold: "Items sold", avg_margin: "Average margin", best_seller: "Best seller",
     monthly_chart: "Monthly chart", by_month: "By month",
     monthly_margin_note: "Margin per month uses the cost Syrve booked at the time of sale, excluding VAT.",
+    avg_items_sold: "Average items sold", avg_per_day: "per day · {n} days with sales",
     all_groups: "All groups", only_sold: "Only sold", sort_sold: "By sales", sort_revenue: "By revenue", sort_margin: "By margin",
     no_recipe: "no recipe", recipe_tree: "🌳 Recipe (tree)", recipe_flat: "🧺 Raw ingredients (total)", ingredient: "Ingredient", raw: "Raw ingredient",
     qty: "Quantity", unit_price: "Price / unit", value: "Cost", share: "Share", semi: "semi-finished", total_cost: "Total cost",
@@ -1105,6 +1107,8 @@ async function renderMenu(view, demo, fresh = false) {
     (r.pricesPending ? `<div class="notice">⏳ ${esc(t("prices_loading").replace("{n}", r.pricesPending))}</div>` : "") +
     `<div class="cards">
       ${card(t("items_sold"), qtyFmt(sold), esc(rangeLabel(range)) + (M.group ? " · " + esc(M.group) : ""), "hero")}
+      ${range.from !== range.to ? card(t("avg_items_sold"), r.salesDays ? qtyFmt(Math.round(sold / r.salesDays * 10) / 10) : "—",
+        esc(t("avg_per_day").replace("{n}", r.salesDays ?? "—")) + (M.group ? " · " + esc(M.group) : "")) : ""}
       ${card(t("revenue"), money(revenue), M.group ? esc(M.group) : "")}
       ${card(t("avg_margin"), avgMargin === null ? "—" : avgMargin.toFixed(1) + "%", esc(t("margin_novat")))}
       ${card(t("best_seller"), best ? esc(best.name) : "—", best ? `${qtyFmt(best.sold)} · ${money(best.revenue)}` : "")}
@@ -1673,7 +1677,9 @@ function demoApi(path, opts) {
       ["ფოკაჩა პროშუტოთი", "ფოკაჩა", 21, 24, 8.9], ["ლიმონათი", "სასმელი", 19, 7, 1.4], ["ესპრესო", "ყავა", 16, 5, 0.9], ["ფოკაჩა ტრიუფელით", "ფოკაჩა", 6, 28, 13.5], ["ტირამისუ", "დესერტი", 0, 14, 4.2]];
     const dishes = rows.map(([name, group, sold, price, cost], i) => { const nv = price / 1.18; return { id: "d" + i, name, group, unit: "ც", type: "DISH", sold, revenue: sold * price, cost, costPartial: false, hasRecipe: i !== 4,
       price, priceNoVat: Math.round(nv * 100) / 100, margin: Math.round((nv - cost) / nv * 1000) / 10, foodCostPct: Math.round(cost / price * 1000) / 10, rank: sold ? i + 1 : null }; });
-    return { dishes, totals: { sold: dishes.reduce((a, d) => a + d.sold, 0), revenue: dishes.reduce((a, d) => a + d.revenue, 0) }, recipesError: "", costError: "" };
+    const qs = new URLSearchParams(path.split("?")[1] || ""), from = qs.get("from") || todayISO(), to = qs.get("to") || from;
+    const salesDays = Math.round((new Date(to + "T12:00:00") - new Date(from + "T12:00:00")) / 864e5) + 1;
+    return { dishes, salesDays, totals: { sold: dishes.reduce((a, d) => a + d.sold, 0), revenue: dishes.reduce((a, d) => a + d.revenue, 0) }, recipesError: "", costError: "" };
   }
   if (path.startsWith("/syrve/paytype")) {
     const name = decodeURIComponent((path.match(/name=([^&]*)/) || [])[1] || "");

@@ -95,9 +95,15 @@ async function fetchSales(env, from, to) {
     let rows, byId = true;
     try { rows = await olap(post, ["DishId", "DishName"], agg, salesFilters(from, to)); }
     catch (_) { rows = await olap(post, ["DishName"], agg, salesFilters(from, to)); byId = false; } // older Syrve: by name
+    // days the café sold anything (for "average items sold" per day); a single day needs no count
+    let days = from === to ? 1 : null;
+    if (days === null) {
+      try { days = (await olap(post, ["OpenDate.Typed"], ["DishAmountInt"], salesFilters(from, to))).filter((r) => num(r.DishAmountInt) > 0).length; } catch (_) {}
+    }
     return {
       rows: rows.map((r) => ({ id: byId ? String(r.DishId || "").toLowerCase() : "", name: r.DishName || "",
         qty: num(r.DishAmountInt), revenue: num(r.DishDiscountSumInt), menuSum: num(r.DishSumInt) })),
+      days,
     };
   });
 }
@@ -245,7 +251,7 @@ function economics(price, cost) {
 
 async function loadBase(env, fresh) { return cached(env, "menu-base3", BASE_TTL, fresh, () => fetchBase(env)); }
 async function loadSales(env, from, to, fresh) {
-  return cached(env, `menu-sales:${from}:${to}`, to >= localDate(env) ? 120 : 3600, fresh, () => fetchSales(env, from, to));
+  return cached(env, `menu-sales2:${from}:${to}`, to >= localDate(env) ? 120 : 3600, fresh, () => fetchSales(env, from, to));
 }
 
 // Which cost prices the list needs: Syrve's dish total comes with any direct ingredient's report, so
@@ -305,7 +311,7 @@ export async function buildMenu(env, from, to, fresh = false, budget = PAGE_BUDG
   for (const d of dishes) d.rank = d.sold > 0 ? ++rank : null;
 
   return {
-    from, to, dishes,
+    from, to, dishes, salesDays: sales.days ?? null,
     totals: { sold: round(dishes.reduce((a, d) => a + d.sold, 0), 3), revenue: round(dishes.reduce((a, d) => a + d.revenue, 0)) },
     recipesError: base.recipesError, costError: costs.error, pricesPending: dishes.filter((d) => d.costPartial).length, vat: VAT,
   };
