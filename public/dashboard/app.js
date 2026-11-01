@@ -34,7 +34,11 @@ const T = {
     no_recipe: "რეცეპტი არ არის", recipe_tree: "🌳 რეცეპტი (ხე)", recipe_flat: "🧺 ნედლეული (ჯამი)", ingredient: "ინგრედიენტი", raw: "ნედლეული",
     qty: "რაოდენობა", unit_price: "ფასი / ერთ.", value: "ღირებულება", share: "წილი", semi: "ნახევარფაბრიკატი", total_cost: "სულ თვითღირებულება",
     price_vat: "ფასი (დღგ-ით)", margin_novat: "მარჟა (დღგ-ს გარეშე)", one_unit: "ერთი ერთეული", rank: "რეიტინგი", sold_when: "როდის გაიყიდა",
-    missing_price: "⚠ ზოგ ინგრედიენტს Syrve-ში ფასი არ აქვს (მარაგში არ არის) — თვითღირებულება შეიძლება რეალურზე ნაკლები იყოს.",
+    missing_price: "⚠ ზოგ ინგრედიენტს ფასი საერთოდ ვერ ვიპოვე (არც მარაგში, არც ბოლო 90 დღის ზედნადებებში) — თვითღირებულება შეიძლება რეალურზე ნაკლები იყოს.",
+    estimated_note: "* — მარაგში არ არის, ამიტომ ფასი შეფასებულია (ბოლო შესყიდვის ფასით ან ნახევარფაბრიკატის რეცეპტით), როგორც Syrve-ის რეცეპტში.",
+    stock_priced: "მარაგის ფასით", food_cost_vat: "Food cost (ფასიდან დღგ-ით)",
+    flat_differs: "ნედლეულის ჯამი {a} — განსხვავდება რეცეპტის თვითღირებულებისგან ({b}), რადგან ზოგი ნახევარფაბრიკატი მარაგში არსებული ფასითაა დათვლილი (როგორც Syrve-ში).",
+    invoice_err: "მომწოდებლების ზედნადებებიდან ფასები ვერ წამოვიდა",
     recipes_err: "Syrve-დან რეცეპტები ვერ წამოვიდა", cost_err: "ინგრედიენტების ფასები ვერ წამოვიდა", no_dishes: "კერძები არ მოიძებნა",
     flat_note: "ყველაფერი დაყვანილია ნედლეულამდე და შეჯამებულია. ყველაზე ძვირი ინგრედიენტი ზემოთაა.", tree_note: "▸ / ▾ — ნახევარფაბრიკატის გახსნა / დახურვა. ფასები: Syrve-ს თვითღირებულება.",
     rent: "ქირა", utilities: "კომუნალური", internet: "ინტერნეტი", salaries: "ხელფასები",
@@ -123,7 +127,11 @@ const T = {
     no_recipe: "no recipe", recipe_tree: "🌳 Recipe (tree)", recipe_flat: "🧺 Raw ingredients (total)", ingredient: "Ingredient", raw: "Raw ingredient",
     qty: "Quantity", unit_price: "Price / unit", value: "Cost", share: "Share", semi: "semi-finished", total_cost: "Total cost",
     price_vat: "Price (incl. VAT)", margin_novat: "Margin (excl. VAT)", one_unit: "one unit", rank: "rank", sold_when: "When it sold",
-    missing_price: "⚠ Some ingredients have no price in Syrve (none in stock) — the cost may be lower than it really is.",
+    missing_price: "⚠ Some ingredients have no price at all (not in stock, not on invoices of the last 90 days) — the cost may be lower than it really is.",
+    estimated_note: "* — not in stock, so the price is estimated (last purchase price, or the semi-finished product's recipe), as on Syrve's recipe card.",
+    stock_priced: "priced from stock", food_cost_vat: "Food cost (of price with VAT)",
+    flat_differs: "Raw ingredients add up to {a} — different from the recipe cost ({b}) because some semi-finished products are priced from their stock, as Syrve does.",
+    invoice_err: "Could not read prices from supplier invoices",
     recipes_err: "Could not read recipes from Syrve", cost_err: "Could not read ingredient prices", no_dishes: "No dishes found",
     flat_note: "Everything reduced to raw ingredients and summed. The most expensive ingredient is on top.", tree_note: "▸ / ▾ — open / close a semi-finished product. Prices: Syrve cost price.",
     rent: "Rent", utilities: "Utilities", internet: "Internet", salaries: "Salaries",
@@ -1049,7 +1057,8 @@ async function renderMonthly(view, demo) {
 // What sold (ranked), price, recipe cost from Syrve and margin without VAT.
 // Clicking a dish opens its recipe: a tree (semi-finished products can be opened) or a flat list
 // of raw ingredients, plus a chart of when it sold.
-const m2 = v => (n(v) > 0 && n(v) < 0.1 ? n(v).toFixed(3) : n(v).toFixed(2)) + " " + CURRENCY; // 0.005 ₾ of salt isn't "0.00"
+// rounds half up like Syrve (1.335 → 1.34); 0.005 ₾ of salt isn't "0.00"
+const m2 = v => { const x = n(v), d = x > 0 && x < 0.005 ? 3 : 2; return (Math.round((x + Number.EPSILON) * 10 ** d) / 10 ** d).toFixed(d) + " " + CURRENCY; };
 const qtyFmt = v => String(Math.round(n(v) * 1000) / 1000);
 const marginCls = m => (m === null ? "neutral" : m >= 65 ? "good" : m >= 50 ? "warn" : "bad");
 
@@ -1075,6 +1084,7 @@ async function renderMenu(view, demo, fresh = false) {
      <button class="btn" id="menuRefresh">${esc(t("refresh"))}</button><button class="btn" id="menuExport">${esc(t("export"))}</button>`) +
     (r.recipesError ? `<div class="notice bad">${esc(t("recipes_err"))}: ${esc(r.recipesError)}</div>` : "") +
     (r.costError ? `<div class="notice bad">${esc(t("cost_err"))}: ${esc(r.costError)}</div>` : "") +
+    (r.invoiceError ? `<div class="notice bad">${esc(t("invoice_err"))}: ${esc(r.invoiceError)}</div>` : "") +
     `<div class="cards">
       ${card(t("items_sold"), qtyFmt(r.totals.sold), esc(rangeLabel(range)), "hero")}
       ${card(t("revenue"), money(r.totals.revenue))}
@@ -1088,14 +1098,14 @@ async function renderMenu(view, demo, fresh = false) {
       <label class="inline"><input type="checkbox" id="menuSold" ${M.soldOnly ? "checked" : ""}> ${esc(t("only_sold"))}</label>
     </div>
     <div class="table-wrap"><table class="menu-table">
-      <thead><tr><th class="r">#</th><th>${esc(t("dish"))}</th><th class="r">${esc(t("sold"))}</th><th class="r">${esc(t("revenue"))}</th><th class="r">${esc(t("price"))}</th><th class="r">${esc(t("cost_short"))}</th><th class="r">${esc(t("margin"))}</th><th class="r">${esc(t("food_cost_pct"))}</th></tr></thead>
+      <thead><tr><th class="r">#</th><th>${esc(t("dish"))}</th><th class="r">${esc(t("sold"))}</th><th class="r">${esc(t("revenue"))}</th><th class="r">${esc(t("price"))}</th><th class="r">${esc(t("cost_short"))}</th><th class="r">${esc(t("margin"))}</th><th class="r" title="${esc(t("food_cost_vat"))}">${esc(t("food_cost_pct"))}</th></tr></thead>
       <tbody>${list.length ? list.map(d => `<tr class="dish-row ${M.open === d.id ? "open" : ""}" data-id="${esc(d.id)}">
         <td class="r num muted">${d.rank ?? ""}</td>
         <td><b>${esc(d.name)}</b>${d.group ? ` <span class="tag">${esc(d.group)}</span>` : ""}${!d.hasRecipe && d.type === "DISH" ? ` <span class="pill warn">${esc(t("no_recipe"))}</span>` : ""}</td>
         <td class="r num"><b>${qtyFmt(d.sold)}</b></td><td class="r num">${money(d.revenue)}</td>
-        <td class="r num">${d.price ? m2(d.price) : "—"}</td><td class="r num">${d.cost !== null ? m2(d.cost) + (d.costPartial ? " ⚠" : "") : "—"}</td>
+        <td class="r num">${d.price ? m2(d.price) : "—"}</td><td class="r num">${d.cost !== null ? m2(d.cost) + (d.costEstimated ? "*" : "") + (d.costPartial ? " ⚠" : "") : "—"}</td>
         <td class="r"><span class="pill ${marginCls(d.margin)}">${d.margin !== null ? d.margin.toFixed(1) + "%" : "—"}</span></td>
-        <td class="r num">${d.foodCostPct !== null ? d.foodCostPct.toFixed(1) + "%" : "—"}</td></tr>
+        <td class="r num">${d.foodCostPct !== null ? d.foodCostPct.toFixed(2) + "%" : "—"}</td></tr>
         ${M.open === d.id ? `<tr class="dish-detail-row"><td colspan="8"><div id="dishDetail" class="dish-detail"><div class="loading">${esc(t("loading"))}</div></div></td></tr>` : ""}`).join("")
       : `<tr><td colspan="8" class="empty">${esc(t("no_dishes"))}</td></tr>`}</tbody>
     </table></div></div>`;
@@ -1127,25 +1137,27 @@ async function renderDishDetail(view, id, range, fresh) {
   if (M.open !== id) return;
   const unitOf = u => (u ? "/" + esc(u) : "");
   const anyMissing = d.tree.missing || d.flat.some(x => x.missing);
+  const star = x => (x.estimated ? "*" : "");
 
   const treeRows = (nodes, level, parent) => nodes.map((x, i) => {
     const key = parent + "/" + i, open = !M.closed.has(key);
     return `<tr class="${x.semi ? "semi" : level ? "child" : ""}">
-      <td style="padding-left:${12 + level * 22}px">${x.semi ? `<button type="button" class="tw" data-toggle="${key}">${open ? "▾" : "▸"}</button>` : `<span class="tw"></span>`}${esc(x.name)}${x.semi ? ` <span class="tag">${esc(t("semi"))}</span>` : ""}</td>
+      <td style="padding-left:${12 + level * 22}px">${x.semi ? `<button type="button" class="tw" data-toggle="${key}">${open ? "▾" : "▸"}</button>` : `<span class="tw"></span>`}${esc(x.name)}${x.semi ? ` <span class="tag">${esc(t("semi"))}</span>` : ""}${x.semi && x.priced === "stock" ? ` <span class="muted small">· ${esc(t("stock_priced"))}</span>` : ""}</td>
       <td class="r num">${qtyFmt(x.qty)} ${esc(x.unit)}</td>
-      <td class="r num">${x.unitCost !== null ? m2(x.unitCost) + unitOf(x.unit) : "—"}</td>
-      <td class="r num">${x.cost !== null ? m2(x.cost) : `<span class="bad-text">—</span>`}</td></tr>` + (x.semi && open ? treeRows(x.children, level + 1, key) : "");
+      <td class="r num">${x.unitCost !== null ? m2(x.unitCost) + star(x) + unitOf(x.unit) : "—"}</td>
+      <td class="r num">${x.cost !== null ? m2(x.cost) + star(x) : `<span class="bad-text">—</span>`}</td></tr>` + (x.semi && open ? treeRows(x.children, level + 1, key) : "");
   }).join("");
   const total = n(d.tree.cost);
+  const flatTotal = d.flat.reduce((a, x) => a + n(x.cost), 0);
   const treeHtml = () => `<table class="rcp"><thead><tr><th>${esc(t("ingredient"))}</th><th class="r">${esc(t("qty"))}</th><th class="r">${esc(t("unit_price"))}</th><th class="r">${esc(t("value"))}</th></tr></thead>
     <tbody>${treeRows(d.tree.children, 0, "")}</tbody><tfoot><tr><td colspan="3">${esc(t("total_cost"))}</td><td class="r num">${m2(total)}</td></tr></tfoot></table>
     <div class="rcp-note">${esc(t("tree_note"))}</div>`;
   const flatHtml = () => `<table class="rcp"><thead><tr><th>${esc(t("raw"))}</th><th class="r">${esc(t("qty"))}</th><th class="r">${esc(t("unit_price"))}</th><th class="r">${esc(t("value"))}</th><th>${esc(t("share"))}</th></tr></thead>
     <tbody>${d.flat.map(x => { const pct = total ? Math.round(n(x.cost) / total * 100) : 0; return `<tr><td>${esc(x.name)}</td><td class="r num">${qtyFmt(x.qty)} ${esc(x.unit)}</td>
-      <td class="r num">${x.unitCost !== null ? m2(x.unitCost) + unitOf(x.unit) : "—"}</td><td class="r num">${x.missing ? `<span class="bad-text">—</span>` : m2(x.cost)}</td>
+      <td class="r num">${x.unitCost !== null ? m2(x.unitCost) + star(x) + unitOf(x.unit) : "—"}</td><td class="r num">${x.missing ? `<span class="bad-text">—</span>` : m2(x.cost) + star(x)}</td>
       <td><span class="share"><i style="width:${pct}%"></i></span><span class="muted small">${pct}%</span></td></tr>`; }).join("")}</tbody>
-    <tfoot><tr><td colspan="3">${esc(t("total_cost"))}</td><td class="r num">${m2(total)}</td><td></td></tr></tfoot></table>
-    <div class="rcp-note">${esc(t("flat_note"))}</div>`;
+    <tfoot><tr><td colspan="3">${esc(t("total_cost"))}</td><td class="r num">${m2(flatTotal)}</td><td></td></tr></tfoot></table>
+    <div class="rcp-note">${esc(t("flat_note"))}${Math.abs(flatTotal - total) > 0.005 ? "<br>" + esc(t("flat_differs").replace("{a}", m2(flatTotal)).replace("{b}", m2(total))) : ""}</div>`;
 
   const s = d.sales || {};
   const chart = (range.from === range.to ? (s.byHour || []).map(h => ({ label: pad(h.hour) + ":00", value: h.qty, tip: `${pad(h.hour)}:00 — ${qtyFmt(h.qty)} · ${money(h.revenue)}` }))
@@ -1155,9 +1167,10 @@ async function renderDishDetail(view, id, range, fresh) {
     box.innerHTML = `<div class="dish-head"><div><h3>${esc(d.name)}</h3>
         <div class="muted small">${esc(t("one_unit"))}${d.unit ? " (" + esc(d.unit) + ")" : ""} · ${esc(t("sold"))}: <b>${qtyFmt(d.sold)}</b>${d.rank ? ` · ${esc(t("rank"))} #${d.rank}` : ""}</div>
         <div class="seg">${["tree", "flat"].map(v => `<button type="button" data-view="${v}" class="${M.view === v ? "on" : ""}">${esc(t("recipe_" + v))}</button>`).join("")}</div></div>
-      <div class="dish-kpis"><div><b>${d.price ? m2(d.price) : "—"}</b><span>${esc(t("price_vat"))}</span></div><div><b>${d.cost !== null ? m2(d.cost) : "—"}</b><span>${esc(t("cost_short"))}</span></div>
-        <div><b class="${marginCls(d.margin)}-text">${d.margin !== null ? d.margin.toFixed(1) + "%" : "—"}</b><span>${esc(t("margin_novat"))}</span></div><div><b>${d.foodCostPct !== null ? d.foodCostPct.toFixed(1) + "%" : "—"}</b><span>${esc(t("food_cost_pct"))}</span></div></div></div>
+      <div class="dish-kpis"><div><b>${d.price ? m2(d.price) : "—"}</b><span>${esc(t("price_vat"))}</span></div><div><b>${d.cost !== null ? m2(d.cost) + (d.costEstimated ? "*" : "") : "—"}</b><span>${esc(t("cost_short"))}</span></div>
+        <div><b class="${marginCls(d.margin)}-text">${d.margin !== null ? d.margin.toFixed(1) + "%" : "—"}</b><span>${esc(t("margin_novat"))}</span></div><div><b>${d.foodCostPct !== null ? d.foodCostPct.toFixed(2) + "%" : "—"}</b><span>${esc(t("food_cost_vat"))}</span></div></div></div>
       ${anyMissing ? `<div class="notice">${esc(t("missing_price"))}</div>` : ""}
+      ${d.tree.estimated || d.flat.some(x => x.estimated) ? `<div class="rcp-note">${esc(t("estimated_note"))}</div>` : ""}
       ${d.tree.children.length ? (M.view === "flat" ? flatHtml() : treeHtml()) : `<div class="empty">${esc(t("no_recipe"))}</div>`}
       <div class="dish-sales"><h4>${esc(t("sold_when"))} · ${esc(rangeLabel(range))}</h4>
         ${s.error ? `<div class="notice bad">${esc(s.error)}</div>` : chart.some(p => p.value) ? barChart(chart, { height: 170, width: Math.max(320, box.clientWidth - 32) }) : `<div class="empty">${esc(t("no_entries"))}</div>`}</div>`;
@@ -1569,14 +1582,14 @@ function demoApi(path, opts) {
     tree.cost = tree.children.reduce((a, c) => a + c.cost, 0);
     const by = new Map(); const walk = x => { if (x.semi) return x.children.forEach(walk); const y = by.get(x.name) || { name: x.name, unit: x.unit, qty: 0, cost: 0, missing: false }; y.qty += x.qty; y.cost += x.cost; by.set(x.name, y); }; tree.children.forEach(walk);
     const flat = [...by.values()].map(y => ({ ...y, unitCost: y.qty ? Math.round(y.cost / y.qty * 100) / 100 : null })).sort((a, b) => b.cost - a.cost);
-    return { id: "d1", name: "ფოკაჩა მარგარიტა", unit: "ც", sold: 41, rank: 2, price: 18, cost: 4.6, margin: 69.8, foodCostPct: 30.2, tree, flat,
+    return { id: "d1", name: "ფოკაჩა მარგარიტა", unit: "ც", sold: 41, rank: 2, price: 18, cost: 4.6, margin: 69.8, foodCostPct: 25.6, tree, flat,
       sales: { byHour: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((h, i) => ({ hour: h, qty: [1, 2, 3, 6, 7, 4, 2, 2, 3, 4, 5, 2][i], revenue: [1, 2, 3, 6, 7, 4, 2, 2, 3, 4, 5, 2][i] * 18 })), byDay: [] } };
   }
   if (path.startsWith("/syrve/menu")) {
     const rows = [["ფოკაჩა კლასიკური", "ფოკაჩა", 58, 12, 2.9], ["ფოკაჩა მარგარიტა", "ფოკაჩა", 41, 18, 4.6], ["ფოკაჩა როზმარინით", "ფოკაჩა", 33, 13, 3.1],
       ["ფოკაჩა პროშუტოთი", "ფოკაჩა", 21, 24, 8.9], ["ლიმონათი", "სასმელი", 19, 7, 1.4], ["ესპრესო", "ყავა", 16, 5, 0.9], ["ფოკაჩა ტრიუფელით", "ფოკაჩა", 6, 28, 13.5], ["ტირამისუ", "დესერტი", 0, 14, 4.2]];
     const dishes = rows.map(([name, group, sold, price, cost], i) => { const nv = price / 1.18; return { id: "d" + i, name, group, unit: "ც", type: "DISH", sold, revenue: sold * price, cost, costPartial: false, hasRecipe: i !== 4,
-      price, priceNoVat: Math.round(nv * 100) / 100, margin: Math.round((nv - cost) / nv * 1000) / 10, foodCostPct: Math.round(cost / nv * 1000) / 10, rank: sold ? i + 1 : null }; });
+      price, priceNoVat: Math.round(nv * 100) / 100, margin: Math.round((nv - cost) / nv * 1000) / 10, foodCostPct: Math.round(cost / price * 1000) / 10, rank: sold ? i + 1 : null }; });
     return { dishes, totals: { sold: dishes.reduce((a, d) => a + d.sold, 0), revenue: dishes.reduce((a, d) => a + d.revenue, 0) }, recipesError: "", costError: "" };
   }
   if (path.startsWith("/syrve/paytype")) {
