@@ -8,6 +8,8 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 const T = {
   ka: {
     appSub: "PriceCheck",
+    navMain: "მთავარი",
+    navDashboard: "დეშბორდი",
     tabs: { products: "პროდუქტები", distributors: "დისტრიბუცია", bazaar: "ბაზარი", orders: "შეკვეთები", storage: "საწყობი", mistakes: "შეცდომები", debts: "ვალები", history: "ისტორია" },
     sync: { ok: "✓ სინქრ.", saving: "ინახება…", error: "⚠ კავშირი" },
     search: "ძებნა…",
@@ -143,6 +145,8 @@ const T = {
   },
   en: {
     appSub: "PriceCheck",
+    navMain: "Main",
+    navDashboard: "Dashboard",
     tabs: { products: "Products", distributors: "Distributors", bazaar: "Bazaar", orders: "Orders", storage: "Storage", mistakes: "Mistakes", debts: "Debts", history: "History" },
     sync: { ok: "✓ Synced", saving: "Saving…", error: "⚠ Offline" },
     search: "Search…",
@@ -1389,7 +1393,11 @@ function App() {
   return (
     <>
       <header className="topbar">
-        <div className="brand">🫓 Focacceria <span className="muted">— {t.appSub}</span></div>
+        <div className="topbar-left">
+          <a className="btn-ghost small" href="/">← {t.navMain}</a>
+          <a className="btn-ghost small" href="/dashboard/">{t.navDashboard}</a>
+          <div className="brand">🫓 Focacceria <span className="muted">— {t.appSub}</span></div>
+        </div>
         <div className="topbar-right">
           <span className={"sync sync-" + sync}>{t.sync[sync]}</span>
           <button className="btn-ghost small" onClick={() => setLang(lang === "ka" ? "en" : "ka")}>{lang === "ka" ? "EN" : "ქა"}</button>
