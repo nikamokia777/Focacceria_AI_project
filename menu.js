@@ -340,6 +340,30 @@ export async function buildDish(env, id, from, to, fresh = false) {
   return { ...dish, tree, flat: flatten(tree), sales, recipesError: base.recipesError, costError: costs.error, pricesPending: ids.filter((x) => costs.unit(x) === null && !costs.store.unit[x]).length };
 }
 
+// ── month by month (the MENU tab's diagram) ──────────────────────────────────
+// Sales per dish and month for the last `months` months, this month included, with the cost Syrve
+// booked at the time of sale (ProductCostBase.ProductCost), so a past month's margin uses that month's
+// ingredient prices. The page adds the rows up per category. Syrve's month looks like "03 (Март)".
+
+export async function buildMenuMonthly(env, months, fresh = false) {
+  const today = localDate(env);
+  const [y, m] = today.split("-").map(Number);
+  const list = Array.from({ length: months }, (_, i) => new Date(Date.UTC(y, m - months + i, 1)).toISOString().slice(0, 7));
+  const [base, sales] = await Promise.all([loadBase(env, false), cached(env, `menu-monthly:${list[0]}:${today}`, 600, fresh, () =>
+    withSyrve(env, async (get, post) => ({
+      rows: (await olap(post, ["YearOpen", "Mounth", "DishId", "DishName"], ["DishAmountInt", "DishDiscountSumInt", "ProductCostBase.ProductCost"],
+        salesFilters(list[0] + "-01", today))).map((r) => ({
+        month: `${r.YearOpen}-${String(parseInt(r.Mounth, 10)).padStart(2, "0")}`, id: String(r.DishId || "").toLowerCase(), name: r.DishName || "",
+        qty: num(r.DishAmountInt), revenue: num(r.DishDiscountSumInt), cost: num(r["ProductCostBase.ProductCost"]),
+      })),
+    })))]);
+  const rows = sales.rows.filter((r) => list.includes(r.month)).map((r) => {
+    const p = base.products[r.id];
+    return { ...r, name: p ? p[0] : r.name, group: p ? p[3] : "" };
+  });
+  return { months: list, rows, vat: VAT };
+}
+
 // Cron (every 15 minutes): read missing or old Syrve cost prices in the background.
 export async function scheduledMenuCosts(env) {
   const base = await loadBase(env, false);

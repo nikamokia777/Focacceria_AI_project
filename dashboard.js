@@ -10,7 +10,7 @@
 //   COMPANY_TIN (our tax ID — transfers to it are between our own accounts, not supplier payments)
 
 import { listOutgoingWaybills } from "./rsge.js";
-import { buildMenu, buildDish } from "./menu.js";
+import { buildMenu, buildDish, buildMenuMonthly } from "./menu.js";
 import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadBankData, loadRecipientPayments, syncStep, bumpVersion, loadVersion } from "./bank.js";
 import { loadLog } from "./store.js";
 
@@ -52,6 +52,7 @@ export async function handleDashboard(request, env, path) {
         if (from > to) return json({ error: "bad range" }, 400);
         const ttl = to >= today ? 60 : 3600;
         if (parts[1] === "menu") {
+          if (parts[2] === "monthly") return json(await buildMenuMonthly(env, url.searchParams.get("months") === "12" ? 12 : 6, fresh));
           if (parts[2] === "dish") {
             const id = String(url.searchParams.get("id") || "").toLowerCase().slice(0, 100);
             if (!id) return json({ error: "id required" }, 400);

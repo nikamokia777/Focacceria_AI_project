@@ -30,6 +30,8 @@ const T = {
     menu_sub: "Syrve-დან: რა და რამდენი გაიყიდა, ფასი, რეცეპტის თვითღირებულება და მარჟა (დღგ-ს გარეშე). დააჭირეთ კერძს — გამოჩნდება რეცეპტი.",
     dish: "კერძი", sold: "გაიყიდა", revenue: "ნავაჭრი", price: "ფასი", cost_short: "თვითღირ.", margin: "მარჟა", food_cost_pct: "Food cost",
     items_sold: "გაყიდული ერთეული", avg_margin: "საშუალო მარჟა", best_seller: "ყველაზე გაყიდვადი",
+    monthly_chart: "თვეების დიაგრამა", by_month: "თვეების მიხედვით",
+    monthly_margin_note: "თვის მარჟა: Syrve-ის მიერ გაყიდვის დროს ჩაწერილი თვითღირებულებით, დღგ-ს გარეშე.",
     all_groups: "ყველა ჯგუფი", only_sold: "მხოლოდ გაყიდული", sort_sold: "გაყიდვადობით", sort_revenue: "ნავაჭრით", sort_margin: "მარჟით",
     no_recipe: "რეცეპტი არ არის", recipe_tree: "🌳 რეცეპტი (ხე)", recipe_flat: "🧺 ნედლეული (ჯამი)", ingredient: "ინგრედიენტი", raw: "ნედლეული",
     qty: "რაოდენობა", unit_price: "ფასი / ერთ.", value: "ღირებულება", share: "წილი", semi: "ნახევარფაბრიკატი", total_cost: "სულ თვითღირებულება",
@@ -58,7 +60,7 @@ const T = {
     by_payment: "გადახდის ტიპის მიხედვით", by_hour: "საათების მიხედვით", refresh: "განახლება",
     updated: "განახლდა", live_sub: "მონაცემები Syrve-დან, ახლდება ყოველ 2 წუთში.",
     range_sub: "მონაცემები Syrve-დან არჩეული პერიოდისთვის.", income_range: "შემოსავალი", by_day: "დღეების მიხედვით",
-    pick_today: "დღეს", pick_yesterday: "გუშინ", pick_week: "ეს კვირა", pick_month: "ეს თვე", pick_last_month: "წინა თვე",
+    pick_today: "დღეს", pick_yesterday: "გუშინ", pick_week: "ეს კვირა", pick_month: "ეს თვე", pick_last_month: "წინა თვე", pick_6m: "6 თვე", pick_12m: "12 თვე",
     pick_end: "აირჩიეთ ბოლო დღე", wdays: ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვ"],
     pay_click: "დააჭირეთ ტიპს — ნახავთ ყველა გადახდას", order_no: "შეკვ. №", customer: "კლიენტი", cashier: "მოლარე",
     products: "პროდუქტები", waybill: "ზედნადები (rs.ge)", by_customer: "კლიენტების მიხედვით", close: "დახურვა",
@@ -124,6 +126,8 @@ const T = {
     menu_sub: "From Syrve: what sold and how much, price, recipe cost and margin (without VAT). Click a dish to see its recipe.",
     dish: "Dish", sold: "Sold", revenue: "Revenue", price: "Price", cost_short: "Cost", margin: "Margin", food_cost_pct: "Food cost",
     items_sold: "Items sold", avg_margin: "Average margin", best_seller: "Best seller",
+    monthly_chart: "Monthly chart", by_month: "By month",
+    monthly_margin_note: "Margin per month uses the cost Syrve booked at the time of sale, excluding VAT.",
     all_groups: "All groups", only_sold: "Only sold", sort_sold: "By sales", sort_revenue: "By revenue", sort_margin: "By margin",
     no_recipe: "no recipe", recipe_tree: "🌳 Recipe (tree)", recipe_flat: "🧺 Raw ingredients (total)", ingredient: "Ingredient", raw: "Raw ingredient",
     qty: "Quantity", unit_price: "Price / unit", value: "Cost", share: "Share", semi: "semi-finished", total_cost: "Total cost",
@@ -152,7 +156,7 @@ const T = {
     by_payment: "By payment type", by_hour: "By hour", refresh: "Refresh",
     updated: "Updated", live_sub: "Data from Syrve, refreshes every 2 minutes.",
     range_sub: "Data from Syrve for the chosen dates.", income_range: "Income", by_day: "By day",
-    pick_today: "Today", pick_yesterday: "Yesterday", pick_week: "This week", pick_month: "This month", pick_last_month: "Last month",
+    pick_today: "Today", pick_yesterday: "Yesterday", pick_week: "This week", pick_month: "This month", pick_last_month: "Last month", pick_6m: "6 months", pick_12m: "12 months",
     pick_end: "Choose the last day", wdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     pay_click: "Click a type to see every payment", order_no: "Order #", customer: "Customer", cashier: "Cashier",
     products: "Products", waybill: "Waybill (rs.ge)", by_customer: "By customer", close: "Close",
@@ -340,9 +344,11 @@ function exportXlsx(filename, sheetName, rows) {
 }
 
 // ====================== bar chart (single series) ======================
-// points: [{label, value, tip}]
+// points: [{label, value, tip, text}]; with text on any point, every bar shows its text instead of the peak value
 function barChart(points, { height = 220, highlightLast = false, width = 720 } = {}) {
-  const W = Math.max(280, Math.round(width)), H = height, padL = 44, padR = 8, padT = 18, padB = 26;
+  // many bars: texts sit in two fixed rows above the chart, neighbours alternating, so they never overlap
+  const texts = points.some(p => p.text), stagger = texts && points.length > 6;
+  const W = Math.max(280, Math.round(width)), H = height, padL = 44, padR = 8, padT = stagger ? 42 : 18, padB = 26;
   const max = Math.max(1, ...points.map(p => p.value));
   const step = niceStep(max / 4);
   const top = Math.ceil(max / step) * step;
@@ -369,10 +375,15 @@ function barChart(points, { height = 220, highlightLast = false, width = 720 } =
     bars += `<rect class="hit" x="${padL + band * i}" y="${padT}" width="${band}" height="${innerH}" data-tip="${esc(p.tip ?? (p.label + ": " + money(p.value)))}" data-i="${i}"/>`;
     if (path) bars += `<path class="bar${dim}" data-i="${i}" d="${path}"/>`;
     if (i % every === 0) labels += `<text x="${cx}" y="${H - 8}" text-anchor="middle">${esc(p.label)}</text>`;
+    if (p.text) {
+      const max = Math.max(4, Math.floor(band * (stagger ? 1.9 : 1) / 8)), s = String(p.text);
+      const shown = s.length > max ? s.slice(0, max - 1) + "…" : s, half = shown.length * 4; // ~8px a letter: keep it inside the chart
+      bars += `<text class="val" pointer-events="none" x="${Math.min(Math.max(cx, half), W - half)}" y="${stagger ? (i % 2 ? 30 : 15) : y0 - 6}" text-anchor="middle">${esc(shown)}</text>`;
+    }
   });
   // label only the highest bar
   let peak = "";
-  if (points.length) {
+  if (points.length && !texts) {
     const pi = points.reduce((b, p, i) => (p.value > points[b].value ? i : b), 0);
     if (points[pi].value > 0) {
       const cx = padL + band * pi + band / 2;
@@ -804,7 +815,7 @@ function calendarHtml(key) {
       day === today ? "today" : ""].filter(Boolean).join(" ");
     cells += `<button type="button" class="${cls}" data-day="${day}" ${day > today ? "disabled" : ""}>${Number(day.slice(8))}</button>`;
   }
-  const quick = [["pick_today", "today"], ["pick_yesterday", "yesterday"], ["pick_week", "week"], ["pick_month", "month"], ["pick_last_month", "lastmonth"]];
+  const quick = [["pick_today", "today"], ["pick_yesterday", "yesterday"], ["pick_week", "week"], ["pick_month", "month"], ["pick_last_month", "lastmonth"], ["pick_6m", "6m"], ["pick_12m", "12m"]];
   return `<div class="rc-head"><button type="button" class="btn small" data-cal="-1">‹</button>
       <b>${esc(monthLabel(ym))}</b><button type="button" class="btn small" data-cal="1" ${ym >= today.slice(0, 7) ? "disabled" : ""}>›</button></div>
     <div class="rc-grid">${t("wdays").map(w => `<span class="rc-wd">${esc(w)}</span>`).join("")}${cells}</div>
@@ -818,6 +829,7 @@ function quickRange(kind) {
   if (kind === "week") { const d = new Date(today + "T12:00:00"); return { from: shiftDay(today, -((d.getDay() + 6) % 7)), to: today }; }
   if (kind === "month") return { from: today.slice(0, 8) + "01", to: today };
   if (kind === "lastmonth") { const ym = ymShift(today.slice(0, 7), -1); return { from: ym + "-01", to: shiftDay(today.slice(0, 8) + "01", -1) }; }
+  if (kind === "6m" || kind === "12m") return { from: ymShift(today.slice(0, 7), kind === "6m" ? -5 : -11) + "-01", to: today }; // this month included
   return { from: today, to: today };
 }
 
@@ -1076,23 +1088,28 @@ async function renderMenu(view, demo, fresh = false) {
   const list = r.dishes
     .filter(d => (!query || d.name.toLowerCase().includes(query)) && (!M.group || d.group === M.group) && (!M.soldOnly || d.sold > 0))
     .sort(M.sort === "revenue" ? (a, b) => b.revenue - a.revenue : M.sort === "margin" ? (a, b) => (b.margin ?? -1e9) - (a.margin ?? -1e9) : () => 0);
-  const withMargin = r.dishes.filter(d => d.margin !== null && d.revenue > 0);
+  // the boxes (and the monthly diagram) follow the category, not the search
+  const inGroup = r.dishes.filter(d => !M.group || d.group === M.group);
+  const sold = inGroup.reduce((a, d) => a + d.sold, 0), revenue = inGroup.reduce((a, d) => a + d.revenue, 0);
+  const withMargin = inGroup.filter(d => d.margin !== null && d.revenue > 0);
   const revM = withMargin.reduce((a, d) => a + d.revenue, 0);
   const avgMargin = revM ? withMargin.reduce((a, d) => a + d.margin * d.revenue, 0) / revM : null;
-  const best = r.dishes.find(d => d.rank === 1);
+  const best = inGroup.filter(d => d.sold > 0).reduce((b, d) => (!b || d.sold > b.sold || (d.sold === b.sold && d.revenue > b.revenue) ? d : b), null);
 
   view.innerHTML = demo + head(t("tab_menu"), t("menu_sub"),
     `<div class="range-pick"><button class="btn range-btn" id="rangeBtn" type="button">📅 ${esc(rangeLabel(range))}</button><div class="rc-pop panel" id="calPop" hidden></div></div>
-     <button class="btn" id="menuRefresh">${esc(t("refresh"))}</button><button class="btn" id="menuExport">${esc(t("export"))}</button>`) +
+     <button class="btn" id="menuRefresh">${esc(t("refresh"))}</button><button class="btn" id="menuExport">${esc(t("export"))}</button>
+     <button class="btn ${M.chart ? "primary" : ""}" id="menuChart">📊 ${esc(t("monthly_chart"))}</button>`) +
     (r.recipesError ? `<div class="notice bad">${esc(t("recipes_err"))}: ${esc(r.recipesError)}</div>` : "") +
     (r.costError ? `<div class="notice bad">${esc(t("cost_err"))}: ${esc(r.costError)}</div>` : "") +
     (r.pricesPending ? `<div class="notice">⏳ ${esc(t("prices_loading").replace("{n}", r.pricesPending))}</div>` : "") +
     `<div class="cards">
-      ${card(t("items_sold"), qtyFmt(r.totals.sold), esc(rangeLabel(range)), "hero")}
-      ${card(t("revenue"), money(r.totals.revenue))}
+      ${card(t("items_sold"), qtyFmt(sold), esc(rangeLabel(range)) + (M.group ? " · " + esc(M.group) : ""), "hero")}
+      ${card(t("revenue"), money(revenue), M.group ? esc(M.group) : "")}
       ${card(t("avg_margin"), avgMargin === null ? "—" : avgMargin.toFixed(1) + "%", esc(t("margin_novat")))}
       ${card(t("best_seller"), best ? esc(best.name) : "—", best ? `${qtyFmt(best.sold)} · ${money(best.revenue)}` : "")}
     </div>
+    ${M.chart ? `<div class="panel" id="menuMonthly"><div class="loading">${esc(t("loading"))}</div></div>` : ""}
     <div class="panel"><div class="form-row menu-filters">
       <input type="text" id="menuSearch" placeholder="${esc(t("search"))}…" value="${esc(M.q)}">
       <select id="menuGroup"><option value="">${esc(t("all_groups"))}</option>${groups.map(g => `<option ${g === M.group ? "selected" : ""}>${esc(g)}</option>`).join("")}</select>
@@ -1126,12 +1143,62 @@ async function renderMenu(view, demo, fresh = false) {
     list.forEach(d => out.push([d.rank ?? "", d.name, d.sold, d.revenue, d.price ?? "", d.cost ?? "", d.margin ?? "", d.foodCostPct ?? ""]));
     exportXlsx(`menu-${range.from}_${range.to}.xlsx`, t("tab_menu"), out);
   });
+  $("#menuChart", view).addEventListener("click", () => { M.chart = !M.chart; rerender(); });
+  if (M.chart) renderMenuMonthly(view, fresh);
   if (M.open) renderDishDetail(view, M.open, range, fresh);
   // Syrve's cost prices arrive a batch per request: ask again until all are in (or 20 tries)
   clearTimeout(S.menuRetry);
   if (r.pricesPending && (S.menuTries = (S.menuTries || 0) + 1) <= 20) {
     S.menuRetry = setTimeout(() => { if (S.tab === "menu") { delete S.syrve["menu" + q]; renderMenu(view, demo).catch(() => {}); } }, 3000);
   } else if (!r.pricesPending) S.menuTries = 0;
+}
+
+// Month by month for the chosen category (6 or 12 months, this month included): items sold, revenue,
+// average margin (on the cost Syrve booked at the time of sale) or the best seller (its units, name on the bar).
+async function renderMenuMonthly(view, fresh = false) {
+  const box = $("#menuMonthly", view);
+  if (!box) return;
+  const M = S.menu, months = M.chartMonths || 6, metric = M.chartMetric || "sold";
+  let r;
+  try { r = await loadSyrve("menu/monthly", `?months=${months}`, fresh); }
+  catch (e) { box.innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; return; }
+  if (!box.isConnected) return;
+
+  const by = new Map(r.months.map(m => [m, { sold: 0, revenue: 0, mRev: 0, mCost: 0, dishes: new Map() }]));
+  for (const x of r.rows) {
+    const b = by.get(x.month);
+    if (!b || (M.group && x.group !== M.group)) continue;
+    b.sold += x.qty; b.revenue += x.revenue;
+    if (x.revenue > 0 && x.cost > 0) { b.mRev += x.revenue; b.mCost += x.cost; } // like the box: only dishes with a cost
+    const d = b.dishes.get(x.id) || { name: x.name, qty: 0, revenue: 0 };
+    d.qty += x.qty; d.revenue += x.revenue;
+    b.dishes.set(x.id, d);
+  }
+  const points = r.months.map(m => {
+    const b = by.get(m), label = monthLabel(m, true), full = monthLabel(m);
+    if (metric === "revenue") return { label, value: b.revenue, text: compact(b.revenue), tip: `${full}: ${money(b.revenue)}` };
+    if (metric === "margin") {
+      const nv = b.mRev / (1 + r.vat), v = nv ? (nv - b.mCost) / nv * 100 : null;
+      return { label, value: Math.max(0, v ?? 0), text: v === null ? "—" : v.toFixed(1) + "%", tip: `${full}: ${v === null ? "—" : v.toFixed(1) + "%"}` };
+    }
+    if (metric === "best") {
+      const top = [...b.dishes.values()].sort((a, c) => c.qty - a.qty || c.revenue - a.revenue)[0];
+      return top && top.qty > 0
+        ? { label, value: top.qty, text: top.name, tip: `${full}: ${top.name} — ${qtyFmt(top.qty)} · ${money(top.revenue)}` }
+        : { label, value: 0, text: "—", tip: `${full}: —` };
+    }
+    return { label, value: b.sold, text: qtyFmt(b.sold), tip: `${full}: ${qtyFmt(b.sold)}` };
+  });
+
+  const seg = (attr, opts, cur) => `<div class="seg">${opts.map(([v, k]) => `<button type="button" data-${attr}="${v}" class="${String(cur) === v ? "on" : ""}">${esc(t(k))}</button>`).join("")}</div>`;
+  box.innerHTML = `<div class="panel-head"><h3>${esc(t("by_month"))} · ${esc(M.group || t("all_groups"))}</h3>
+      <div class="mm-ctl">${seg("metric", [["sold", "items_sold"], ["revenue", "revenue"], ["margin", "avg_margin"], ["best", "best_seller"]], metric)}
+        ${seg("months", [["6", "pick_6m"], ["12", "pick_12m"]], months)}</div></div>
+    <div class="panel-body">${barChart(points, { height: 240, width: panelWidth(false) })}</div>
+    ${metric === "margin" ? `<div class="rcp-note">${esc(t("monthly_margin_note"))}</div>` : ""}`;
+  wireChartHover(box);
+  $$("[data-metric]", box).forEach(b => b.addEventListener("click", () => { M.chartMetric = b.dataset.metric; renderMenuMonthly(view); }));
+  $$("[data-months]", box).forEach(b => b.addEventListener("click", () => { M.chartMonths = Number(b.dataset.months); renderMenuMonthly(view); }));
 }
 
 async function renderDishDetail(view, id, range, fresh) {
@@ -1591,6 +1658,15 @@ function demoApi(path, opts) {
     const flat = [...by.values()].map(y => ({ ...y, unitCost: y.qty ? Math.round(y.cost / y.qty * 100) / 100 : null })).sort((a, b) => b.cost - a.cost);
     return { id: "d1", name: "ფოკაჩა მარგარიტა", unit: "ც", sold: 41, rank: 2, price: 18, cost: 4.6, margin: 69.8, foodCostPct: 25.6, tree, flat,
       sales: { byHour: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((h, i) => ({ hour: h, qty: [1, 2, 3, 6, 7, 4, 2, 2, 3, 4, 5, 2][i], revenue: [1, 2, 3, 6, 7, 4, 2, 2, 3, 4, 5, 2][i] * 18 })), byDay: [] } };
+  }
+  if (path.startsWith("/syrve/menu/monthly")) {
+    const count = path.includes("months=12") ? 12 : 6, list = Array.from({ length: count }, (_, i) => ymShift(ymNow(), i - count + 1));
+    const dishes = [["d0", "ფოკაჩა კლასიკური", "ფოკაჩა", 12, 2.9], ["d1", "ფოკაჩა მარგარიტა", "ფოკაჩა", 18, 4.6], ["d4", "ლიმონათი", "სასმელი", 7, 1.4], ["d5", "ესპრესო", "ყავა", 5, 0.9]];
+    const rows = list.flatMap((month, i) => dishes.map(([id, name, group, price, cost], k) => {
+      const qty = 120 + ((i * 37 + k * 53) % 90) - k * 20;
+      return { month, id, name, group, qty, revenue: qty * price, cost: Math.round(qty * cost * (1 + i * 0.02) * 100) / 100 };
+    }));
+    return { months: list, rows, vat: 0.18 };
   }
   if (path.startsWith("/syrve/menu")) {
     const rows = [["ფოკაჩა კლასიკური", "ფოკაჩა", 58, 12, 2.9], ["ფოკაჩა მარგარიტა", "ფოკაჩა", 41, 18, 4.6], ["ფოკაჩა როზმარინით", "ფოკაჩა", 33, 13, 3.1],
