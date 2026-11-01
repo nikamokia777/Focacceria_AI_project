@@ -21,7 +21,8 @@
 // Everything else is served from the static files in /public.
 //
 // Every 15 minutes (cron in wrangler.jsonc) stock is checked against the minimums
-// and the bank statements are synced (so the Debts page doesn't have to).
+// and the bank statements are synced (so the Debts page doesn't have to), and Syrve's cost prices
+// for the Menu tab are read in the background.
 
 import { checkServiceUser } from "./rsge.js";
 import {
@@ -33,6 +34,7 @@ import { handleUpdate, handleWhatsAppLink, setupWebhook, webhookSecret } from ".
 import { handleDashboard } from "./dashboard.js";
 import { buildStock, updateStock, checkStockAlarms, scheduledStockCheck } from "./stock.js";
 import { scheduledBankSync } from "./bank.js";
+import { scheduledMenuCosts } from "./menu.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 
@@ -242,6 +244,7 @@ export default {
   async scheduled(event, env, ctx) {
     if (!env.STORE) return;
     if (env.SYRVE_URL) ctx.waitUntil(scheduledStockCheck(env).catch((err) => console.error("stock check failed:", err?.stack || err)));
+    if (env.SYRVE_URL) ctx.waitUntil(scheduledMenuCosts(env).catch((err) => console.error("menu costs failed:", err?.stack || err)));
     ctx.waitUntil(scheduledBankSync(env).catch((err) => console.error("bank sync failed:", err?.stack || err)));
   },
 };
