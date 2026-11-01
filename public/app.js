@@ -9,6 +9,8 @@ const {
 const T = {
   ka: {
     appSub: "PriceCheck",
+    navMain: "მთავარი",
+    navDashboard: "დეშბორდი",
     tabs: {
       products: "პროდუქტები",
       distributors: "დისტრიბუცია",
@@ -223,6 +225,8 @@ const T = {
   },
   en: {
     appSub: "PriceCheck",
+    navMain: "Main",
+    navDashboard: "Dashboard",
     tabs: {
       products: "Products",
       distributors: "Distributors",
@@ -2068,10 +2072,18 @@ function App() {
   return React.createElement(React.Fragment, null, React.createElement("header", {
     className: "topbar"
   }, React.createElement("div", {
+    className: "topbar-left"
+  }, React.createElement("a", {
+    className: "btn-ghost small",
+    href: "/"
+  }, "← ", t.navMain), React.createElement("a", {
+    className: "btn-ghost small",
+    href: "/dashboard/"
+  }, t.navDashboard), React.createElement("div", {
     className: "brand"
   }, "🫓 Focacceria ", React.createElement("span", {
     className: "muted"
-  }, "— ", t.appSub)), React.createElement("div", {
+  }, "— ", t.appSub))), React.createElement("div", {
     className: "topbar-right"
   }, React.createElement("span", {
     className: "sync sync-" + sync
