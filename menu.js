@@ -4,9 +4,11 @@
 // Everything comes from Syrve (read only), nothing is calculated from stock or invoices:
 //   products   /v2/entities/products/list      name, type, unit, group, menu price (defaultSalePrice)
 //   recipes    /v2/assemblyCharts/getAll       recipe cards valid today: ingredients per output amount
-//   costs      /reports/ingredientEntry        Syrve's own cost prices, as shown on the recipe card:
-//                sourceProductCostNorm = cost of one unit of the product ("Price per unit")
-//                dishCostNorm          = total cost of each dish it goes into (the card's total)
+//   costs      /reports/ingredientEntry        Syrve's own cost prices, as shown on the recipe card. One report per
+//                product, one row per dish it goes into (the dish is the row's nested <sourceProduct>):
+//                sourceProductCostNorm = cost of one unit of the product ("Price per unit"); 0 for a
+//                                        semi-finished product, whose cost is that of its own recipe
+//                dishCostNorm          = total cost of the dish (the card's total), on first-level rows
 //   sales      /v2/reports/olap (SALES)        quantity and revenue per dish, per hour or day
 //
 // One ingredientEntry call per product, so costs are kept in KV for COST_TTL and fetched a batch at a
@@ -21,7 +23,7 @@ const MAX_DEPTH = 8;
 const BASE_TTL = 3600;                     // products, recipes and costs change rarely
 const SELLABLE = new Set(["DISH"]);        // listed even when nothing was sold
 const RECIPES_PATH = "/v2/assemblyCharts/getAll";
-const COSTS_KEY = "menu:syrve-costs";
+const COSTS_KEY = "menu:syrve-costs2";     // 2: dish totals are now stored (the old store has none)
 const COST_TTL = 3 * 3600;                 // Syrve cost prices are re-read after 3 hours
 const PAGE_BUDGET = 30;                    // ingredientEntry calls per page request (Cloudflare limits outgoing calls)
 const CRON_BUDGET = 40;
@@ -107,6 +109,16 @@ const recipeOf = (base, pid, path) => {
   return chart && chart.items.length && !path.has(pid) && path.size < MAX_DEPTH ? chart : null;
 };
 
+// ingredientEntry rows. The dish is only in the nested <sourceProduct>, which xmlRecords skips,
+// so each <item> is read here; the row's own fields come before <sourceProduct>.
+function entryRows(xml) {
+  const field = (s, tag) => { const m = s.match(new RegExp(`<${tag}>([^<]*)</${tag}>`)); return m ? m[1].trim() : ""; };
+  return [...xml.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/g)].map(([, s]) => ({
+    level: field(s, "treeLevel"), unitCost: field(s, "sourceProductCostNorm"), dishCost: field(s, "dishCostNorm"),
+    dish: ((s.match(/<sourceProduct>\s*<id>([^<]*)<\/id>/) || [])[1] || "").trim().toLowerCase(),
+  }));
+}
+
 // Reads Syrve's cost prices in batches inside one Syrve login. `pick(store)` says which products to
 // read next (it is asked again after every batch, so a list can stop as soon as it has what it needs);
 // products read within COST_TTL are skipped unless in `forceIds`. At most `budget` reports per call.
@@ -127,14 +139,12 @@ async function syrveCosts(env, base, pick, budget, forceIds = []) {
           read += batch.length;
           await Promise.all(batch.map(async (id) => {
             done.add(id);
-            const xml = await get("/reports/ingredientEntry", { date, product: id, department: base.department || undefined, includeSubtree: "true" });
-            const rows = xmlRecords(xml, "item");
-            const own = rows.find((r) => r.sourceProductCostNorm !== undefined && r.sourceProductCostNorm !== "");
+            const rows = entryRows(await get("/reports/ingredientEntry", { date, product: id, department: base.department || undefined, includeSubtree: "true" }));
+            const own = rows.find((r) => r.level === "1" && r.unitCost !== "") || rows.find((r) => r.unitCost !== "");
             const now = Date.now();
-            store.unit[id] = [own ? num(own.sourceProductCostNorm) : null, now];
-            for (const r of rows) {
-              const p = String(r.product || "").toLowerCase();
-              if (p && r.dishCostNorm !== undefined && r.dishCostNorm !== "") store.dish[p] = [num(r.dishCostNorm), now];
+            store.unit[id] = [own ? num(own.unitCost) : null, now];
+            for (const r of rows) { // deeper rows can say 0 for the same dish
+              if (r.dish && r.level === "1" && num(r.dishCost) > 0) store.dish[r.dish] = [num(r.dishCost), now];
             }
           }));
         }
@@ -149,24 +159,32 @@ async function syrveCosts(env, base, pick, budget, forceIds = []) {
   };
 }
 
-// Cost of one unit of a dish: Syrve's own total (dishCostNorm) when known, otherwise the sum of
-// its first-level ingredients × their Syrve cost prices — the same arithmetic as the card.
+// Cost of one unit of a product: Syrve's cost price, or, when Syrve gives none (0 for a semi-finished
+// product), the sum of its recipe's ingredients × their cost prices — the same arithmetic as the card.
+function unitCost(base, costs, pid, path = new Set()) {
+  const u = costs.unit(pid);
+  const chart = u ? null : recipeOf(base, pid, path);
+  if (!chart) return { cost: u, partial: false };
+  path.add(pid);
+  let cost = 0, partial = false;
+  for (const [child, q] of chart.items) {
+    const c = unitCost(base, costs, child, path);
+    if (c.cost === null || c.partial) partial = true; else cost += (q / chart.out) * c.cost;
+  }
+  path.delete(pid);
+  return { cost, partial };
+}
+
+// Cost of one unit of a dish: Syrve's own total (dishCostNorm) when known, otherwise from its recipe.
 function dishCost(base, costs, pid) {
   const own = costs.dish(pid);
   if (own !== null) return { cost: own, partial: false };
-  const chart = base.charts[pid];
-  if (!chart || !chart.items.length) { const u = costs.unit(pid); return { cost: u, partial: false }; }
-  let cost = 0, partial = false;
-  for (const [child, q] of chart.items) {
-    const u = costs.unit(child);
-    if (u === null) partial = true; else cost += (q / chart.out) * u;
-  }
-  return { cost, partial };
+  return unitCost(base, costs, pid);
 }
 
 // The recipe as a tree; every line priced with Syrve's cost price of that product.
 // Semi-finished products show their own recipe underneath (for reading); their line uses
-// Syrve's cost price of the semi-finished product, exactly as the card does.
+// Syrve's cost price of the semi-finished product, or the sum of its recipe when Syrve has none.
 function recipeTree(base, costs, pid, qty, depth = 0, path = new Set()) {
   const p = base.products[pid] || ["?", "", "", "", null];
   const node = { id: pid, name: p[0], unit: p[2], qty: round(qty, 4), semi: false, unitCost: null, cost: null, missing: false, children: [] };
@@ -182,9 +200,9 @@ function recipeTree(base, costs, pid, qty, depth = 0, path = new Set()) {
     node.cost = own !== null ? own * qty : node.children.reduce((a, c) => a + (c.cost || 0), 0);
     node.missing = own === null && node.children.some((c) => c.missing);
   } else {
-    const u = costs.unit(pid);
-    if (u === null) node.missing = true;
-    else { node.unitCost = round(u, 2); node.cost = round(u * qty, 4); }
+    const c = unitCost(base, costs, pid, new Set(path));
+    if (c.cost === null || c.partial) node.missing = true;
+    else { node.unitCost = round(c.cost, 2); node.cost = round(c.cost * qty, 4); }
   }
   return node;
 }
@@ -230,14 +248,19 @@ async function loadSales(env, from, to, fresh) {
   return cached(env, `menu-sales:${from}:${to}`, to >= localDate(env) ? 120 : 3600, fresh, () => fetchSales(env, from, to));
 }
 
-// Which cost prices the list needs: Syrve's dish total comes with any ingredient's report, so read
-// the ingredients shared by the most dishes first (packaging, dough…) — few calls cover many dishes.
+// Which cost prices the list needs: Syrve's dish total comes with any direct ingredient's report, so
+// read the ingredients shared by the most dishes first (packaging, dough…) — few calls cover many dishes.
+// A dish still without a total after that is priced from its recipe, so the deeper ingredients come last.
 function listCostIds(base, dishIds, store) {
   const now = Date.now(), old = (x) => !x || now - x[1] > COST_TTL * 1000;
   const uncovered = dishIds.filter((id) => base.charts[id] && old(store.dish[id]));
-  const freq = new Map();
-  for (const d of uncovered) for (const [child] of base.charts[d].items) if (old(store.unit[child])) freq.set(child, (freq.get(child) || 0) + 1);
-  return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  const freq = new Map(), deep = new Set();
+  for (const d of uncovered) {
+    for (const [child] of base.charts[d].items) if (old(store.unit[child])) freq.set(child, (freq.get(child) || 0) + 1);
+    for (const id of treeIds(base, d)) if (old(store.unit[id])) deep.add(id);
+  }
+  const direct = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  return [...direct, ...[...deep].filter((id) => !freq.has(id))];
 }
 
 async function menuCosts(env, base, dishIds, budget) {
