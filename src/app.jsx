@@ -23,7 +23,7 @@ const T = {
     add: "+ დამატება",
     csv: "↓ CSV",
     edit: "რედაქტირება",
-    col: { n: "#", cat: "კატ.", name: "დასახელება", code: "rs.ge კოდი", supplier: "მომწოდებელი", contact: "კონტაქტი", size: "ზომა", price: "ფასი ₾", comment: "კომ." },
+    col: { n: "#", cat: "კატ.", name: "დასახელება", code: "rs.ge კოდი", supplier: "მომწოდებელი", contact: "კონტაქტი", size: "ზომა", netSize: "ზომა (ნეტო)", price: "ფასი ₾", unitPrice: "ერთეულის ფასი", comment: "კომ." },
     kpi: {
       products: "პროდუქტი", suppliers: "მომწოდებელი", avgPrice: "საშ. ფასი", alternatives: "ალტერნატივა",
       priceKnown: "ფასი ცნობ.", priceUnknown: "ფასი უცნობ.",
@@ -85,7 +85,7 @@ const T = {
     editProduct: "პროდუქტის რედაქტირება",
     f: {
       type: "ტიპი", category: "კატეგორია", name: "დასახელება", nameRs: "დასახელება rs.ge-ზე", code: "rs.ge კოდი",
-      supplier: "მომწოდებელი", contactName: "საკონტაქტო პირი", phone: "ტელეფონი (WhatsApp)", size: "ზომა",
+      supplier: "მომწოდებელი", contactName: "საკონტაქტო პირი", phone: "ტელეფონი (WhatsApp)", size: "ზომა", netSize: "ზომა (ნეტო)",
       price: "ფასი ₾", altSupplier: "ალტ. მომწოდებელი", comment: "კომენტარი",
     },
     nameRequired: "დასახელება აუცილებელია",
@@ -160,7 +160,7 @@ const T = {
     add: "+ Add",
     csv: "↓ CSV",
     edit: "Edit",
-    col: { n: "#", cat: "Cat.", name: "Name", code: "rs.ge code", supplier: "Supplier", contact: "Contact", size: "Size", price: "Price ₾", comment: "Note" },
+    col: { n: "#", cat: "Cat.", name: "Name", code: "rs.ge code", supplier: "Supplier", contact: "Contact", size: "Size", netSize: "Net size", price: "Price ₾", unitPrice: "Unit price", comment: "Note" },
     kpi: {
       products: "Products", suppliers: "Suppliers", avgPrice: "Avg. price", alternatives: "Alternatives",
       priceKnown: "Price known", priceUnknown: "Price unknown",
@@ -218,7 +218,7 @@ const T = {
     editProduct: "Edit product",
     f: {
       type: "Type", category: "Category", name: "Name", nameRs: "Name on rs.ge", code: "rs.ge code",
-      supplier: "Supplier", contactName: "Contact person", phone: "Phone (WhatsApp)", size: "Size",
+      supplier: "Supplier", contactName: "Contact person", phone: "Phone (WhatsApp)", size: "Size", netSize: "Net size",
       price: "Price ₾", altSupplier: "Alt. supplier", comment: "Note",
     },
     nameRequired: "Name is required",
@@ -301,6 +301,13 @@ function catColor(cat) {
 
 const num = (v) => Number(v) || 0;
 const money = (n) => (num(n) > 0 ? `${num(n).toFixed(2)}₾` : "—");
+const NET_UNITS = ["კგ", "ლ", "ც"];
+// unit price = price ÷ the number in ზომა ("1.5 კგ" → 1.5), per the unit written there; "" when ზომა has no number
+const unitPrice = (p) => {
+  const m = String(p.unit || "").replace(",", ".").match(/(\d+(?:\.\d+)?)\s*([^\d\s.,x×]*)/);
+  const size = m ? Number(m[1]) : 0;
+  return size > 0 && num(p.basePrice) > 0 ? `${(num(p.basePrice) / size).toFixed(2)}₾${m[2] ? "/" + m[2] : ""}` : "";
+};
 const qtyStr = (n) => String(Math.round(num(n) * 1000) / 1000);
 const norm = (s) => String(s ?? "").toLowerCase().trim();
 
@@ -449,8 +456,8 @@ function ProductTable({ t, lang, rows, onEdit, emptyText }) {
           <thead>
             <tr>
               <th className="c-n">{t.col.n}</th><th>{t.col.cat}</th><th>{t.col.name}</th><th>{t.col.code}</th>
-              <th>{t.col.supplier}</th><th>{t.col.contact}</th><th>{t.col.size}</th><th>{t.col.price}</th>
-              <th>{t.col.comment}</th><th />
+              <th>{t.col.supplier}</th><th>{t.col.contact}</th><th>{t.col.size}</th><th>{t.col.netSize}</th><th>{t.col.price}</th>
+              <th>{t.col.unitPrice}</th><th>{t.col.comment}</th><th />
             </tr>
           </thead>
           <tbody>
@@ -467,7 +474,9 @@ function ProductTable({ t, lang, rows, onEdit, emptyText }) {
                 <td>{p.supplier || <span className="muted">—</span>}</td>
                 <td><Contact name={p.contactName} phone={p.phone} /></td>
                 <td>{p.unit || <span className="muted">—</span>}</td>
+                <td>{p.netSize > 0 ? `${p.netSize} ${p.netUnit || NET_UNITS[0]}` : <span className="muted">—</span>}</td>
                 <td className="strong">{money(p.basePrice)}</td>
+                <td>{unitPrice(p) || <span className="muted">—</span>}</td>
                 <td className="muted small">
                   {p.comment}
                   {p.altSupplier && <div>{t.alt} {p.altSupplier}</div>}
@@ -484,8 +493,9 @@ function ProductTable({ t, lang, rows, onEdit, emptyText }) {
 }
 
 function productCsv(list, name) {
-  downloadCsv(name, ["type", "category", "name", "nameRs", "code", "supplier", "contactName", "phone", "size", "price", "altSupplier", "comment"],
-    list.map((p) => [p.type, p.category, p.name, p.nameRs, p.code, p.supplier, p.contactName, p.phone, p.unit, p.basePrice, p.altSupplier, p.comment]));
+  downloadCsv(name, ["type", "category", "name", "nameRs", "code", "supplier", "contactName", "phone", "size", "price", "altSupplier", "comment", "netSize", "unitPrice"],
+    list.map((p) => [p.type, p.category, p.name, p.nameRs, p.code, p.supplier, p.contactName, p.phone, p.unit, p.basePrice, p.altSupplier, p.comment,
+      p.netSize > 0 ? `${p.netSize} ${p.netUnit || NET_UNITS[0]}` : "", unitPrice(p)]));
 }
 
 function matchesSearch(p, q) {
@@ -1123,7 +1133,7 @@ function ProductModal({ t, lang, draft, products, onSave, onDelete, onClose }) {
   const save = async () => {
     if (!String(p.name || "").trim()) { setErr(t.nameRequired); return; }
     setBusy(true); setErr("");
-    try { await onSave({ ...p, basePrice: num(String(p.basePrice).replace(",", ".")) }); }
+    try { await onSave({ ...p, basePrice: num(String(p.basePrice).replace(",", ".")), netSize: num(String(p.netSize ?? "").replace(",", ".")) }); }
     catch { setErr(t.saveFailed); setBusy(false); }
   };
   const remove = async () => {
@@ -1170,6 +1180,15 @@ function ProductModal({ t, lang, draft, products, onSave, onDelete, onClose }) {
           {field("contactName", t.f.contactName)}
           {field("phone", t.f.phone, { type: "tel", placeholder: "5XX XX XX XX" })}
           {field("unit", t.f.size, { placeholder: "1 კგ" })}
+          <label className="field">
+            <span className="field-label">{t.f.netSize}</span>
+            <div className="row">
+              <input className="input" inputMode="decimal" placeholder="1.5" value={p.netSize === 0 ? "" : p.netSize ?? ""} onChange={set("netSize")} />
+              <select className="input" style={{ width: 80 }} value={p.netUnit || NET_UNITS[0]} onChange={set("netUnit")}>
+                {NET_UNITS.map((u) => <option key={u}>{u}</option>)}
+              </select>
+            </div>
+          </label>
           {field("basePrice", t.f.price, { inputMode: "decimal" })}
           {field("altSupplier", t.f.altSupplier)}
           <label className="field span2">

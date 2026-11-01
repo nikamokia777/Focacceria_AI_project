@@ -23,6 +23,8 @@ export async function loadBasePrices(env) {
   return Array.isArray(list) ? list : [];
 }
 
+const NET_UNITS = ["კგ", "ლ", "ც"];
+
 export function cleanProduct(p, i = 0) {
   return {
     id: Number(p.id) || i + 1,
@@ -35,6 +37,8 @@ export function cleanProduct(p, i = 0) {
     contactName: str(p.contactName, 80),
     phone: str(p.phone, 40),
     unit: p.unit === "unit" ? "" : str(p.unit, 40), // size / pack, e.g. "1 კგ", "0.38" ("unit" was the old default)
+    netSize: Math.max(0, Number(p.netSize) || 0),   // net size (typed in now, later maybe from Syrve) + its unit
+    netUnit: NET_UNITS.includes(p.netUnit) ? p.netUnit : NET_UNITS[0],
     basePrice: Math.max(0, Number(p.basePrice) || 0),
     altSupplier: str(p.altSupplier, 120),
     comment: str(p.comment, 300),

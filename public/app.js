@@ -45,7 +45,9 @@ const T = {
       supplier: "მომწოდებელი",
       contact: "კონტაქტი",
       size: "ზომა",
+      netSize: "ზომა (ნეტო)",
       price: "ფასი ₾",
+      unitPrice: "ერთეულის ფასი",
       comment: "კომ."
     },
     kpi: {
@@ -134,6 +136,7 @@ const T = {
       contactName: "საკონტაქტო პირი",
       phone: "ტელეფონი (WhatsApp)",
       size: "ზომა",
+      netSize: "ზომა (ნეტო)",
       price: "ფასი ₾",
       altSupplier: "ალტ. მომწოდებელი",
       comment: "კომენტარი"
@@ -261,7 +264,9 @@ const T = {
       supplier: "Supplier",
       contact: "Contact",
       size: "Size",
+      netSize: "Net size",
       price: "Price ₾",
+      unitPrice: "Unit price",
       comment: "Note"
     },
     kpi: {
@@ -350,6 +355,7 @@ const T = {
       contactName: "Contact person",
       phone: "Phone (WhatsApp)",
       size: "Size",
+      netSize: "Net size",
       price: "Price ₾",
       altSupplier: "Alt. supplier",
       comment: "Note"
@@ -474,6 +480,12 @@ function catColor(cat) {
 }
 const num = v => Number(v) || 0;
 const money = n => num(n) > 0 ? `${num(n).toFixed(2)}₾` : "—";
+const NET_UNITS = ["კგ", "ლ", "ც"];
+const unitPrice = p => {
+  const m = String(p.unit || "").replace(",", ".").match(/(\d+(?:\.\d+)?)\s*([^\d\s.,x×]*)/);
+  const size = m ? Number(m[1]) : 0;
+  return size > 0 && num(p.basePrice) > 0 ? `${(num(p.basePrice) / size).toFixed(2)}₾${m[2] ? "/" + m[2] : ""}` : "";
+};
 const qtyStr = n => String(Math.round(num(n) * 1000) / 1000);
 const norm = s => String(s ?? "").toLowerCase().trim();
 function fmtDate(iso, withYear = false) {
@@ -682,7 +694,7 @@ function ProductTable({
     className: "table"
   }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", {
     className: "c-n"
-  }, t.col.n), React.createElement("th", null, t.col.cat), React.createElement("th", null, t.col.name), React.createElement("th", null, t.col.code), React.createElement("th", null, t.col.supplier), React.createElement("th", null, t.col.contact), React.createElement("th", null, t.col.size), React.createElement("th", null, t.col.price), React.createElement("th", null, t.col.comment), React.createElement("th", null))), React.createElement("tbody", null, rows.map((p, i) => React.createElement("tr", {
+  }, t.col.n), React.createElement("th", null, t.col.cat), React.createElement("th", null, t.col.name), React.createElement("th", null, t.col.code), React.createElement("th", null, t.col.supplier), React.createElement("th", null, t.col.contact), React.createElement("th", null, t.col.size), React.createElement("th", null, t.col.netSize), React.createElement("th", null, t.col.price), React.createElement("th", null, t.col.unitPrice), React.createElement("th", null, t.col.comment), React.createElement("th", null))), React.createElement("tbody", null, rows.map((p, i) => React.createElement("tr", {
     key: p.id
   }, React.createElement("td", {
     className: "c-n muted"
@@ -704,9 +716,13 @@ function ProductTable({
     phone: p.phone
   })), React.createElement("td", null, p.unit || React.createElement("span", {
     className: "muted"
+  }, "—")), React.createElement("td", null, p.netSize > 0 ? `${p.netSize} ${p.netUnit || NET_UNITS[0]}` : React.createElement("span", {
+    className: "muted"
   }, "—")), React.createElement("td", {
     className: "strong"
-  }, money(p.basePrice)), React.createElement("td", {
+  }, money(p.basePrice)), React.createElement("td", null, unitPrice(p) || React.createElement("span", {
+    className: "muted"
+  }, "—")), React.createElement("td", {
     className: "muted small"
   }, p.comment, p.altSupplier && React.createElement("div", null, t.alt, " ", p.altSupplier)), React.createElement("td", {
     className: "c-act"
@@ -717,7 +733,7 @@ function ProductTable({
   }, "✎"))))))), !rows.length && React.createElement(Empty, null, emptyText));
 }
 function productCsv(list, name) {
-  downloadCsv(name, ["type", "category", "name", "nameRs", "code", "supplier", "contactName", "phone", "size", "price", "altSupplier", "comment"], list.map(p => [p.type, p.category, p.name, p.nameRs, p.code, p.supplier, p.contactName, p.phone, p.unit, p.basePrice, p.altSupplier, p.comment]));
+  downloadCsv(name, ["type", "category", "name", "nameRs", "code", "supplier", "contactName", "phone", "size", "price", "altSupplier", "comment", "netSize", "unitPrice"], list.map(p => [p.type, p.category, p.name, p.nameRs, p.code, p.supplier, p.contactName, p.phone, p.unit, p.basePrice, p.altSupplier, p.comment, p.netSize > 0 ? `${p.netSize} ${p.netUnit || NET_UNITS[0]}` : "", unitPrice(p)]));
 }
 function matchesSearch(p, q) {
   if (!q) return true;
@@ -1650,7 +1666,8 @@ function ProductModal({
     try {
       await onSave({
         ...p,
-        basePrice: num(String(p.basePrice).replace(",", "."))
+        basePrice: num(String(p.basePrice).replace(",", ".")),
+        netSize: num(String(p.netSize ?? "").replace(",", "."))
       });
     } catch {
       setErr(t.saveFailed);
@@ -1735,7 +1752,28 @@ function ProductModal({
     placeholder: "5XX XX XX XX"
   }), field("unit", t.f.size, {
     placeholder: "1 კგ"
-  }), field("basePrice", t.f.price, {
+  }), React.createElement("label", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "field-label"
+  }, t.f.netSize), React.createElement("div", {
+    className: "row"
+  }, React.createElement("input", {
+    className: "input",
+    inputMode: "decimal",
+    placeholder: "1.5",
+    value: p.netSize === 0 ? "" : p.netSize ?? "",
+    onChange: set("netSize")
+  }), React.createElement("select", {
+    className: "input",
+    style: {
+      width: 80
+    },
+    value: p.netUnit || NET_UNITS[0],
+    onChange: set("netUnit")
+  }, NET_UNITS.map(u => React.createElement("option", {
+    key: u
+  }, u))))), field("basePrice", t.f.price, {
     inputMode: "decimal"
   }), field("altSupplier", t.f.altSupplier), React.createElement("label", {
     className: "field span2"
