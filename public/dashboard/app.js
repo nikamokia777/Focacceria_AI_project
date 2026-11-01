@@ -34,10 +34,11 @@ const T = {
     no_recipe: "რეცეპტი არ არის", recipe_tree: "🌳 რეცეპტი (ხე)", recipe_flat: "🧺 ნედლეული (ჯამი)", ingredient: "ინგრედიენტი", raw: "ნედლეული",
     qty: "რაოდენობა", unit_price: "ფასი / ერთ.", value: "ღირებულება", share: "წილი", semi: "ნახევარფაბრიკატი", total_cost: "სულ თვითღირებულება",
     price_vat: "ფასი (დღგ-ით)", margin_novat: "მარჟა (დღგ-ს გარეშე)", one_unit: "ერთი ერთეული", rank: "რეიტინგი", sold_when: "როდის გაიყიდა",
-    missing_price: "⚠ ზოგ ინგრედიენტს ფასი საერთოდ ვერ ვიპოვე (არც მარაგში, არც ბოლო 90 დღის ზედნადებებში) — თვითღირებულება შეიძლება რეალურზე ნაკლები იყოს.",
+    missing_price: "⚠ Syrve-მ ზოგი ინგრედიენტის თვითღირებულება არ დააბრუნა — ეს სტრიქონები „—“-ით არის აღნიშნული.",
+    prices_loading: "Syrve-დან თვითღირებულებები იტვირთება… დარჩა {n} კერძი. გვერდი თავისით განახლდება.",
     estimated_note: "* — მარაგში არ არის, ამიტომ ფასი შეფასებულია (ბოლო შესყიდვის ფასით ან ნახევარფაბრიკატის რეცეპტით), როგორც Syrve-ის რეცეპტში.",
     stock_priced: "მარაგის ფასით", food_cost_vat: "Food cost (ფასიდან დღგ-ით)",
-    flat_differs: "ნედლეულის ჯამი {a} — განსხვავდება რეცეპტის თვითღირებულებისგან ({b}), რადგან ზოგი ნახევარფაბრიკატი მარაგში არსებული ფასითაა დათვლილი (როგორც Syrve-ში).",
+    flat_differs: "ნედლეულის ჯამი {a} — განსხვავდება რეცეპტის თვითღირებულებისგან ({b}), რადგან Syrve ნახევარფაბრიკატს საკუთარი თვითღირებულებით ითვლის და არა მისი ინგრედიენტების ჯამით.",
     invoice_err: "მომწოდებლების ზედნადებებიდან ფასები ვერ წამოვიდა",
     recipes_err: "Syrve-დან რეცეპტები ვერ წამოვიდა", cost_err: "ინგრედიენტების ფასები ვერ წამოვიდა", no_dishes: "კერძები არ მოიძებნა",
     flat_note: "ყველაფერი დაყვანილია ნედლეულამდე და შეჯამებულია. ყველაზე ძვირი ინგრედიენტი ზემოთაა.", tree_note: "▸ / ▾ — ნახევარფაბრიკატის გახსნა / დახურვა. ფასები: Syrve-ს თვითღირებულება.",
@@ -127,10 +128,11 @@ const T = {
     no_recipe: "no recipe", recipe_tree: "🌳 Recipe (tree)", recipe_flat: "🧺 Raw ingredients (total)", ingredient: "Ingredient", raw: "Raw ingredient",
     qty: "Quantity", unit_price: "Price / unit", value: "Cost", share: "Share", semi: "semi-finished", total_cost: "Total cost",
     price_vat: "Price (incl. VAT)", margin_novat: "Margin (excl. VAT)", one_unit: "one unit", rank: "rank", sold_when: "When it sold",
-    missing_price: "⚠ Some ingredients have no price at all (not in stock, not on invoices of the last 90 days) — the cost may be lower than it really is.",
+    missing_price: "⚠ Syrve returned no cost price for some ingredients — those lines show “—”.",
+    prices_loading: "Loading cost prices from Syrve… {n} dishes left. The page will update by itself.",
     estimated_note: "* — not in stock, so the price is estimated (last purchase price, or the semi-finished product's recipe), as on Syrve's recipe card.",
     stock_priced: "priced from stock", food_cost_vat: "Food cost (of price with VAT)",
-    flat_differs: "Raw ingredients add up to {a} — different from the recipe cost ({b}) because some semi-finished products are priced from their stock, as Syrve does.",
+    flat_differs: "Raw ingredients add up to {a} — different from the recipe cost ({b}) because Syrve prices a semi-finished product at its own cost price, not as the sum of its ingredients.",
     invoice_err: "Could not read prices from supplier invoices",
     recipes_err: "Could not read recipes from Syrve", cost_err: "Could not read ingredient prices", no_dishes: "No dishes found",
     flat_note: "Everything reduced to raw ingredients and summed. The most expensive ingredient is on top.", tree_note: "▸ / ▾ — open / close a semi-finished product. Prices: Syrve cost price.",
@@ -1084,7 +1086,7 @@ async function renderMenu(view, demo, fresh = false) {
      <button class="btn" id="menuRefresh">${esc(t("refresh"))}</button><button class="btn" id="menuExport">${esc(t("export"))}</button>`) +
     (r.recipesError ? `<div class="notice bad">${esc(t("recipes_err"))}: ${esc(r.recipesError)}</div>` : "") +
     (r.costError ? `<div class="notice bad">${esc(t("cost_err"))}: ${esc(r.costError)}</div>` : "") +
-    (r.invoiceError ? `<div class="notice bad">${esc(t("invoice_err"))}: ${esc(r.invoiceError)}</div>` : "") +
+    (r.pricesPending ? `<div class="notice">⏳ ${esc(t("prices_loading").replace("{n}", r.pricesPending))}</div>` : "") +
     `<div class="cards">
       ${card(t("items_sold"), qtyFmt(r.totals.sold), esc(rangeLabel(range)), "hero")}
       ${card(t("revenue"), money(r.totals.revenue))}
@@ -1125,6 +1127,11 @@ async function renderMenu(view, demo, fresh = false) {
     exportXlsx(`menu-${range.from}_${range.to}.xlsx`, t("tab_menu"), out);
   });
   if (M.open) renderDishDetail(view, M.open, range, fresh);
+  // Syrve's cost prices arrive a batch per request: ask again until all are in (or 20 tries)
+  clearTimeout(S.menuRetry);
+  if (r.pricesPending && (S.menuTries = (S.menuTries || 0) + 1) <= 20) {
+    S.menuRetry = setTimeout(() => { if (S.tab === "menu") { delete S.syrve["menu" + q]; renderMenu(view, demo).catch(() => {}); } }, 3000);
+  } else if (!r.pricesPending) S.menuTries = 0;
 }
 
 async function renderDishDetail(view, id, range, fresh) {
