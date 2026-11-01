@@ -61,7 +61,7 @@ export async function handleDashboard(request, env, path) {
           }
           return json(await buildMenu(env, from, to, fresh));
         }
-        if (parts[1] === "live") return json(await cached(env, `live:${from}:${to}`, ttl, fresh, () => syrveLive(env, from, to)));
+        if (parts[1] === "live") return json(await cached(env, `live2:${from}:${to}`, ttl, fresh, () => syrveLive(env, from, to)));
         const name = String(url.searchParams.get("name") || "").slice(0, 100);
         if (!name) return json({ error: "name required" }, 400);
         return json(await cached(env, `pay:${from}:${to}:${name}`, ttl, fresh, () => syrvePayType(env, from, to, name)));
@@ -257,13 +257,14 @@ async function syrveLive(env, from, to) {
       if (from !== to) {
         result.byDay = days.map(r => ({ day: String(r["OpenDate.Typed"] || "").slice(0, 10), sum: num(r.DishDiscountSumInt) }))
           .filter(r => r.day).sort((a, b) => a.day.localeCompare(b.day));
-      } else {
-        try {
-          result.byHour = (await olap(["HourOpen"], ["DishDiscountSumInt"]))
-            .map(r => ({ hour: Number(r.HourOpen), sum: num(r.DishDiscountSumInt) }))
-            .filter(r => !Number.isNaN(r.hour)).sort((a, b) => a.hour - b.hour);
-        } catch (_) {}
+        result.salesDays = result.byDay.filter(r => r.sum > 0).length; // a range's hours are averaged over these
       }
+      // by hour: one day's hours, or a range's hours summed over all its days
+      try {
+        result.byHour = (await olap(["HourOpen"], ["DishDiscountSumInt"]))
+          .map(r => ({ hour: Number(r.HourOpen), sum: num(r.DishDiscountSumInt) }))
+          .filter(r => !Number.isNaN(r.hour)).sort((a, b) => a.hour - b.hour);
+      } catch (_) {}
       if (!result.byPayType.some(p => p.notIncome)) result.byPayType.push({ name: "მარკეტინგი", sum: 0, notIncome: true });
       result.source = "olap2";
       return result;
