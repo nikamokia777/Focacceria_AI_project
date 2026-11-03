@@ -14,6 +14,7 @@ import { buildMenu, buildDish, buildMenuMonthly } from "./menu.js";
 import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadBankData, loadRecipientPayments, syncStep, bumpVersion, loadVersion } from "./bank.js";
 import { loadLog } from "./store.js";
 import { syncWaybills, waybillTotals } from "./waybills.js";
+import { runProbe } from "./rsprobe.js";
 
 const DATA_KEYS = ["fixed", "variable", "ratings", "tasks"];
 const LINKS_KEY = "dash:bank:links"; // { byTin, byIban, byTx: { key: supplierId | "ignore" } } — the CEO's remembered decisions
@@ -98,6 +99,8 @@ export async function handleDashboard(request, env, path) {
         return json(await cached(env, "emp:" + month, 300, fresh, () => syrveEmployees(env, month)));
       }
     }
+    // one-off read-only check of rs.ge / Syrve / Telegram answers (rsprobe.js)
+    if (parts[0] === "probe" && request.method === "GET") return json(await runProbe(env));
     // bank settings / sync / review
     if (parts[0] === "bank") {
       if (parts[1] === "settings" && request.method === "GET") return json({ settings: await loadBankSettings(env), configured: bankConfigured(env) });
