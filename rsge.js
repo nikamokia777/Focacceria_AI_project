@@ -207,6 +207,45 @@ export async function listOutgoingWaybills(env, fromDay, toDay) {
   return childrenOf(list, "WAYBILL").map(mapWaybillHeader);
 }
 
+// Like resultDocument(…, "WAYBILL_LIST"), but an rs.ge error code (a negative number in place of
+// the list) is thrown instead of being read as "no waybills" — a debt must never drop to 0 silently.
+function strictList(response, method) {
+  const result = childOf(response, `${method}Result`);
+  if (!result) throw new Error(`rs.ge ${method}: no result`);
+  const list = resultDocument(response, method, "WAYBILL_LIST");
+  if (list) return childrenOf(list, "WAYBILL");
+  const code = (result.text || textOf(findDeep(result, "RESULT"), "STATUS") || textOf(result, "STATUS")).trim();
+  if (/^-\d+$/.test(code)) throw new Error(`rs.ge ${method}: error ${code}`);
+  return [];
+}
+
+// Waybills we received (we are the buyer), created between two days (inclusive).
+// isConfirmed: 1 = confirmed by us, 0 = not confirmed yet, -1 = rejected by us.
+export async function listBuyerWaybills(env, fromDay, toDay, isConfirmed) {
+  const response = await soapCall(env, "get_buyer_waybills_ex", [
+    ["create_date_s", `${fromDay}T00:00:00`],
+    ["create_date_e", `${toDay}T23:59:59`],
+    ["is_confirmed", String(isConfirmed)],
+  ]);
+  return strictList(response, "get_buyer_waybills_ex").map(mapWaybillHeader);
+}
+
+// Same as listOutgoingWaybills, but rs.ge errors are thrown (used for the Debts page).
+export async function listOutgoingWaybillsStrict(env, fromDay, toDay) {
+  const response = await soapCall(env, "get_waybills", [
+    ["create_date_s", `${fromDay}T00:00:00`],
+    ["create_date_e", `${toDay}T23:59:59`],
+  ]);
+  return strictList(response, "get_waybills").map(mapWaybillHeader);
+}
+
+// [{ id, name }] — e.g. { id: "6", name: "ქვე-ზედნადები" }
+export async function listWaybillTypes(env) {
+  const response = await soapCall(env, "get_waybill_types", []);
+  const list = resultDocument(response, "get_waybill_types", "WAYBILL_TYPES");
+  return childrenOf(list, "WAYBILL_TYPE").map((x) => ({ id: textOf(x, "ID"), name: textOf(x, "NAME") }));
+}
+
 // Full waybill, including the goods lines.
 export async function getWaybill(env, waybillId) {
   const response = await soapCall(env, "get_waybill", [["waybill_id", waybillId]]);

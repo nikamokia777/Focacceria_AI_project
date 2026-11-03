@@ -79,7 +79,7 @@ const T = {
     cost_fallback: "Syrve-ს თვითღირებულება მიუწვდომელია — ნაცვლად ცვლადი ხარჯების „საქონელი“ აკლდება.",
     income_by_month: "შემოსავალი თვეების მიხედვით",
     total_owed: "სულ გადასახდელი", suppliers: "მომწოდებლები", supplier: "მომწოდებელი", owed: "გადასახდელი",
-    debts_sub: "რამდენი გვმართებს მომწოდებლებს, Syrve-ს ბალანსის მიხედვით.", search: "ძებნა",
+    debts_sub: "რამდენი გვმართებს მომწოდებლებს: rs.ge-ს ზედნადებები − დაბრუნებები − ბანკის გადარიცხვები.", search: "ძებნა",
     prepaid: "წინასწარ გადახდილი", no_debts: "ვალები არ არის",
     platform: "პლატფორმა", rating: "რეიტინგი", reviews: "შეფასებები", latest: "ბოლო",
     ratings_sub: "მიტანის აპლიკაციების რეიტინგები. შეიყვანეთ ციფრები აპლიკაციიდან.", history: "ისტორია",
@@ -98,7 +98,13 @@ const T = {
     expenses: "ხარჯები", left_to_pay_all: "სულ გადასასახდელი", debts_short: "ვალები", fixed_short: "ფიქს.",
     variable_short: "ცვლ.", avg_rating: "რეიტინგი", average: "საშუალო", vs_last_month: "წინა თვესთან",
     load_failed: "ვერ ჩაიტვირთა", unpaid_total: "გადაუხდელი", today: "დღეს",
-    invoices: "ზედნადებები (Syrve)", paid_bank: "გადახდილი (ბანკი)", tax_id: "ს/კ", to_review: "გადასამოწმებელი",
+    dv_received: "მიღებული ზედნადები vs გადარიცხვა", dv_unconfirmed: "მიღებული / გასასწორებელი vs გადარიცხვა", dv_confirmed: "დადასტურებული ზედნადები vs გადარიცხვა",
+    dv_main_hint: "ეს თანხა ჩანს მთავარ გვერდზე", wb_received: "მიღებული ზედნადებები", wb_unconfirmed: "დაუდასტურებელი ზედნადებები", wb_confirmed: "დადასტურებული ზედნადებები",
+    wb_count: "ზედნადები", returns_col: "დაბრუნება", syrve_col: "Syrve (შედარება)", dv_confirmed_short: "დადასტ.", dv_unconfirmed_short: "დაუდასტ.", rejected_short: "უარყოფ.",
+    rsge_not_connected: "rs.ge არ არის დაკავშირებული: Cloudflare-ში საჭიროა RSGE_SERVICE_USER და RSGE_SERVICE_PASSWORD.",
+    rsge_need_start: "ქვემოთ, ბანკის პარამეტრებში მიუთითეთ თარიღი — ზედნადებებიც და გადარიცხვებიც ამ თარიღიდან ითვლება.",
+    rsge_loading: "იტვირთება rs.ge-ს ზედნადებები… {a} / {b} თვე", rsge_no_returns: "rs.ge-ზე „უკან დაბრუნების“ ტიპი ვერ ვიპოვე — დაბრუნებები არ აკლდება.",
+    syrve_col_error: "Syrve-ს სვეტი ახლა მიუწვდომელია", paid_bank: "გადახდილი (ბანკი)", tax_id: "ს/კ", to_review: "გადასამოწმებელი",
     review_sub: "მიმღებები, რომელთა გადახდები ავტომატურად ვერ დავაკავშირე მომწოდებელს", recipient: "მიმღები", why: "მიზეზი",
     why_name_differs: "ს/კ ემთხვევა, სახელი განსხვავდება", why_several_matches: "რამდენიმე შესაძლო მომწოდებელი",
     why_not_in_syrve: "rs.ge-ზეა, Syrve-ში ვერ ვიპოვე", why_name_only: "მხოლოდ სახელი ემთხვევა", why_unknown: "უცნობი მიმღები", why_tin_differs: "სახელი ემთხვევა, ს/კ განსხვავდება",
@@ -110,8 +116,8 @@ const T = {
     save: "შენახვა", tbc_auto: "TBC-ის GEL ანგარიშები ავტომატურად იკითხება", payments_loaded: "გადახდა", matched: "დაკავშირებული",
     ignored: "გამოტოვებული", bank_not_connected: "ბანკი არ არის დაკავშირებული",
     bank_secrets_hint: "Cloudflare-ში დაამატეთ Secret-ები: BOG_CLIENT_ID, BOG_CLIENT_SECRET და/ან TBC_CLIENT_ID, TBC_CLIENT_SECRET.",
-    need_start: "ქვემოთ, ბანკის პარამეტრებში მიუთითეთ თარიღი, საიდანაც იწყება Syrve-ის ისტორია, და BOG-ის ანგარიშები.",
-    history_note: "Syrve-ში გადახდები არ ფიქსირდება, ამიტომ თარიღი უნდა იყოს Syrve-ის ზედნადებების დაწყების თარიღი. გადასახადები, საკუთარ ანგარიშებს შორის გადარიცხვები და საკომისიოები ავტომატურად გამოტოვებულია.",
+    need_start: "ქვემოთ, ბანკის პარამეტრებში მიუთითეთ თარიღი, საიდანაც ითვლება ზედნადებები და გადარიცხვები, და BOG-ის ანგარიშები.",
+    history_note: "rs.ge-ს ზედნადებებიც და ბანკის გადარიცხვებიც ამ თარიღიდან ითვლება. გადასახადები, საკუთარ ანგარიშებს შორის გადარიცხვები და საკომისიოები ავტომატურად გამოტოვებულია.",
     loading_history: "იტვირთება ბანკის ისტორია…",
     err_tbc_test_keys: "ეს TBC-ის სატესტო გასაღებებია (developers.tbcbank.ge-დან) — რეალურ ანგარიშებზე არ მუშაობს. საჭიროა გასაღებები TBC ბიზნეს ინტერნეტბანკიდან: API ინტეგრაცია → ახალი ინტეგრაცია → უფლება „ტრანზაქციების ისტორიის და ამონაწერების ნახვა“. Client ID → TBC_CLIENT_ID, Client Secret → TBC_CLIENT_SECRET.",
     err_tbc_unknown_id: "TBC ამ Client ID-ს არ იცნობს (არც სვაპით). შექმენით ახალი ინტეგრაცია TBC ბიზნეს ინტერნეტბანკში (API ინტეგრაცია, SMS დადასტურებით) და ჩასვით ახალი Client ID და Secret Cloudflare-ში.",
@@ -178,7 +184,7 @@ const T = {
     cost_fallback: "Syrve's cost price isn't available — 'goods' from Variable costs is subtracted instead.",
     income_by_month: "Income by month",
     total_owed: "Total owed", suppliers: "Suppliers", supplier: "Supplier", owed: "Owed",
-    debts_sub: "What we owe suppliers, from Syrve balances.", search: "Search",
+    debts_sub: "What we owe suppliers: rs.ge waybills − returns − bank transfers.", search: "Search",
     prepaid: "Prepaid", no_debts: "No debts",
     platform: "Platform", rating: "Rating", reviews: "Reviews", latest: "Latest",
     ratings_sub: "Delivery app ratings. Enter the numbers from each app.", history: "History",
@@ -197,7 +203,13 @@ const T = {
     expenses: "expenses", left_to_pay_all: "Left to pay", debts_short: "debts", fixed_short: "fixed",
     variable_short: "variable", avg_rating: "Rating", average: "average", vs_last_month: "vs last month",
     load_failed: "Couldn't load", unpaid_total: "Unpaid", today: "Today",
-    invoices: "Invoices (Syrve)", paid_bank: "Paid (bank)", tax_id: "Tax ID", to_review: "To review",
+    dv_received: "Received waybills vs transfers", dv_unconfirmed: "Received / to fix vs transfers", dv_confirmed: "Confirmed waybills vs transfers",
+    dv_main_hint: "This amount is shown on the Main page", wb_received: "Received waybills", wb_unconfirmed: "Unconfirmed waybills", wb_confirmed: "Confirmed waybills",
+    wb_count: "waybills", returns_col: "Returns", syrve_col: "Syrve (compare)", dv_confirmed_short: "confirmed", dv_unconfirmed_short: "unconfirmed", rejected_short: "rejected",
+    rsge_not_connected: "rs.ge isn't connected: Cloudflare needs RSGE_SERVICE_USER and RSGE_SERVICE_PASSWORD.",
+    rsge_need_start: "In Bank settings below, set the start date — waybills and transfers are both counted from it.",
+    rsge_loading: "Loading rs.ge waybills… {a} / {b} months", rsge_no_returns: "rs.ge has no “return” waybill type — returns aren't subtracted.",
+    syrve_col_error: "The Syrve column isn't available right now", paid_bank: "Paid (bank)", tax_id: "Tax ID", to_review: "To review",
     review_sub: "Recipients whose payments the app couldn't match to a supplier on its own", recipient: "Recipient", why: "Why",
     why_name_differs: "Tax ID matches, name differs", why_several_matches: "Several possible suppliers",
     why_not_in_syrve: "On rs.ge, not found in Syrve", why_name_only: "Only the name matches", why_unknown: "Unknown recipient", why_tin_differs: "Name matches, tax ID differs",
@@ -209,8 +221,8 @@ const T = {
     save: "Save", tbc_auto: "TBC GEL accounts are read automatically", payments_loaded: "payments", matched: "matched",
     ignored: "skipped", bank_not_connected: "Bank not connected",
     bank_secrets_hint: "Add these Secrets in Cloudflare: BOG_CLIENT_ID, BOG_CLIENT_SECRET and/or TBC_CLIENT_ID, TBC_CLIENT_SECRET.",
-    need_start: "In Bank settings below, set the date your Syrve history starts and your BOG accounts.",
-    history_note: "Payments aren't recorded in Syrve, so the date should be when Syrve invoices start. Taxes, transfers between your own accounts and bank fees are skipped automatically.",
+    need_start: "In Bank settings below, set the date waybills and transfers are counted from, and your BOG accounts.",
+    history_note: "rs.ge waybills and bank transfers are both counted from this date. Taxes, transfers between your own accounts and bank fees are skipped automatically.",
     loading_history: "Loading bank history…",
     err_tbc_test_keys: "These are TBC test keys (from developers.tbcbank.ge) — they never work on real accounts. You need keys from TBC Business Internet Banking: API Integration → new integration → permission “View transaction history and statements”. Client ID → TBC_CLIENT_ID, Client Secret → TBC_CLIENT_SECRET.",
     err_tbc_unknown_id: "TBC doesn't recognise this Client ID (also tried swapped). Create a new integration in TBC Business Internet Banking (API Integration, confirmed by SMS) and paste the new Client ID and Secret in Cloudflare.",
@@ -237,6 +249,7 @@ const S = {
   varMonth: ymNow(),
   empMonth: ymNow(),
   debtQuery: "",
+  debtView: store.get("dash_debt_view") || "confirmed", // received | unconfirmed | confirmed
   liveTimer: null,
 };
 
@@ -1289,14 +1302,24 @@ async function renderDishDetail(view, id, range, fresh) {
 }
 
 // ====================== 5. DEBTS ======================
-// Debt per supplier = Syrve invoices − payments from BOG / TBC matched by tax ID.
+// Debt per supplier = rs.ge waybills − our return waybills − payments from BOG / TBC, in three views:
+// received (all) / unconfirmed / confirmed waybills. The confirmed view is the total used on the Main page.
+// Syrve's balance stays as a grey comparison column.
 // Payments the app can't match safely wait in "To review" until the CEO assigns them.
+const DEBT_VIEWS = ["received", "unconfirmed", "confirmed"];
 async function renderDebts(view, demo, fresh = false, quiet = false) {
   if (!S.syrve.debts && !quiet) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
   const r = await loadSyrve("debts", "", fresh);
+  const dv = DEBT_VIEWS.includes(S.debtView) ? S.debtView : "confirmed";
+  const owedOf = s => (s.owedBy ? s.owedBy[dv] : s.owed);
+  const wbOf = s => (dv === "received" ? s.received : s[dv]) ?? 0;
+  const wbCount = s => dv === "received" ? (s.nConfirmed || 0) + (s.nUnconfirmed || 0) + (s.nRejected || 0) : s[dv === "confirmed" ? "nConfirmed" : "nUnconfirmed"] || 0;
+  const viewTotal = r.totals ? r.totals[dv] : r.total;
   const q = S.debtQuery.toLowerCase();
-  const list = r.suppliers.filter(s => !q || String(s.name).toLowerCase().includes(q) || String(s.tin || "").includes(q));
-  const owing = r.suppliers.filter(s => s.owed > 0);
+  const list = r.suppliers.filter(s => !q || String(s.name).toLowerCase().includes(q) || String(s.tin || "").includes(q) || String(s.rsName || "").toLowerCase().includes(q))
+    .sort((a, b) => owedOf(b) - owedOf(a));
+  const owing = r.suppliers.filter(s => owedOf(s) > 0);
+  const wb = r.waybills || {};
   const bank = r.bank || { configured: {} };
   const connected = bank.configured.bog || bank.configured.tbc;
   const rev = r.review || { count: 0, amount: 0, items: [] };
@@ -1315,6 +1338,13 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       : `<div class="notice bad">${esc(src.toUpperCase())}: ${esc(msg)}</div>`;
   }
   if ((bank.notes || {}).tbc === "tbc_swapped") notices += `<div class="notice">TBC: ${esc(t("note_tbc_swapped"))}</div>`;
+  // rs.ge waybills
+  if (wb.configured === false) notices += `<div class="notice bad">📄 ${esc(t("rsge_not_connected"))}</div>`;
+  else if (wb.configured && !wb.from && !(connected && !bank.settings.historyFrom)) notices += `<div class="notice">📄 ${esc(t("rsge_need_start"))}</div>`;
+  if (wb.error) notices += `<div class="notice bad">rs.ge: ${esc(wb.error)}</div>`;
+  else if (wb.pending) notices += `<div class="notice">⏳ ${esc(t("rsge_loading").replace("{a}", wb.months).replace("{b}", wb.total))}</div>`;
+  if (wb.configured && wb.from && wb.returnsKnown === false) notices += `<div class="notice">${esc(t("rsge_no_returns"))}</div>`;
+  if (r.syrveError) notices += `<div class="notice">${esc(t("syrve_col_error"))}: <span class="muted small">${esc(r.syrveError)}</span></div>`;
   notices += `<div id="bankProgress"></div>`;
 
   const supplierSelect = (sel, attrs) => `<select ${attrs}><option value="">${esc(t("choose_supplier"))}</option>${(r.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === sel ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select>`;
@@ -1355,32 +1385,51 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
   view.innerHTML = demo + head(t("tab_debts"), t("debts_sub"),
     `<input type="text" id="debtSearch" placeholder="${esc(t("search"))}…" value="${esc(S.debtQuery)}"><button class="btn" id="debtRefresh">${esc(t("refresh"))}</button><button class="btn" id="debtExport">${esc(t("export"))}</button>`) +
     notices +
-    `<div class="cards">
-      ${card(t("total_owed"), money(r.total), "", r.total > 0 ? "hero bad" : "hero")}
+    `<div class="seg debt-views">${DEBT_VIEWS.map(v => `<button type="button" data-dv="${v}" class="${v === dv ? "on" : ""}">${esc(t("dv_" + v))}</button>`).join("")}</div>
+    <div class="cards">
+      ${card(t("total_owed"), money(viewTotal), dv === "confirmed" ? esc(t("dv_main_hint")) : "", viewTotal > 0 ? "hero bad" : "hero")}
       ${card(t("suppliers"), String(owing.length))}
       ${card(t("to_review"), String(rev.count), rev.count ? `${rev.payments || rev.count} ${esc(t("payments_col").toLowerCase())} · ${money(rev.amount)}` : "", rev.count ? "bad" : "")}
       ${card(t("bank"), connected ? "✓" : "—", lastSync ? `${esc(t("last_sync"))} ${pad(lastSync.getHours())}:${pad(lastSync.getMinutes())}` : esc(t("bank_not_connected")))}
     </div>
     ${reviewHtml}
     <div class="panel"><div class="table-wrap"><table>
-      <thead><tr><th>${esc(t("supplier"))}</th><th>${esc(t("tax_id"))}</th><th class="r">${esc(t("invoices"))}</th><th class="r">${esc(t("paid_bank"))}</th><th class="r">${esc(t("owed"))}</th></tr></thead>
-      <tbody>${list.length ? list.map(s => `<tr><td>${esc(s.name)}</td><td class="muted num">${esc(s.tin || "")}</td>
-        <td class="r num">${money(s.invoices ?? s.owed)}</td><td class="r num">${s.paid ? money(s.paid) : "—"}</td>
-        <td class="r num">${s.owed >= 0 ? `<b>${money(s.owed)}</b>` : `<span class="pill neutral">${esc(t("prepaid"))}</span> ${money(-s.owed)}`}</td></tr>`).join("")
-        : `<tr><td colspan="5" class="empty">${esc(t("no_debts"))}</td></tr>`}</tbody>
-      ${list.length ? `<tfoot><tr><td colspan="4">${esc(t("total_owed"))}</td><td class="r num">${money(r.total)}</td></tr></tfoot>` : ""}
+      <thead><tr><th>${esc(t("supplier"))}</th><th>${esc(t("tax_id"))}</th><th class="r">${esc(t("wb_" + dv))}</th><th class="r">${esc(t("returns_col"))}</th><th class="r">${esc(t("paid_bank"))}</th><th class="r">${esc(t("owed"))}</th><th class="r muted">${esc(t("syrve_col"))}</th></tr></thead>
+      <tbody>${list.length ? list.map(s => {
+        const o = owedOf(s), k = wbCount(s);
+        const split = dv === "received" && (s.nUnconfirmed || s.nRejected)
+          ? `${t("dv_confirmed_short")} ${money(s.confirmed)} · ${t("dv_unconfirmed_short")} ${money(s.unconfirmed)}${s.nRejected ? ` · ${t("rejected_short")} ${money(s.rejected)}` : ""}` : "";
+        return `<tr><td>${esc(s.name)}${s.rsName && s.rsName !== s.name ? `<div class="muted small">rs.ge: ${esc(s.rsName)}</div>` : ""}</td><td class="muted num">${esc(s.tin || "")}</td>
+        <td class="r num" ${split ? `title="${esc(split)}"` : ""}>${wbOf(s) ? money(wbOf(s)) : "—"}${k ? `<div class="muted small">${k} ${esc(t("wb_count"))}</div>` : ""}</td>
+        <td class="r num">${s.returns ? money(s.returns) : "—"}</td>
+        <td class="r num">${s.paid ? money(s.paid) : "—"}</td>
+        <td class="r num">${o >= 0 ? `<b>${money(o)}</b>` : `<span class="pill neutral">${esc(t("prepaid"))}</span> ${money(-o)}`}</td>
+        <td class="r num muted">${s.syrve != null ? money(s.syrve) : "—"}</td></tr>`;
+      }).join("")
+        : `<tr><td colspan="7" class="empty">${esc(t("no_debts"))}</td></tr>`}</tbody>
+      ${list.length ? `<tfoot><tr><td colspan="5">${esc(t("total_owed"))}</td><td class="r num">${money(viewTotal)}</td><td></td></tr></tfoot>` : ""}
     </table></div></div>
     ${settingsHtml}`;
+
+  $$("[data-dv]", view).forEach(b => b.addEventListener("click", () => {
+    S.debtView = b.dataset.dv; store.set("dash_debt_view", S.debtView);
+    renderDebts(view, demo, false, true).catch(e => toast(e.message));
+  }));
+  // rs.ge months arrive a few per request: ask again until all are in (or 20 tries)
+  clearTimeout(S.debtRetry);
+  if (wb.pending && (S.debtTries = (S.debtTries || 0) + 1) <= 20) {
+    S.debtRetry = setTimeout(() => { if (S.tab === "debts") { S.syrve.debts = null; renderDebts(view, demo, false, true).catch(() => {}); } }, 1500);
+  } else if (!wb.pending) S.debtTries = 0;
 
   // search / refresh / export
   const sEl = $("#debtSearch", view);
   sEl.addEventListener("input", () => { S.debtQuery = sEl.value; renderDebts(view, demo).then(() => { const x = $("#debtSearch"); x.focus(); x.setSelectionRange(x.value.length, x.value.length); }); });
   $("#debtRefresh", view).addEventListener("click", () => renderDebts(view, demo, true).catch(e => toast(e.message)));
   $("#debtExport", view).addEventListener("click", () => {
-    const out = [[t("supplier"), t("tax_id"), t("invoices"), t("paid_bank"), t("owed")]];
-    r.suppliers.forEach(x => out.push([x.name, x.tin || "", x.invoices ?? x.owed, x.paid || 0, x.owed]));
-    out.push([t("total_owed"), "", "", "", r.total]);
-    exportXlsx(`debts-${todayISO()}.xlsx`, t("tab_debts"), out);
+    const out = [[t("dv_" + dv)], [t("supplier"), t("tax_id"), t("wb_" + dv), t("returns_col"), t("paid_bank"), t("owed"), t("syrve_col")]];
+    list.forEach(x => out.push([x.name, x.tin || "", wbOf(x), x.returns || 0, x.paid || 0, owedOf(x), x.syrve ?? ""]));
+    out.push([t("total_owed"), "", "", "", "", viewTotal, ""]);
+    exportXlsx(`debts-${dv}-${todayISO()}.xlsx`, t("tab_debts"), out);
   });
 
   const reload = async () => { S.syrve.debts = null; await renderDebts(view, demo, false, true); };
@@ -1732,16 +1781,25 @@ function demoApi(path, opts) {
     return { months };
   }
   if (path.startsWith("/syrve/debts")) {
-    const rows = [["Nikora", "204567891", 12420.5, 9000], ["Sante GMT", "205123456", 6180, 4000], ["Ori Nabiji", "400112233", 3460, 2000], ["Metro Cash & Carry", "211334455", 890.4, 0], ["Local farm (veg)", "01001012345", 300, 500]];
-    const suppliers = rows.map(([name, tin, inv, paid], i) => ({ id: "s" + i, name, tin, invoices: inv, paid, owed: Math.round((inv - paid) * 100) / 100 }));
-    return { asOf: todayISO(), total: suppliers.filter(s => s.owed > 0).reduce((a, s) => a + s.owed, 0), suppliers,
+    // [name, tin, confirmed, unconfirmed, rejected, returns, paid, syrve]
+    const rows = [["Nikora", "204567891", 11200.5, 1220, 0, 0, 9000, 12420.5], ["Sante GMT", "205123456", 5400, 780, 150, 60, 4000, 6180], ["Ori Nabiji", "400112233", 3460, 0, 0, 0, 2000, 3460],
+      ["Metro Cash & Carry", "211334455", 0, 890.4, 0, 0, 0, null], ["Local farm (veg)", "01001012345", 300, 0, 0, 0, 500, 300]];
+    const r2 = x => Math.round(x * 100) / 100;
+    const suppliers = rows.map(([name, tin, c, u, rj, ret, paid, syrve]) => {
+      const received = r2(c + u + rj), owed = v => r2(v - ret - paid);
+      return { id: tin, name, tin, rsName: "", confirmed: c, unconfirmed: u, rejected: rj, nConfirmed: c ? Math.ceil(c / 400) : 0, nUnconfirmed: u ? Math.ceil(u / 400) : 0, nRejected: rj ? 1 : 0,
+        returns: ret, nReturns: ret ? 1 : 0, paid, syrve, received, owedBy: { received: owed(received), unconfirmed: owed(u), confirmed: owed(c) }, owed: owed(c) };
+    });
+    const sum = v => r2(suppliers.reduce((a, s) => a + Math.max(0, s.owedBy[v]), 0));
+    return { asOf: todayISO(), total: sum("confirmed"), totals: { received: sum("received"), unconfirmed: sum("unconfirmed"), confirmed: sum("confirmed") }, suppliers,
+      waybills: { configured: true, from: "2026-03-01", months: 9, total: 9, pending: false, error: "", returnsKnown: true },
       review: { count: 2, payments: 7, amount: 1700, items: [
-        { rk: "t:204999888", name: "შპს ნიკორა ტრეიდი", tin: "204999888", iban: "", count: 5, amount: 1450, last: todayISO(), purpose: "ზედნადები #0457812", bank: "BOG", reason: "name_only", suggestion: "s0", rsName: "" },
+        { rk: "t:204999888", name: "შპს ნიკორა ტრეიდი", tin: "204999888", iban: "", count: 5, amount: 1450, last: todayISO(), purpose: "ზედნადები #0457812", bank: "BOG", reason: "name_only", suggestion: "204567891", rsName: "" },
         { rk: "t:01001055555", name: "Giorgi Beridze", tin: "01001055555", iban: "GE33TB0000000000000003", count: 2, amount: 250, last: ymNow() + "-12", purpose: "transfer", bank: "TBC", reason: "unknown", suggestion: null, rsName: "" },
       ] },
       options: suppliers.map(s => ({ id: s.id, name: s.name })),
       linkedTins: [{ tin: "206000111", to: "ignore", name: "" }],
-      bank: { configured: { bog: true, tbc: true }, settings: { historyFrom: "2024-01-01", bogAccounts: ["GE00BG0000000000000001"] }, lastSyncAt: new Date().toISOString(), errors: {}, cursors: {}, payments: 412, matched: 371, ignored: 39 } };
+      bank: { configured: { bog: true, tbc: true }, settings: { historyFrom: "2026-03-01", bogAccounts: ["GE00BG0000000000000001"] }, lastSyncAt: new Date().toISOString(), errors: {}, cursors: {}, payments: 412, matched: 371, ignored: 39 } };
   }
   if (path.startsWith("/bank/")) return { ok: true, done: true };
   if (path.startsWith("/syrve/employees")) {
