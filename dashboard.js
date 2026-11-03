@@ -12,8 +12,10 @@
 import { listOutgoingWaybills } from "./rsge.js";
 import { buildMenu, buildDish, buildMenuMonthly } from "./menu.js";
 import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadBankData, loadRecipientPayments, syncStep, bumpVersion, loadVersion } from "./bank.js";
-import { loadLog } from "./store.js";
+import { loadLog, loadBasePrices } from "./store.js";
 import { syncWaybills, waybillTotals } from "./waybills.js";
+import { syncInvoices, invoiceTotals } from "./syrveinv.js";
+import { syncTelegramApproved, categorizer, loadCategories, saveCategory, CATEGORIES } from "./debtsrc.js";
 import { runProbe } from "./rsprobe.js";
 
 const DATA_KEYS = ["fixed", "variable", "ratings", "tasks"];
@@ -70,27 +72,30 @@ export async function handleDashboard(request, env, path) {
       }
       if (parts[1] === "monthly") return json(await cached(env, "monthly2", 900, fresh, () => syrveMonthly(env)));
       if (parts[1] === "debts") {
-        // rs.ge waybills: a few missing months per request (the page asks again while some are missing);
-        // Refresh also re-reads the current month
-        const waybills = await syncWaybills(env, { max: 3, current: fresh });
+        // rs.ge waybills and Syrve invoices: a little of what is missing per request (the page asks again
+        // while something is missing); Refresh also re-reads the current month. Then new Telegram approvals.
+        const waybills = await syncWaybills(env, { budget: 24, current: fresh });
+        const invoices = await syncInvoices(env, { current: fresh });
+        const tg = await syncTelegramApproved(env);
         // Syrve's balance is only a comparison column now: the page still works without it
         let syrve;
         try { syrve = await cached(env, "debts-syrve", 900, fresh, () => syrveDebts(env)); }
         catch (e) { syrve = { error: String(e.message || e).slice(0, 200), suppliers: [], owed: {}, _at: "err" }; }
         // reuse the last result until something changes (bank sync, rs.ge waybills, a CEO decision, Syrve refresh)
         const version = `${syrve._at}|${await loadVersion(env)}`;
-        const saved = await env.STORE.get("dash:cache:debts-result2");
+        const saved = await env.STORE.get("dash:cache:debts-result3");
         let result;
         if (saved && saved.startsWith(version + "\n")) result = JSON.parse(saved.slice(version.length + 1));
         else {
-          result = await buildDebts(env, syrve);
-          await env.STORE.put("dash:cache:debts-result2", version + "\n" + JSON.stringify(result));
+          result = await buildDebts(env, syrve, tg);
+          await env.STORE.put("dash:cache:debts-result3", version + "\n" + JSON.stringify(result));
         }
         // The sync states change on every sync, even when the debts don't: always send the
         // current ones. (A stale copy made the page think the bank was behind and sync forever.)
         const state = await loadBankState(env);
         Object.assign(result.bank, { lastSyncAt: state.lastSyncAt, errors: state.errors, notes: state.notes, cursors: state.cursors });
         result.waybills = waybills;
+        result.invoices = invoices;
         return json(result);
       }
       if (parts[1] === "employees") {
@@ -98,6 +103,11 @@ export async function handleDashboard(request, env, path) {
         if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: "bad month" }, 400);
         return json(await cached(env, "emp:" + month, 300, fresh, () => syrveEmployees(env, month)));
       }
+    }
+    // Debts → "rs მოსული": move a product to another category ({ key, cat }; cat "" = automatic again)
+    if (parts[0] === "debts" && parts[1] === "category" && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      return json(await saveCategory(env, body || {}));
     }
     // one-off read-only check of rs.ge / Syrve / Telegram answers (rsprobe.js)
     if (parts[0] === "probe" && request.method === "GET") return json(await runProbe(env));
@@ -474,11 +484,15 @@ async function syrveMonthly(env) {
 }
 
 // ---------- DEBTS: what we owe suppliers ----------
-// Debt per supplier (tax ID) = rs.ge waybills − our return waybills − bank payments, in three views:
-//   received (confirmed + unconfirmed + rejected), unconfirmed only, confirmed only.
-// The confirmed view is THE debt (total, Main page). Waybills and payments both count from the bank "history from" date.
-// Syrve part: every supplier (with tax ID) and its Syrve balance, shown only as a comparison column.
-// Payments are not entered in Syrve, so that balance is the sum of all Syrve invoices.
+// Debt per supplier (tax ID) = goods received − our return waybills (rs.ge) − bank payments, in four views:
+//   rs.ge:     active rs.ge waybills (confirmed + not yet confirmed; rejected / cancelled ones don't count).
+//              THE debt: its total is shown on the Main page.
+//   Syrve:     Syrve incoming invoices (syrveinv.js); Syrve's own balance is a grey comparison column.
+//   Telegram:  waybills approved in the Telegram bot (debtsrc.js), plus a waybill-by-waybill comparison with rs.ge.
+//   rs მოსული: the rs.ge goods lines by category (food / consumables / equipment / other); each supplier's
+//              payments and returns are split between its categories by their share of its goods.
+// Everything counts from the bank "history from" date.
+// Payments are not entered in Syrve, so Syrve's balance is the sum of all Syrve invoices.
 async function syrveDebts(env) {
   const sign = Number(env.DEBT_SIGN ?? -1);
   const timestamp = nowLocal(env).toISOString().slice(0, 19); // yyyy-MM-ddTHH:mm:ss
@@ -573,7 +587,7 @@ async function saveReview(env, body) {
   return { ok: true };
 }
 
-async function buildDebts(env, syrve) {
+async function buildDebts(env, syrve, tg) {
   const settings = await loadBankSettings(env);
   const state = await loadBankState(env);
   const configured = bankConfigured(env);
@@ -596,7 +610,8 @@ async function buildDebts(env, syrve) {
     return [...hit].map(i => supList[i]);
   };
   // rs.ge waybills: seller tax ID → seller name (PriceCheck's waybill log, then the Debts waybills)
-  const { sellers, returns } = await waybillTotals(env);
+  const { sellers, returns, waybills, goods } = await waybillTotals(env);
+  const invoices = await invoiceTotals(env);
   const rsName = {};
   try { for (const r of await loadLog(env)) if (r.sellerTin && r.seller) rsName[r.sellerTin] = r.seller; } catch (_) {}
   for (const [tin, s] of Object.entries(sellers)) if (s.name) rsName[tin] = s.name;
@@ -666,29 +681,119 @@ async function buildDebts(env, syrve) {
       bank: banks === 3 ? "BOG + TBC" : banks === 2 ? "TBC" : "BOG", reason: d.reason, suggestion: d.suggestion, rsName: rsName[tin] || "" });
   }
 
-  // one row per tax ID (Syrve suppliers without a tax ID get their own row)
+  // "rs მოსული": the goods lines of the active rs.ge waybills, per product and per supplier and category
   const r2 = x => Math.round(x * 100) / 100;
+  const cat = categorizer(await loadCategories(env), await loadBasePrices(env));
+  const products = {}, bySup = {};
+  for (const [tin, lines] of Object.entries(goods)) {
+    for (const [name, amount] of Object.entries(lines)) {
+      const c = cat(name);
+      const p = products[c.key] = products[c.key] || { key: c.key, name, cat: c.cat, manual: c.manual, amount: 0, by: {} };
+      p.amount = r2(p.amount + amount);
+      p.by[tin] = r2((p.by[tin] || 0) + amount);
+      const g = bySup[tin] = bySup[tin] || { total: 0 };
+      g[c.cat] = r2((g[c.cat] || 0) + amount);
+      g.total = r2(g.total + amount);
+    }
+  }
+
+  // one row per tax ID (Syrve suppliers without a tax ID get their own row, so do Telegram sellers without one)
   const rows = {};
-  const row = key => rows[key] = rows[key] || { id: key, name: "", tin: key.startsWith("s:") ? "" : key, rsName: "",
-    confirmed: 0, unconfirmed: 0, rejected: 0, nConfirmed: 0, nUnconfirmed: 0, nRejected: 0, returns: 0, nReturns: 0, paid: 0, syrve: null };
+  const row = key => rows[key] = rows[key] || { id: key, name: "", tin: /^[sn]:/.test(key) ? "" : key, rsName: "",
+    confirmed: 0, unconfirmed: 0, rejected: 0, nConfirmed: 0, nUnconfirmed: 0, nRejected: 0, returns: 0, nReturns: 0, paid: 0,
+    syrveBalance: null, inv: 0, nInv: 0, tg: 0, nTg: 0 };
   for (const [tin, s] of Object.entries(sellers)) { const x = row(tin); Object.assign(x, s, { name: "", rsName: s.name }); }
+  for (const tin of Object.keys(bySup)) row(tin);
   for (const [tin, s] of Object.entries(returns)) { const x = row(tin); x.returns = s.amount; x.nReturns = s.n; if (!x.rsName) x.rsName = s.name; }
   for (const s of syrve.suppliers) {
     const owed = syrve.owed[s.id];
     const x = s.tin || owed ? row(rowKey(s.id)) : rows[rowKey(s.id)];
     if (!x) continue;
     if (!x.name) x.name = s.name; // Syrve's name: the one the team knows
-    if (owed) x.syrve = r2((x.syrve || 0) + owed);
+    if (owed) x.syrveBalance = r2((x.syrveBalance || 0) + owed);
+  }
+  // Syrve incoming invoices (a supplier Syrve no longer lists keeps its own row)
+  for (const [id, v] of Object.entries(invoices.suppliers)) {
+    const x = row(sup[id] ? rowKey(id) : "s:" + id);
+    if (!x.name && sup[id]) x.name = sup[id].name;
+    x.inv = r2(x.inv + v.amount);
+    x.nInv += v.n;
+  }
+  // waybills approved in Telegram, from the bank start date; a seller without a tax ID is found by name
+  const tgKey = w => {
+    if (w.tin) return w.tin;
+    const k = nameKey(w.seller);
+    const s = supList.find(s => sameKey(s.key, k));
+    if (s) return rowKey(s.id);
+    return Object.keys(rsName).find(tin => sameKey(nameKey(rsName[tin]), k)) || "n:" + (k.n || w.seller || "?");
+  };
+  const tgList = (tg?.list || []).filter(w => !settings.historyFrom || !w.day || w.day >= settings.historyFrom).map(w => ({ ...w, key: tgKey(w) }));
+  for (const w of tgList) {
+    const x = row(w.key);
+    if (!x.rsName && w.seller) x.rsName = w.seller;
+    x.tg = r2(x.tg + w.total);
+    x.nTg++;
   }
   for (const [to, amount] of Object.entries(paid)) { const x = row(rowKey(to)); x.paid = r2(x.paid + amount); }
 
   const list = Object.values(rows).map(x => {
-    const received = r2(x.confirmed + x.unconfirmed + x.rejected);
-    const owed = v => r2(v - x.returns - x.paid);
-    return { ...x, name: x.name || x.rsName || rsName[x.tin] || x.tin, received,
-      owedBy: { received: owed(received), unconfirmed: owed(x.unconfirmed), confirmed: owed(x.confirmed) }, owed: owed(x.confirmed) };
-  }).filter(x => x.received || x.returns || x.paid || x.syrve).sort((a, b) => b.owed - a.owed);
-  const sumOwed = view => r2(list.reduce((a, x) => a + Math.max(0, x.owedBy[view]), 0));
+    const active = r2(x.confirmed + x.unconfirmed);
+    const left = v => r2(v - x.returns - x.paid);
+    return { ...x, name: x.name || x.rsName || rsName[x.tin] || x.tin || x.id, active, nActive: x.nConfirmed + x.nUnconfirmed,
+      owed: left(active), owedInv: left(x.inv), owedTg: left(x.tg) };
+  }).filter(x => x.active || x.rejected || x.returns || x.paid || x.syrveBalance || x.inv || x.tg || bySup[x.tin]).sort((a, b) => b.owed - a.owed);
+  const sumPos = f => r2(list.reduce((a, x) => a + Math.max(0, f(x)), 0));
+  const nameOf = new Map(list.map(x => [x.id, x.name]));
+  const nameFor = key => nameOf.get(key) || rsName[key] || key;
+
+  // categories: each supplier's payments and returns split by its goods' shares; its debt (if any) the same way
+  const catTotals = Object.fromEntries(CATEGORIES.map(k => [k, { amount: 0, paid: 0, returns: 0, owed: 0, n: 0 }]));
+  const catSuppliers = [];
+  let unsplit = 0; // payments to suppliers without rs.ge goods
+  for (const x of list) {
+    const g = x.tin && bySup[x.tin];
+    if (!g || !g.total) { unsplit = r2(unsplit + x.paid); continue; }
+    const owed = r2(g.total - x.returns - x.paid);
+    const e = { id: x.id, name: x.name, tin: x.tin, total: g.total, paid: x.paid, returns: x.returns, owed, c: {} };
+    for (const k of CATEGORIES) {
+      if (!g[k]) continue;
+      const share = g[k] / g.total;
+      const v = e.c[k] = { amount: g[k], share: Math.round(share * 1000) / 10, paid: r2(x.paid * share), returns: r2(x.returns * share), owed: r2(Math.max(0, owed) * share) };
+      const t = catTotals[k];
+      t.amount = r2(t.amount + v.amount); t.paid = r2(t.paid + v.paid); t.returns = r2(t.returns + v.returns); t.owed = r2(t.owed + v.owed); t.n++;
+    }
+    catSuppliers.push(e);
+  }
+  catSuppliers.sort((a, b) => b.owed - a.owed);
+  const productList = Object.values(products).sort((a, b) => b.amount - a.amount).slice(0, 3000).map(p => ({
+    key: p.key, name: p.name, cat: p.cat, manual: p.manual, amount: p.amount,
+    sellers: Object.entries(p.by).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tin]) => nameFor(tin)) }));
+
+  // Telegram approvals vs the active rs.ge waybills, waybill by waybill, from the day the bot saw its first waybill
+  const compare = { since: "", onlyTg: [], onlyRs: [], diff: [], suppliers: [], counts: { onlyTg: 0, onlyRs: 0, diff: 0 } };
+  if (tg?.since) {
+    const since = compare.since = [tg.since, settings.historyFrom || ""].sort().pop();
+    const rsBy = new Map(waybills.map(w => [w[0], w]));
+    const tgBy = new Set(tgList.map(w => w.number));
+    const per = {};
+    const add = (key, field, amount) => { const p = per[key] = per[key] || { key, tg: 0, rs: 0, nTg: 0, nRs: 0 }; p[field] = r2(p[field] + amount); p[field === "tg" ? "nTg" : "nRs"]++; };
+    for (const w of tgList) {
+      add(w.key, "tg", w.total);
+      const r = rsBy.get(w.number);
+      if (!r || r[4] === -1) compare.onlyTg.push({ number: w.number, name: nameFor(w.key), amount: w.total, day: w.day, why: r ? "rejected" : "missing" });
+      else if (Math.abs(r[2] - w.total) >= 0.01) compare.diff.push({ number: w.number, name: nameFor(r[1]), tg: w.total, rs: r[2], day: w.day });
+    }
+    for (const r of waybills) {
+      if (r[4] === -1 || !r[3] || r[3] < since) continue;
+      add(r[1], "rs", r[2]);
+      if (!tgBy.has(r[0])) compare.onlyRs.push({ number: r[0], name: nameFor(r[1]), amount: r[2], day: r[3] });
+    }
+    compare.onlyRs.sort((a, b) => b.day.localeCompare(a.day));
+    compare.counts = { onlyTg: compare.onlyTg.length, onlyRs: compare.onlyRs.length, diff: compare.diff.length };
+    compare.onlyRs = compare.onlyRs.slice(0, 300);
+    compare.suppliers = Object.values(per).map(p => ({ ...p, name: nameFor(p.key), gap: r2(p.rs - p.tg) }))
+      .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+  }
 
   // the review list's supplier choices: Syrve suppliers, then rs.ge sellers that aren't in Syrve
   const syrveTins = new Set(syrve.suppliers.map(s => s.tin).filter(Boolean));
@@ -702,9 +807,13 @@ async function buildDebts(env, syrve) {
   return {
     asOf: syrve.asOf || "",
     syrveError: syrve.error || "",
-    total: sumOwed("confirmed"),
-    totals: { received: sumOwed("received"), unconfirmed: sumOwed("unconfirmed"), confirmed: sumOwed("confirmed") },
+    total: sumPos(x => x.owed), // the rs.ge view: shown on the Main page
+    totals: { rs: sumPos(x => x.owed), syrve: sumPos(x => x.owedInv), tg: sumPos(x => x.owedTg),
+      cats: r2(CATEGORIES.reduce((a, k) => a + catTotals[k].owed, 0)) },
     suppliers: list,
+    cats: { totals: catTotals, suppliers: catSuppliers, products: productList, unsplit },
+    compare,
+    tgSince: tg?.since || "",
     review: { count: review.length, payments: review.reduce((a, x) => a + x.count, 0), amount: Math.round(reviewAmount * 100) / 100, items: review.slice(0, 150) },
     options,
     linkedTins: [
