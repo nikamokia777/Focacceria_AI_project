@@ -186,6 +186,7 @@ function mapWaybillHeader(w) {
     beginDate: textOf(w, "BEGIN_DATE"),
     deliveryDate: textOf(w, "DELIVERY_DATE"),
     comment: textOf(w, "WAYBILL_COMMENT"),
+    isConfirmed: textOf(w, "IS_CONFIRMED"), // "1" confirmed by the buyer, "-1" rejected, "0" not yet
   };
 }
 
@@ -219,24 +220,60 @@ function strictList(response, method) {
   return [];
 }
 
-// Waybills we received (we are the buyer), created between two days (inclusive).
-// isConfirmed: 1 = confirmed by us, 0 = not confirmed yet, -1 = rejected by us.
-export async function listBuyerWaybills(env, fromDay, toDay, isConfirmed) {
+// Waybills we received (we are the buyer), created between two days (inclusive), all states;
+// each one says in isConfirmed whether we confirmed it on rs.ge. A whole month works in one call.
+export async function listBuyerWaybills(env, fromDay, toDay) {
   const response = await soapCall(env, "get_buyer_waybills_ex", [
     ["create_date_s", `${fromDay}T00:00:00`],
     ["create_date_e", `${toDay}T23:59:59`],
-    ["is_confirmed", String(isConfirmed)],
   ]);
   return strictList(response, "get_buyer_waybills_ex").map(mapWaybillHeader);
 }
 
-// Same as listOutgoingWaybills, but rs.ge errors are thrown (used for the Debts page).
-export async function listOutgoingWaybillsStrict(env, fromDay, toDay) {
+// The goods lines of the waybills we received, created between two days (inclusive): one entry per
+// line, with its waybill's seller, number, state and amount. A whole month works in one call.
+export async function listBuyerGoods(env, fromDay, toDay) {
+  const response = await soapCall(env, "get_buyer_waybilll_goods_list", [ // sic: rs.ge spells it with "lll"
+    ["create_date_s", `${fromDay}T00:00:00`],
+    ["create_date_e", `${toDay}T23:59:59`],
+  ]);
+  return strictList(response, "get_buyer_waybilll_goods_list").map((g) => ({
+    number: textOf(g, "WAYBILL_NUMBER"),
+    type: textOf(g, "TYPE"),
+    status: textOf(g, "STATUS"),
+    isConfirmed: textOf(g, "IS_CONFIRMED"),
+    sellerTin: textOf(g, "TIN"),
+    sellerName: textOf(g, "NAME"),
+    createDate: textOf(g, "CREATE_DATE"),
+    name: textOf(g, "W_NAME"),
+    quantity: parseFloat(textOf(g, "QUANTITY")) || 0,
+    amount: parseFloat(textOf(g, "AMOUNT")) || 0,
+  }));
+}
+
+// Waybills we issued, of one type (itypes, e.g. "5" = return), strict. rs.ge allows at most
+// 72 hours here (error -1064), so ask for 3 days at a time: day 1 00:00:00 → day 3 23:59:59.
+export async function listOutgoingWaybillsStrict(env, fromDay, toDay, itypes = "") {
   const response = await soapCall(env, "get_waybills", [
+    ["itypes", itypes],
     ["create_date_s", `${fromDay}T00:00:00`],
     ["create_date_e", `${toDay}T23:59:59`],
   ]);
   return strictList(response, "get_waybills").map(mapWaybillHeader);
+}
+
+// { "-1064": "შექმნის თარიღის დიაპაზონის …" } — rs.ge's own texts for its error codes
+export async function listErrorCodes(env) {
+  const response = await soapCall(env, "get_error_codes", []);
+  // the list's root tag isn't documented: take whatever document the result holds
+  const result = childOf(response, "get_error_codesResult");
+  const list = result && (result.children[0] || (result.text ? parseXml(result.text) : null));
+  const out = {};
+  for (const x of list ? list.children : []) {
+    const id = textOf(x, "ID");
+    if (id) out[id] = textOf(x, "TEXT");
+  }
+  return out;
 }
 
 // [{ id, name }] — e.g. { id: "6", name: "ქვე-ზედნადები" }

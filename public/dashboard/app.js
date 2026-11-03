@@ -79,7 +79,7 @@ const T = {
     cost_fallback: "Syrve-ს თვითღირებულება მიუწვდომელია — ნაცვლად ცვლადი ხარჯების „საქონელი“ აკლდება.",
     income_by_month: "შემოსავალი თვეების მიხედვით",
     total_owed: "სულ გადასახდელი", suppliers: "მომწოდებლები", supplier: "მომწოდებელი", owed: "გადასახდელი",
-    debts_sub: "რამდენი გვმართებს მომწოდებლებს: rs.ge-ს ზედნადებები − დაბრუნებები − ბანკის გადარიცხვები.", search: "ძებნა",
+    debts_sub: "რამდენი გვმართებს მომწოდებლებს: მიღებული საქონელი − დაბრუნებები − ბანკის გადარიცხვები.", search: "ძებნა",
     prepaid: "წინასწარ გადახდილი", no_debts: "ვალები არ არის",
     platform: "პლატფორმა", rating: "რეიტინგი", reviews: "შეფასებები", latest: "ბოლო",
     ratings_sub: "მიტანის აპლიკაციების რეიტინგები. შეიყვანეთ ციფრები აპლიკაციიდან.", history: "ისტორია",
@@ -98,9 +98,20 @@ const T = {
     expenses: "ხარჯები", left_to_pay_all: "სულ გადასასახდელი", debts_short: "ვალები", fixed_short: "ფიქს.",
     variable_short: "ცვლ.", avg_rating: "რეიტინგი", average: "საშუალო", vs_last_month: "წინა თვესთან",
     load_failed: "ვერ ჩაიტვირთა", unpaid_total: "გადაუხდელი", today: "დღეს",
-    dv_received: "მიღებული ზედნადები vs გადარიცხვა", dv_unconfirmed: "მიღებული / გასასწორებელი vs გადარიცხვა", dv_confirmed: "დადასტურებული ზედნადები vs გადარიცხვა",
-    dv_main_hint: "ეს თანხა ჩანს მთავარ გვერდზე", wb_received: "მიღებული ზედნადებები", wb_unconfirmed: "დაუდასტურებელი ზედნადებები", wb_confirmed: "დადასტურებული ზედნადებები",
-    wb_count: "ზედნადები", returns_col: "დაბრუნება", syrve_col: "Syrve (შედარება)", dv_confirmed_short: "დადასტ.", dv_unconfirmed_short: "დაუდასტ.", rejected_short: "უარყოფ.",
+    dt_rs: "rs.ge ზედნადებები vs გადარიცხვა", dt_syrve: "Syrve vs გადარიცხვა", dt_tg: "Telegram დადასტურებული vs გადარიცხვა", dt_cats: "rs მოსული",
+    dv_main_hint: "ეს თანხა ჩანს მთავარ გვერდზე", col_rs: "rs.ge ზედნადებები", col_syrve: "Syrve-ს ზედნადებები", col_tg: "Telegram-ში დადასტურებული",
+    wb_count: "ზედნადები", returns_col: "დაბრუნება", syrve_balance: "Syrve-ს ბალანსი (შედარება)", confirmed_short: "დადასტ. rs.ge-ზე", rejected_tip: "rs.ge-ზე უარყოფილი (არ ითვლება)",
+    inv_loading: "იტვირთება Syrve-ს ზედნადებები… {a} / {b} თვე", inv_error: "Syrve-ს ზედნადებები",
+    tg_since: "Telegram-ის ბოტი ზედნადებებს {d}-დან იწერს, გადარიცხვები კი {f}-დან ითვლება — ამიტომ ადრე გადახდილი მომწოდებლები აქ „წინასწარ გადახდილად“ ჩანს.",
+    tg_none: "Telegram-ში დადასტურებული ზედნადებები ჯერ არ არის.",
+    cmp_btn: "⇄ შედარება rs.ge-სთან", cmp_hide: "✕ შედარების დამალვა", cmp_title: "Telegram vs rs.ge ზედნადებები ({d}-დან)",
+    cmp_only_tg: "მხოლოდ Telegram-ში", cmp_only_rs: "მხოლოდ rs.ge-ზე (Telegram-ში არ დადასტურებულა)", cmp_diff: "თანხა განსხვავდება",
+    cmp_missing: "rs.ge-ზე ვერ მოიძებნა", cmp_rejected: "rs.ge-ზე უარყოფილია", cmp_gap: "სხვაობა (rs.ge − Telegram)", cmp_all_match: "ყველაფერი ემთხვევა",
+    cat_food: "საკვები და სასმელი", cat_supplies: "სახარჯი მასალა", cat_equipment: "ძირითადი სახარჯი", cat_other: "სხვა ხარჯი",
+    cat_goods: "მიღებული საქონელი", cat_paid: "გადახდილი (წილით)", cat_returns: "დაბრუნება (წილით)", cat_owed: "ვალი (წილით)", cat_share: "მომწოდებლის საქონლიდან",
+    cats_hint: "თითო მომწოდებლის გადახდები და დაბრუნებები მის კატეგორიებს შორის ნაწილდება მისი საქონლის წილის მიხედვით.",
+    cat_unsplit: "გადახდები მომწოდებლებზე, რომლებსაც rs.ge-ზე პროდუქცია არ აქვთ ({a}), კატეგორიებში არ ითვლება.",
+    products_hint: "კატეგორია ავტომატურად ირჩევა სახელით — შეცვლა შეგიძლიათ, დაიმახსოვრება", manual_cat: "ხელით", reset_auto: "ავტომატურზე დაბრუნება",
     rsge_not_connected: "rs.ge არ არის დაკავშირებული: Cloudflare-ში საჭიროა RSGE_SERVICE_USER და RSGE_SERVICE_PASSWORD.",
     rsge_need_start: "ქვემოთ, ბანკის პარამეტრებში მიუთითეთ თარიღი — ზედნადებებიც და გადარიცხვებიც ამ თარიღიდან ითვლება.",
     rsge_loading: "იტვირთება rs.ge-ს ზედნადებები… {a} / {b} თვე", rsge_no_returns: "rs.ge-ზე „უკან დაბრუნების“ ტიპი ვერ ვიპოვე — დაბრუნებები არ აკლდება.",
@@ -184,7 +195,7 @@ const T = {
     cost_fallback: "Syrve's cost price isn't available — 'goods' from Variable costs is subtracted instead.",
     income_by_month: "Income by month",
     total_owed: "Total owed", suppliers: "Suppliers", supplier: "Supplier", owed: "Owed",
-    debts_sub: "What we owe suppliers: rs.ge waybills − returns − bank transfers.", search: "Search",
+    debts_sub: "What we owe suppliers: goods received − returns − bank transfers.", search: "Search",
     prepaid: "Prepaid", no_debts: "No debts",
     platform: "Platform", rating: "Rating", reviews: "Reviews", latest: "Latest",
     ratings_sub: "Delivery app ratings. Enter the numbers from each app.", history: "History",
@@ -203,9 +214,20 @@ const T = {
     expenses: "expenses", left_to_pay_all: "Left to pay", debts_short: "debts", fixed_short: "fixed",
     variable_short: "variable", avg_rating: "Rating", average: "average", vs_last_month: "vs last month",
     load_failed: "Couldn't load", unpaid_total: "Unpaid", today: "Today",
-    dv_received: "Received waybills vs transfers", dv_unconfirmed: "Received / to fix vs transfers", dv_confirmed: "Confirmed waybills vs transfers",
-    dv_main_hint: "This amount is shown on the Main page", wb_received: "Received waybills", wb_unconfirmed: "Unconfirmed waybills", wb_confirmed: "Confirmed waybills",
-    wb_count: "waybills", returns_col: "Returns", syrve_col: "Syrve (compare)", dv_confirmed_short: "confirmed", dv_unconfirmed_short: "unconfirmed", rejected_short: "rejected",
+    dt_rs: "rs.ge waybills vs transfers", dt_syrve: "Syrve vs transfers", dt_tg: "Telegram approved vs transfers", dt_cats: "rs received",
+    dv_main_hint: "This amount is shown on the Main page", col_rs: "rs.ge waybills", col_syrve: "Syrve invoices", col_tg: "Approved in Telegram",
+    wb_count: "waybills", returns_col: "Returns", syrve_balance: "Syrve balance (compare)", confirmed_short: "confirmed on rs.ge", rejected_tip: "Rejected on rs.ge (not counted)",
+    inv_loading: "Loading Syrve invoices… {a} / {b} months", inv_error: "Syrve invoices",
+    tg_since: "The Telegram bot records waybills from {d}, while transfers count from {f} — so suppliers paid earlier show as prepaid here.",
+    tg_none: "No waybills approved in Telegram yet.",
+    cmp_btn: "⇄ Compare with rs.ge", cmp_hide: "✕ Hide comparison", cmp_title: "Telegram vs rs.ge waybills (from {d})",
+    cmp_only_tg: "Only in Telegram", cmp_only_rs: "Only on rs.ge (not approved in Telegram)", cmp_diff: "Amount differs",
+    cmp_missing: "not found on rs.ge", cmp_rejected: "rejected on rs.ge", cmp_gap: "Difference (rs.ge − Telegram)", cmp_all_match: "Everything matches",
+    cat_food: "Food & drink", cat_supplies: "Consumables", cat_equipment: "Equipment", cat_other: "Other expenses",
+    cat_goods: "Goods received", cat_paid: "Paid (by share)", cat_returns: "Returns (by share)", cat_owed: "Owed (by share)", cat_share: "of the supplier's goods",
+    cats_hint: "Each supplier's payments and returns are split between its categories by their share of its goods.",
+    cat_unsplit: "Payments to suppliers without rs.ge goods ({a}) aren't counted in the categories.",
+    products_hint: "The category is chosen automatically by name — change it and it is remembered", manual_cat: "by hand", reset_auto: "Back to automatic",
     rsge_not_connected: "rs.ge isn't connected: Cloudflare needs RSGE_SERVICE_USER and RSGE_SERVICE_PASSWORD.",
     rsge_need_start: "In Bank settings below, set the start date — waybills and transfers are both counted from it.",
     rsge_loading: "Loading rs.ge waybills… {a} / {b} months", rsge_no_returns: "rs.ge has no “return” waybill type — returns aren't subtracted.",
@@ -249,7 +271,9 @@ const S = {
   varMonth: ymNow(),
   empMonth: ymNow(),
   debtQuery: "",
-  debtView: store.get("dash_debt_view") || "confirmed", // received | unconfirmed | confirmed
+  debtTab: store.get("dash_debt_tab") || "rs",     // rs | syrve | tg | cats
+  debtCat: store.get("dash_debt_cat") || "food",   // the category shown in "rs მოსული"
+  debtCompare: false,                              // Telegram view: comparison with rs.ge open
   liveTimer: null,
 };
 
@@ -1302,28 +1326,61 @@ async function renderDishDetail(view, id, range, fresh) {
 }
 
 // ====================== 5. DEBTS ======================
-// Debt per supplier = rs.ge waybills − our return waybills − payments from BOG / TBC, in three views:
-// received (all) / unconfirmed / confirmed waybills. The confirmed view is the total used on the Main page.
-// Syrve's balance stays as a grey comparison column.
+// Debt per supplier = goods received − our return waybills (rs.ge) − payments from BOG / TBC, in four views:
+// rs.ge waybills (its total is the one on the Main page) / Syrve incoming invoices / waybills approved in
+// Telegram (with a waybill-by-waybill comparison with rs.ge) / "rs მოსული": the rs.ge goods by category,
+// each supplier's payments split between its categories by share.
 // Payments the app can't match safely wait in "To review" until the CEO assigns them.
-const DEBT_VIEWS = ["received", "unconfirmed", "confirmed"];
+const DEBT_TABS = ["rs", "syrve", "tg", "cats"];
+const DEBT_CATS = ["food", "supplies", "equipment", "other"];
+// a supplier row's [goods, waybills, owed] in each per-supplier view
+const DEBT_COLS = {
+  rs: s => [s.active, s.nActive, s.owed],
+  syrve: s => [s.inv, s.nInv, s.owedInv],
+  tg: s => [s.tg, s.nTg, s.owedTg],
+};
+// The Telegram view's comparison: approvals vs the active rs.ge waybills, per supplier and waybill by waybill
+function compareHtml(cmp, match) {
+  if (!cmp.since) return `<div class="notice">${esc(t("tg_none"))}</div>`;
+  const c = cmp.counts || {};
+  const sups = (cmp.suppliers || []).filter(p => match({ name: p.name, tin: p.key }));
+  const gap = v => Math.abs(v) < 0.01 ? "✓" : `<b class="bad-text">${money(v)}</b>`;
+  const block = (title, total, items, cells) => !items.length ? "" : `<div class="panel-body"><h4>${esc(title)} · ${total}</h4></div>
+    <div class="table-wrap"><table><tbody>${items.slice(0, 100).map(cells).join("")}</tbody></table></div>
+    ${total > Math.min(items.length, 100) ? `<div class="muted small" style="padding:6px 16px 12px">${esc(t("showing_of").replace("{a}", Math.min(items.length, 100)).replace("{b}", total))}</div>` : ""}`;
+  return `<div class="panel">
+    <div class="panel-head"><h3>⇄ ${esc(t("cmp_title").replace("{d}", cmp.since))}</h3>
+      <span class="muted small">${esc(t("cmp_only_tg"))}: ${c.onlyTg || 0} · ${esc(t("cmp_diff"))}: ${c.diff || 0} · ${esc(t("cmp_only_rs"))}: ${c.onlyRs || 0}</span></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>${esc(t("supplier"))}</th><th class="r">Telegram</th><th class="r">rs.ge</th><th class="r">${esc(t("cmp_gap"))}</th></tr></thead>
+      <tbody>${sups.map(p => `<tr><td>${esc(p.name)}</td>
+        <td class="r num">${money(p.tg)}<div class="muted small">${p.nTg} ${esc(t("wb_count"))}</div></td>
+        <td class="r num">${money(p.rs)}<div class="muted small">${p.nRs} ${esc(t("wb_count"))}</div></td>
+        <td class="r num">${gap(p.gap)}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+    </table></div>
+    ${!c.onlyTg && !c.onlyRs && !c.diff ? `<div class="panel-body">✓ ${esc(t("cmp_all_match"))}</div>` : ""}
+    ${block(t("cmp_only_tg"), c.onlyTg, cmp.onlyTg || [], x => `<tr><td class="num">${esc(x.number)}</td><td>${esc(x.name)}</td><td class="muted">${esc(x.day)}</td><td class="r num">${money(x.amount)}</td><td><span class="pill warn">${esc(t("cmp_" + x.why))}</span></td></tr>`)}
+    ${block(t("cmp_diff"), c.diff, cmp.diff || [], x => `<tr><td class="num">${esc(x.number)}</td><td>${esc(x.name)}</td><td class="muted">${esc(x.day)}</td><td class="r num">Telegram ${money(x.tg)}</td><td class="r num">rs.ge ${money(x.rs)}</td></tr>`)}
+    ${block(t("cmp_only_rs"), c.onlyRs, cmp.onlyRs || [], x => `<tr><td class="num">${esc(x.number)}</td><td>${esc(x.name)}</td><td class="muted">${esc(x.day)}</td><td class="r num">${money(x.amount)}</td></tr>`)}
+  </div>`;
+}
 async function renderDebts(view, demo, fresh = false, quiet = false) {
   if (!S.syrve.debts && !quiet) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
   const r = await loadSyrve("debts", "", fresh);
-  const dv = DEBT_VIEWS.includes(S.debtView) ? S.debtView : "confirmed";
-  const owedOf = s => (s.owedBy ? s.owedBy[dv] : s.owed);
-  const wbOf = s => (dv === "received" ? s.received : s[dv]) ?? 0;
-  const wbCount = s => dv === "received" ? (s.nConfirmed || 0) + (s.nUnconfirmed || 0) + (s.nRejected || 0) : s[dv === "confirmed" ? "nConfirmed" : "nUnconfirmed"] || 0;
-  const viewTotal = r.totals ? r.totals[dv] : r.total;
+  const dt = DEBT_TABS.includes(S.debtTab) ? S.debtTab : "rs";
+  const dc = DEBT_CATS.includes(S.debtCat) ? S.debtCat : "food";
+  const col = DEBT_COLS[dt];
+  const totals = r.totals || {};
+  const C = r.cats || { totals: {}, suppliers: [], products: [], unsplit: 0 };
   const q = S.debtQuery.toLowerCase();
-  const list = r.suppliers.filter(s => !q || String(s.name).toLowerCase().includes(q) || String(s.tin || "").includes(q) || String(s.rsName || "").toLowerCase().includes(q))
-    .sort((a, b) => owedOf(b) - owedOf(a));
-  const owing = r.suppliers.filter(s => owedOf(s) > 0);
+  const match = s => !q || String(s.name).toLowerCase().includes(q) || String(s.tin || "").includes(q) || String(s.rsName || "").toLowerCase().includes(q);
+  const list = col ? r.suppliers.filter(s => (col(s)[0] || s.paid || s.returns || (dt === "rs" && s.rejected) || (dt === "syrve" && s.syrveBalance)) && match(s))
+    .sort((a, b) => col(b)[2] - col(a)[2]) : [];
   const wb = r.waybills || {};
+  const inv = r.invoices || {};
   const bank = r.bank || { configured: {} };
   const connected = bank.configured.bog || bank.configured.tbc;
   const rev = r.review || { count: 0, amount: 0, items: [] };
-  const optionName = id => (r.options || []).find(o => o.id === id)?.name || "";
   const lastSync = bank.lastSyncAt ? new Date(bank.lastSyncAt) : null;
 
   // notices about the bank connection
@@ -1338,12 +1395,14 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       : `<div class="notice bad">${esc(src.toUpperCase())}: ${esc(msg)}</div>`;
   }
   if ((bank.notes || {}).tbc === "tbc_swapped") notices += `<div class="notice">TBC: ${esc(t("note_tbc_swapped"))}</div>`;
-  // rs.ge waybills
+  // rs.ge waybills and Syrve invoices
   if (wb.configured === false) notices += `<div class="notice bad">📄 ${esc(t("rsge_not_connected"))}</div>`;
   else if (wb.configured && !wb.from && !(connected && !bank.settings.historyFrom)) notices += `<div class="notice">📄 ${esc(t("rsge_need_start"))}</div>`;
   if (wb.error) notices += `<div class="notice bad">rs.ge: ${esc(wb.error)}</div>`;
   else if (wb.pending) notices += `<div class="notice">⏳ ${esc(t("rsge_loading").replace("{a}", wb.months).replace("{b}", wb.total))}</div>`;
   if (wb.configured && wb.from && wb.returnsKnown === false) notices += `<div class="notice">${esc(t("rsge_no_returns"))}</div>`;
+  if (inv.error) notices += `<div class="notice bad">${esc(t("inv_error"))}: ${esc(inv.error)}</div>`;
+  else if (inv.pending) notices += `<div class="notice">⏳ ${esc(t("inv_loading").replace("{a}", inv.months).replace("{b}", inv.total))}</div>`;
   if (r.syrveError) notices += `<div class="notice">${esc(t("syrve_col_error"))}: <span class="muted small">${esc(r.syrveError)}</span></div>`;
   notices += `<div id="bankProgress"></div>`;
 
@@ -1382,55 +1441,118 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       </div>
     </details>`;
 
+  const owedCell = o => o >= 0 ? `<b>${money(o)}</b>` : `<span class="pill neutral">${esc(t("prepaid"))}</span> ${money(-o)}`;
+  const reviewCard = card(t("to_review"), String(rev.count), rev.count ? `${rev.payments || rev.count} ${esc(t("payments_col").toLowerCase())} · ${money(rev.amount)}` : "", rev.count ? "bad" : "");
+  const bankCard = card(t("bank"), connected ? "✓" : "—", lastSync ? `${esc(t("last_sync"))} ${pad(lastSync.getHours())}:${pad(lastSync.getMinutes())}` : esc(t("bank_not_connected")));
+  const supName = s => `${esc(s.name)}${s.rsName && s.rsName !== s.name ? `<div class="muted small">rs.ge: ${esc(s.rsName)}</div>` : ""}`;
+
+  let cards, body;
+  if (col) {
+    // rs.ge / Syrve / Telegram: one row per supplier
+    const total = totals[dt] || 0;
+    const owing = r.suppliers.filter(s => col(s)[2] > 0).length;
+    cards = card(t("total_owed"), money(total), dt === "rs" ? esc(t("dv_main_hint")) : "", total > 0 ? "hero bad" : "hero") +
+      card(t("suppliers"), String(owing)) + reviewCard + bankCard;
+    const extra = dt === "syrve";
+    const rows = list.map(s => {
+      const [a, k, o] = col(s);
+      const sub = k ? `${k} ${t("wb_count")}${dt === "rs" ? ` · ${s.nConfirmed || 0} ${t("confirmed_short")}` : ""}` : "";
+      const tip = dt === "rs" && s.nRejected ? `${t("rejected_tip")}: ${s.nRejected} · ${money(s.rejected)}` : "";
+      return `<tr><td>${supName(s)}</td><td class="muted num">${esc(s.tin || "")}</td>
+        <td class="r num" ${tip ? `title="${esc(tip)}"` : ""}>${a ? money(a) : "—"}${sub ? `<div class="muted small">${esc(sub)}</div>` : ""}</td>
+        <td class="r num">${s.returns ? money(s.returns) : "—"}</td>
+        <td class="r num">${s.paid ? money(s.paid) : "—"}</td>
+        <td class="r num">${owedCell(o)}</td>
+        ${extra ? `<td class="r num muted">${s.syrveBalance != null ? money(s.syrveBalance) : "—"}</td>` : ""}</tr>`;
+    }).join("");
+    const tgNote = dt === "tg" && r.tgSince ? `<div class="notice">${esc(t("tg_since").replace("{d}", r.tgSince).replace("{f}", bank.settings?.historyFrom || "—"))}</div>` : "";
+    body = (dt === "tg" ? tgNote + (S.debtCompare ? compareHtml(r.compare || {}, match) : "") : "") +
+      `<div class="panel">${dt === "tg" ? `<div class="panel-head"><h3>${esc(t("col_tg"))}</h3><button class="btn small" id="tgCompare">${esc(t(S.debtCompare ? "cmp_hide" : "cmp_btn"))}</button></div>` : ""}
+      <div class="table-wrap"><table>
+      <thead><tr><th>${esc(t("supplier"))}</th><th>${esc(t("tax_id"))}</th><th class="r">${esc(t("col_" + dt))}</th><th class="r">${esc(t("returns_col"))}</th><th class="r">${esc(t("paid_bank"))}</th><th class="r">${esc(t("owed"))}</th>${extra ? `<th class="r muted">${esc(t("syrve_balance"))}</th>` : ""}</tr></thead>
+      <tbody>${rows || `<tr><td colspan="${extra ? 7 : 6}" class="empty">${esc(t(dt === "tg" && !r.tgSince ? "tg_none" : "no_debts"))}</td></tr>`}</tbody>
+      ${list.length ? `<tfoot><tr><td colspan="5">${esc(t("total_owed"))}</td><td class="r num">${money(total)}</td>${extra ? "<td></td>" : ""}</tr></tfoot>` : ""}
+    </table></div></div>`;
+  } else {
+    // "rs მოსული": one category at a time — its suppliers (payments split by share) and its products
+    const ct = C.totals[dc] || { amount: 0, paid: 0, returns: 0, owed: 0, n: 0 };
+    cards = card(t("cat_owed"), money(ct.owed), esc(t("cat_" + dc)), ct.owed > 0 ? "hero bad" : "hero") +
+      card(t("cat_goods"), money(ct.amount), `${ct.n} ${esc(t("suppliers").toLowerCase())}`) +
+      card(t("cat_paid"), money(ct.paid), ct.returns ? `${esc(t("returns_col"))} ${money(ct.returns)}` : "") + reviewCard;
+    const sups = C.suppliers.filter(s => s.c[dc] && match(s));
+    const prods = C.products.filter(p => p.cat === dc && (!q || p.name.toLowerCase().includes(q) || p.sellers.some(n => String(n).toLowerCase().includes(q))));
+    const shown = prods.slice(0, 300);
+    body = `<div class="seg debt-cats">${DEBT_CATS.map(k => `<button type="button" data-dc="${k}" class="${k === dc ? "on" : ""}">${esc(t("cat_" + k))} · ${money(C.totals[k]?.owed || 0)}</button>`).join("")}</div>
+      <div class="muted small" style="margin:-6px 0 14px">${esc(t("cats_hint"))}${C.unsplit ? " " + esc(t("cat_unsplit").replace("{a}", money(C.unsplit))) : ""}</div>
+      <div class="panel"><div class="table-wrap"><table>
+        <thead><tr><th>${esc(t("supplier"))}</th><th>${esc(t("tax_id"))}</th><th class="r">${esc(t("cat_goods"))}</th><th class="r">${esc(t("cat_paid"))}</th><th class="r">${esc(t("cat_returns"))}</th><th class="r">${esc(t("cat_owed"))}</th></tr></thead>
+        <tbody>${sups.length ? sups.map(s => { const v = s.c[dc]; return `<tr><td>${esc(s.name)}</td><td class="muted num">${esc(s.tin || "")}</td>
+          <td class="r num">${money(v.amount)}<div class="muted small">${v.share}% ${esc(t("cat_share"))}</div></td>
+          <td class="r num">${v.paid ? money(v.paid) : "—"}</td><td class="r num">${v.returns ? money(v.returns) : "—"}</td>
+          <td class="r num">${v.owed ? `<b>${money(v.owed)}</b>` : s.owed < 0 ? `<span class="pill neutral">${esc(t("prepaid"))}</span>` : "—"}</td></tr>`; }).join("")
+          : `<tr><td colspan="6" class="empty">${esc(t("no_debts"))}</td></tr>`}</tbody>
+        ${sups.length ? `<tfoot><tr><td colspan="5">${esc(t("cat_owed"))}</td><td class="r num">${money(ct.owed)}</td></tr></tfoot>` : ""}
+      </table></div></div>
+      <div class="panel"><div class="panel-head"><h3>${esc(t("products"))} · ${prods.length}</h3><span class="muted small">${esc(t("products_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit">
+          <thead><tr><th>${esc(t("products"))}</th><th>${esc(t("supplier"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("category"))}</th></tr></thead>
+          <tbody>${shown.length ? shown.map(p => `<tr><td>${esc(p.name)}${p.manual ? ` <span class="pill neutral">${esc(t("manual_cat"))}</span>` : ""}</td>
+            <td class="muted small">${esc(p.sellers.join(", "))}</td><td class="r num">${money(p.amount)}</td>
+            <td class="nowrap"><select class="cat-sel" data-key="${esc(p.key)}">${DEBT_CATS.map(k => `<option value="${k}" ${k === p.cat ? "selected" : ""}>${esc(t("cat_" + k))}</option>`).join("")}</select>
+              ${p.manual ? `<button class="icon-btn cat-auto" data-key="${esc(p.key)}" title="${esc(t("reset_auto"))}">↺</button>` : ""}</td></tr>`).join("")
+            : `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div>
+        ${prods.length > shown.length ? `<div class="muted small" style="padding:10px 16px">${esc(t("showing_of").replace("{a}", shown.length).replace("{b}", prods.length))}</div>` : ""}
+      </div>`;
+  }
+
   view.innerHTML = demo + head(t("tab_debts"), t("debts_sub"),
     `<input type="text" id="debtSearch" placeholder="${esc(t("search"))}…" value="${esc(S.debtQuery)}"><button class="btn" id="debtRefresh">${esc(t("refresh"))}</button><button class="btn" id="debtExport">${esc(t("export"))}</button>`) +
     notices +
-    `<div class="seg debt-views">${DEBT_VIEWS.map(v => `<button type="button" data-dv="${v}" class="${v === dv ? "on" : ""}">${esc(t("dv_" + v))}</button>`).join("")}</div>
-    <div class="cards">
-      ${card(t("total_owed"), money(viewTotal), dv === "confirmed" ? esc(t("dv_main_hint")) : "", viewTotal > 0 ? "hero bad" : "hero")}
-      ${card(t("suppliers"), String(owing.length))}
-      ${card(t("to_review"), String(rev.count), rev.count ? `${rev.payments || rev.count} ${esc(t("payments_col").toLowerCase())} · ${money(rev.amount)}` : "", rev.count ? "bad" : "")}
-      ${card(t("bank"), connected ? "✓" : "—", lastSync ? `${esc(t("last_sync"))} ${pad(lastSync.getHours())}:${pad(lastSync.getMinutes())}` : esc(t("bank_not_connected")))}
-    </div>
+    `<div class="seg debt-views">${DEBT_TABS.map(v => `<button type="button" data-dt="${v}" class="${v === dt ? "on" : ""}">${esc(t("dt_" + v))}</button>`).join("")}</div>
+    <div class="cards">${cards}</div>
     ${reviewHtml}
-    <div class="panel"><div class="table-wrap"><table>
-      <thead><tr><th>${esc(t("supplier"))}</th><th>${esc(t("tax_id"))}</th><th class="r">${esc(t("wb_" + dv))}</th><th class="r">${esc(t("returns_col"))}</th><th class="r">${esc(t("paid_bank"))}</th><th class="r">${esc(t("owed"))}</th><th class="r muted">${esc(t("syrve_col"))}</th></tr></thead>
-      <tbody>${list.length ? list.map(s => {
-        const o = owedOf(s), k = wbCount(s);
-        const split = dv === "received" && (s.nUnconfirmed || s.nRejected)
-          ? `${t("dv_confirmed_short")} ${money(s.confirmed)} · ${t("dv_unconfirmed_short")} ${money(s.unconfirmed)}${s.nRejected ? ` · ${t("rejected_short")} ${money(s.rejected)}` : ""}` : "";
-        return `<tr><td>${esc(s.name)}${s.rsName && s.rsName !== s.name ? `<div class="muted small">rs.ge: ${esc(s.rsName)}</div>` : ""}</td><td class="muted num">${esc(s.tin || "")}</td>
-        <td class="r num" ${split ? `title="${esc(split)}"` : ""}>${wbOf(s) ? money(wbOf(s)) : "—"}${k ? `<div class="muted small">${k} ${esc(t("wb_count"))}</div>` : ""}</td>
-        <td class="r num">${s.returns ? money(s.returns) : "—"}</td>
-        <td class="r num">${s.paid ? money(s.paid) : "—"}</td>
-        <td class="r num">${o >= 0 ? `<b>${money(o)}</b>` : `<span class="pill neutral">${esc(t("prepaid"))}</span> ${money(-o)}`}</td>
-        <td class="r num muted">${s.syrve != null ? money(s.syrve) : "—"}</td></tr>`;
-      }).join("")
-        : `<tr><td colspan="7" class="empty">${esc(t("no_debts"))}</td></tr>`}</tbody>
-      ${list.length ? `<tfoot><tr><td colspan="5">${esc(t("total_owed"))}</td><td class="r num">${money(viewTotal)}</td><td></td></tr></tfoot>` : ""}
-    </table></div></div>
+    ${body}
     ${settingsHtml}`;
 
-  $$("[data-dv]", view).forEach(b => b.addEventListener("click", () => {
-    S.debtView = b.dataset.dv; store.set("dash_debt_view", S.debtView);
-    renderDebts(view, demo, false, true).catch(e => toast(e.message));
-  }));
-  // rs.ge months arrive a few per request: ask again until all are in (or 20 tries)
+  const rerender = () => renderDebts(view, demo, false, true).catch(e => toast(e.message));
+  $$("[data-dt]", view).forEach(b => b.addEventListener("click", () => { S.debtTab = b.dataset.dt; store.set("dash_debt_tab", S.debtTab); rerender(); }));
+  $$("[data-dc]", view).forEach(b => b.addEventListener("click", () => { S.debtCat = b.dataset.dc; store.set("dash_debt_cat", S.debtCat); rerender(); }));
+  const cmpBtn = $("#tgCompare", view);
+  if (cmpBtn) cmpBtn.addEventListener("click", () => { S.debtCompare = !S.debtCompare; rerender(); });
+  // rs.ge months and Syrve months arrive a few per request: ask again until all are in (or 20 tries)
   clearTimeout(S.debtRetry);
-  if (wb.pending && (S.debtTries = (S.debtTries || 0) + 1) <= 20) {
+  const pending = wb.pending || inv.pending;
+  if (pending && (S.debtTries = (S.debtTries || 0) + 1) <= 20) {
     S.debtRetry = setTimeout(() => { if (S.tab === "debts") { S.syrve.debts = null; renderDebts(view, demo, false, true).catch(() => {}); } }, 1500);
-  } else if (!wb.pending) S.debtTries = 0;
+  } else if (!pending) S.debtTries = 0;
 
   // search / refresh / export
   const sEl = $("#debtSearch", view);
   sEl.addEventListener("input", () => { S.debtQuery = sEl.value; renderDebts(view, demo).then(() => { const x = $("#debtSearch"); x.focus(); x.setSelectionRange(x.value.length, x.value.length); }); });
   $("#debtRefresh", view).addEventListener("click", () => renderDebts(view, demo, true).catch(e => toast(e.message)));
   $("#debtExport", view).addEventListener("click", () => {
-    const out = [[t("dv_" + dv)], [t("supplier"), t("tax_id"), t("wb_" + dv), t("returns_col"), t("paid_bank"), t("owed"), t("syrve_col")]];
-    list.forEach(x => out.push([x.name, x.tin || "", wbOf(x), x.returns || 0, x.paid || 0, owedOf(x), x.syrve ?? ""]));
-    out.push([t("total_owed"), "", "", "", "", viewTotal, ""]);
-    exportXlsx(`debts-${dv}-${todayISO()}.xlsx`, t("tab_debts"), out);
+    let out;
+    if (col) {
+      out = [[t("dt_" + dt)], [t("supplier"), t("tax_id"), t("col_" + dt), t("returns_col"), t("paid_bank"), t("owed"), ...(dt === "syrve" ? [t("syrve_balance")] : [])]];
+      list.forEach(x => { const [a, , o] = col(x); out.push([x.name, x.tin || "", a || 0, x.returns || 0, x.paid || 0, o, ...(dt === "syrve" ? [x.syrveBalance ?? ""] : [])]); });
+      out.push([t("total_owed"), "", "", "", "", totals[dt] || 0]);
+    } else {
+      out = [[`${t("dt_cats")} · ${t("cat_" + dc)}`], [t("supplier"), t("tax_id"), t("cat_goods"), t("cat_paid"), t("cat_returns"), t("cat_owed")]];
+      C.suppliers.filter(s => s.c[dc] && match(s)).forEach(s => { const v = s.c[dc]; out.push([s.name, s.tin || "", v.amount, v.paid, v.returns, v.owed]); });
+      out.push([], [t("products"), t("supplier"), t("amount"), t("category")]);
+      C.products.filter(p => p.cat === dc).forEach(p => out.push([p.name, p.sellers.join(", "), p.amount, t("cat_" + p.cat)]));
+    }
+    exportXlsx(`debts-${dt}${col ? "" : "-" + dc}-${todayISO()}.xlsx`, t("tab_debts"), out);
   });
+
+  // "rs მოსული": move a product to another category (↺ = automatic again)
+  const setCat = async (key, cat) => {
+    try { await api("/debts/category", { method: "POST", body: { key, cat } }); toast(t("saved")); S.syrve.debts = null; await renderDebts(view, demo, false, true); }
+    catch (e) { toast(e.message); }
+  };
+  $$(".cat-sel", view).forEach(sel => sel.addEventListener("change", () => setCat(sel.dataset.key, sel.value)));
+  $$(".cat-auto", view).forEach(b => b.addEventListener("click", () => setCat(b.dataset.key, "")));
 
   const reload = async () => { S.syrve.debts = null; await renderDebts(view, demo, false, true); };
 
@@ -1781,18 +1903,48 @@ function demoApi(path, opts) {
     return { months };
   }
   if (path.startsWith("/syrve/debts")) {
-    // [name, tin, confirmed, unconfirmed, rejected, returns, paid, syrve]
-    const rows = [["Nikora", "204567891", 11200.5, 1220, 0, 0, 9000, 12420.5], ["Sante GMT", "205123456", 5400, 780, 150, 60, 4000, 6180], ["Ori Nabiji", "400112233", 3460, 0, 0, 0, 2000, 3460],
-      ["Metro Cash & Carry", "211334455", 0, 890.4, 0, 0, 0, null], ["Local farm (veg)", "01001012345", 300, 0, 0, 0, 500, 300]];
+    // [name, tin, confirmed, unconfirmed, rejected, returns, paid, Syrve invoices, Syrve balance, Telegram approved]
+    const rows = [["Nikora", "204567891", 0, 12420.5, 0, 0, 9000, 12420.5, 12420.5, 2100], ["Sante GMT", "205123456", 400, 5780, 150, 60, 4000, 6000, 6180, 0],
+      ["Ori Nabiji", "400112233", 0, 3460, 0, 0, 2000, 3460, 3460, 640], ["Metro Cash & Carry", "211334455", 0, 890.4, 0, 0, 0, 0, null, 0],
+      ["Local farm (veg)", "01001012345", 0, 300, 0, 0, 500, 300, 300, 0]];
     const r2 = x => Math.round(x * 100) / 100;
-    const suppliers = rows.map(([name, tin, c, u, rj, ret, paid, syrve]) => {
-      const received = r2(c + u + rj), owed = v => r2(v - ret - paid);
-      return { id: tin, name, tin, rsName: "", confirmed: c, unconfirmed: u, rejected: rj, nConfirmed: c ? Math.ceil(c / 400) : 0, nUnconfirmed: u ? Math.ceil(u / 400) : 0, nRejected: rj ? 1 : 0,
-        returns: ret, nReturns: ret ? 1 : 0, paid, syrve, received, owedBy: { received: owed(received), unconfirmed: owed(u), confirmed: owed(c) }, owed: owed(c) };
+    const suppliers = rows.map(([name, tin, c, u, rj, ret, paid, inv, bal, tg]) => {
+      const active = r2(c + u), left = v => r2(v - ret - paid), nU = Math.ceil(u / 400);
+      return { id: tin, name, tin, rsName: "", confirmed: c, unconfirmed: u, rejected: rj, nConfirmed: c ? 1 : 0, nUnconfirmed: nU, nRejected: rj ? 1 : 0,
+        returns: ret, nReturns: ret ? 1 : 0, paid, syrveBalance: bal, inv, nInv: inv ? Math.ceil(inv / 400) : 0, tg, nTg: tg ? Math.ceil(tg / 500) : 0,
+        active, nActive: (c ? 1 : 0) + nU, owed: left(active), owedInv: left(inv), owedTg: left(tg) };
     });
-    const sum = v => r2(suppliers.reduce((a, s) => a + Math.max(0, s.owedBy[v]), 0));
-    return { asOf: todayISO(), total: sum("confirmed"), totals: { received: sum("received"), unconfirmed: sum("unconfirmed"), confirmed: sum("confirmed") }, suppliers,
+    const sum = f => r2(suppliers.reduce((a, s) => a + Math.max(0, f(s)), 0));
+    // rs მოსული: [product, tin, amount, category], payments split by each supplier's shares
+    const goods = [["ფქვილი მადლი I ხ საცხობი 50კგ", "204567891", 8200, "food"], ["მოცარელა 1კგ", "204567891", 3200.5, "food"], ["ქაღალდის ხელსახოცი", "204567891", 1020, "supplies"],
+      ["ზეითუნის ზეთი 5ლ", "205123456", 4600, "food"], ["პიცის ყუთი 33სმ", "205123456", 1580, "supplies"], ["Coca-Cola 0.5ლ", "400112233", 3460, "food"],
+      ["მიკროტალღური ღუმელი", "211334455", 890.4, "equipment"], ["ბოსტნეული ასორტი", "01001012345", 300, "food"]];
+    const cats = { totals: {}, suppliers: [], products: goods.map(([name, tin, amount, cat]) => ({ key: name.toLowerCase(), name, cat, manual: name.startsWith("ბოსტნეული"), amount,
+      sellers: [suppliers.find(s => s.tin === tin).name] })), unsplit: 0 };
+    for (const k of DEBT_CATS) cats.totals[k] = { amount: 0, paid: 0, returns: 0, owed: 0, n: 0 };
+    for (const s of suppliers) {
+      const mine = goods.filter(g => g[1] === s.tin), total = r2(mine.reduce((a, g) => a + g[2], 0));
+      const owed = r2(total - s.returns - s.paid), e = { id: s.id, name: s.name, tin: s.tin, total, paid: s.paid, returns: s.returns, owed, c: {} };
+      for (const k of DEBT_CATS) {
+        const amount = r2(mine.filter(g => g[3] === k).reduce((a, g) => a + g[2], 0));
+        if (!amount) continue;
+        const share = amount / total, v = e.c[k] = { amount, share: Math.round(share * 1000) / 10, paid: r2(s.paid * share), returns: r2(s.returns * share), owed: r2(Math.max(0, owed) * share) };
+        const tt = cats.totals[k]; tt.amount = r2(tt.amount + v.amount); tt.paid = r2(tt.paid + v.paid); tt.returns = r2(tt.returns + v.returns); tt.owed = r2(tt.owed + v.owed); tt.n++;
+      }
+      cats.suppliers.push(e);
+    }
+    const since = ymNow() + "-01";
+    return { asOf: todayISO(), total: sum(s => s.owed), suppliers, cats, tgSince: since,
+      totals: { rs: sum(s => s.owed), syrve: sum(s => s.owedInv), tg: sum(s => s.owedTg), cats: r2(DEBT_CATS.reduce((a, k) => a + cats.totals[k].owed, 0)) },
+      compare: { since, counts: { onlyTg: 1, onlyRs: 3, diff: 1 },
+        suppliers: [{ key: "205123456", name: "Sante GMT", tg: 0, rs: 980, nTg: 0, nRs: 2, gap: 980 }, { key: "204567891", name: "Nikora", tg: 2100, rs: 2350, nTg: 5, nRs: 5, gap: 250 },
+          { key: "400112233", name: "Ori Nabiji", tg: 640, rs: 640, nTg: 2, nRs: 1, gap: 0 }],
+        onlyTg: [{ number: "1017058856", name: "Ori Nabiji", amount: 320, day: since, why: "missing" }],
+        diff: [{ number: "1011388053", name: "Nikora", tg: 410, rs: 660, day: since }],
+        onlyRs: [{ number: "1011390112", name: "Sante GMT", amount: 560, day: todayISO() }, { number: "1011390001", name: "Sante GMT", amount: 420, day: todayISO() },
+          { number: "1011389555", name: "Ori Nabiji", amount: 320, day: since }] },
       waybills: { configured: true, from: "2026-03-01", months: 9, total: 9, pending: false, error: "", returnsKnown: true },
+      invoices: { configured: true, from: "2026-03-01", months: 9, total: 9, pending: false, error: "" },
       review: { count: 2, payments: 7, amount: 1700, items: [
         { rk: "t:204999888", name: "შპს ნიკორა ტრეიდი", tin: "204999888", iban: "", count: 5, amount: 1450, last: todayISO(), purpose: "ზედნადები #0457812", bank: "BOG", reason: "name_only", suggestion: "204567891", rsName: "" },
         { rk: "t:01001055555", name: "Giorgi Beridze", tin: "01001055555", iban: "GE33TB0000000000000003", count: 2, amount: 250, last: ymNow() + "-12", purpose: "transfer", bank: "TBC", reason: "unknown", suggestion: null, rsName: "" },
@@ -1802,6 +1954,7 @@ function demoApi(path, opts) {
       bank: { configured: { bog: true, tbc: true }, settings: { historyFrom: "2026-03-01", bogAccounts: ["GE00BG0000000000000001"] }, lastSyncAt: new Date().toISOString(), errors: {}, cursors: {}, payments: 412, matched: 371, ignored: 39 } };
   }
   if (path.startsWith("/bank/")) return { ok: true, done: true };
+  if (path.startsWith("/debts/")) return { ok: true };
   if (path.startsWith("/syrve/employees")) {
     const month = (path.match(/month=(\d{4}-\d{2})/) || [])[1] || ymNow();
     const people = ["Nino Beridze", "Giorgi Kapanadze", "Ana Lomidze", "Luka Tsiklauri", "Mariam Gelashvili", "Saba Abashidze"];

@@ -21,8 +21,8 @@
 // Everything else is served from the static files in /public.
 //
 // Every 15 minutes (cron in wrangler.jsonc) stock is checked against the minimums
-// and the bank statements and rs.ge waybills are synced (so the Debts page doesn't have to), and
-// Syrve's cost prices for the Menu tab are read in the background.
+// and the bank statements, rs.ge waybills and Syrve incoming invoices are synced (so the Debts page
+// doesn't have to), and Syrve's cost prices for the Menu tab are read in the background.
 
 import { checkServiceUser } from "./rsge.js";
 import {
@@ -36,6 +36,7 @@ import { buildStock, updateStock, checkStockAlarms, scheduledStockCheck } from "
 import { scheduledBankSync } from "./bank.js";
 import { scheduledMenuCosts } from "./menu.js";
 import { scheduledWaybills } from "./waybills.js";
+import { scheduledInvoices } from "./syrveinv.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 
@@ -248,5 +249,6 @@ export default {
     if (env.SYRVE_URL) ctx.waitUntil(scheduledMenuCosts(env).catch((err) => console.error("menu costs failed:", err?.stack || err)));
     ctx.waitUntil(scheduledBankSync(env).catch((err) => console.error("bank sync failed:", err?.stack || err)));
     ctx.waitUntil(scheduledWaybills(env).catch((err) => console.error("waybills sync failed:", err?.stack || err)));
+    if (env.SYRVE_URL) ctx.waitUntil(scheduledInvoices(env).catch((err) => console.error("syrve invoices sync failed:", err?.stack || err)));
   },
 };
