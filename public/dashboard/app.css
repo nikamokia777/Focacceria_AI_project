@@ -332,6 +332,7 @@ details.bank-settings textarea { width: 100%; resize: vertical; font-family: inh
 .remember .rm-cancel { align-self: flex-end; padding: 2px 8px; }
 .remember .btn { white-space: normal; text-align: center; }
 .remember .q { font-size: 12px; font-weight: 600; line-height: 1.35; }
+.remember textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: inherit; resize: vertical; }
 
 /* ---------- Income now: date range + payment details ---------- */
 .range-pick { position: relative; }

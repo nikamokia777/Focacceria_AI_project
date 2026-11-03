@@ -107,7 +107,10 @@ const T = {
     cmp_btn: "⇄ შედარება rs.ge-სთან", cmp_hide: "✕ შედარების დამალვა", cmp_title: "Telegram vs rs.ge ზედნადებები ({d}-დან)",
     cmp_only_tg: "მხოლოდ Telegram-ში", cmp_only_rs: "მხოლოდ rs.ge-ზე (Telegram-ში არ დადასტურებულა)", cmp_diff: "თანხა განსხვავდება",
     cmp_missing: "rs.ge-ზე ვერ მოიძებნა", cmp_rejected: "rs.ge-ზე უარყოფილია", cmp_gap: "სხვაობა (rs.ge − Telegram)", cmp_all_match: "ყველაფერი ემთხვევა",
-    cat_food: "საკვები და სასმელი", cat_supplies: "სახარჯი მასალა", cat_equipment: "ძირითადი სახარჯი", cat_other: "სხვა ხარჯი",
+    cat_food: "საკვები და სასმელი", cat_supplies: "სახარჯი მასალა", cat_equipment: "ძირითადი საშუალება", cat_other: "სხვა ხარჯი", cat_outsource: "აუთსორსინგი",
+    who_q: "ვინ არის ეს?", comment_ph: "კომენტარი (მაგ. ქირა, რემონტი)…", nw_title: "გადახდები ზედნადების გარეშე", nw_card: "ზედნადების გარეშე გადახდილი",
+    nw_hint: "მომწოდებლები არ არიან — მომწოდებლების ვალს არ ცვლის", unsorted_title: "არ არის მომწოდებელი — კატეგორიის გარეშე",
+    unsorted_hint: "აირჩიეთ, რა ხარჯია — დაიმახსოვრება ამ ს/კ-ზე ან ანგარიშზე", back_review: "გადასამოწმებელში დაბრუნება", recipients_n: "მიმღები",
     cat_goods: "მიღებული საქონელი", cat_paid: "გადახდილი (წილით)", cat_returns: "დაბრუნება (წილით)", cat_owed: "ვალი (წილით)", cat_share: "მომწოდებლის საქონლიდან",
     cats_hint: "თითო მომწოდებლის გადახდები და დაბრუნებები მის კატეგორიებს შორის ნაწილდება მისი საქონლის წილის მიხედვით.",
     cat_unsplit: "გადახდები მომწოდებლებზე, რომლებსაც rs.ge-ზე პროდუქცია არ აქვთ ({a}), კატეგორიებში არ ითვლება.",
@@ -223,7 +226,10 @@ const T = {
     cmp_btn: "⇄ Compare with rs.ge", cmp_hide: "✕ Hide comparison", cmp_title: "Telegram vs rs.ge waybills (from {d})",
     cmp_only_tg: "Only in Telegram", cmp_only_rs: "Only on rs.ge (not approved in Telegram)", cmp_diff: "Amount differs",
     cmp_missing: "not found on rs.ge", cmp_rejected: "rejected on rs.ge", cmp_gap: "Difference (rs.ge − Telegram)", cmp_all_match: "Everything matches",
-    cat_food: "Food & drink", cat_supplies: "Consumables", cat_equipment: "Equipment", cat_other: "Other expenses",
+    cat_food: "Food & drink", cat_supplies: "Consumables", cat_equipment: "Fixed assets", cat_other: "Other expenses", cat_outsource: "Outsourcing",
+    who_q: "Who is this?", comment_ph: "Comment (e.g. rent, repairs)…", nw_title: "Payments without a waybill", nw_card: "Paid without a waybill",
+    nw_hint: "Not suppliers — doesn't change any supplier's debt", unsorted_title: "Not a supplier — no category yet",
+    unsorted_hint: "Choose what kind of expense it is — remembered for this tax ID or account", back_review: "Back to review", recipients_n: "recipients",
     cat_goods: "Goods received", cat_paid: "Paid (by share)", cat_returns: "Returns (by share)", cat_owed: "Owed (by share)", cat_share: "of the supplier's goods",
     cats_hint: "Each supplier's payments and returns are split between its categories by their share of its goods.",
     cat_unsplit: "Payments to suppliers without rs.ge goods ({a}) aren't counted in the categories.",
@@ -1332,7 +1338,9 @@ async function renderDishDetail(view, id, range, fresh) {
 // each supplier's payments split between its categories by share.
 // Payments the app can't match safely wait in "To review" until the CEO assigns them.
 const DEBT_TABS = ["rs", "syrve", "tg", "cats"];
-const DEBT_CATS = ["food", "supplies", "equipment", "other"];
+const DEBT_CATS = ["food", "supplies", "equipment", "other", "outsource"]; // the sections of "rs მოსული"
+const PRODUCT_CATS = ["food", "supplies", "equipment", "other"];           // a product's category
+const EXPENSE_CATS = ["supplies", "equipment", "other", "outsource"];      // a recipient that is not a supplier
 // a supplier row's [goods, waybills, owed] in each per-supplier view
 const DEBT_COLS = {
   rs: s => [s.active, s.nActive, s.owed],
@@ -1363,6 +1371,24 @@ function compareHtml(cmp, match) {
     ${block(t("cmp_diff"), c.diff, cmp.diff || [], x => `<tr><td class="num">${esc(x.number)}</td><td>${esc(x.name)}</td><td class="muted">${esc(x.day)}</td><td class="r num">Telegram ${money(x.tg)}</td><td class="r num">rs.ge ${money(x.rs)}</td></tr>`)}
     ${block(t("cmp_only_rs"), c.onlyRs, cmp.onlyRs || [], x => `<tr><td class="num">${esc(x.number)}</td><td>${esc(x.name)}</td><td class="muted">${esc(x.day)}</td><td class="r num">${money(x.amount)}</td></tr>`)}
   </div>`;
+}
+// "Who is this?" for a recipient that is not a supplier: one of EXPENSE_CATS; "other" also asks for a comment.
+// onPick(cat, comment) — comment is undefined unless "other" was chosen.
+function expenseChooser(cell, onPick, onCancel) {
+  cell.innerHTML = `<div class="remember"><div class="q">${esc(t("who_q"))}</div>
+    ${EXPENSE_CATS.map(k => `<button type="button" class="btn small" data-x="${k}">${esc(t("cat_" + k))}</button>`).join("")}
+    <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+  $(".rm-cancel", cell).addEventListener("click", onCancel);
+  $$("[data-x]", cell).forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.x !== "other") return onPick(b.dataset.x);
+    cell.innerHTML = `<div class="remember"><div class="q">${esc(t("cat_other"))}</div>
+      <textarea class="x-note" rows="2" maxlength="300" placeholder="${esc(t("comment_ph"))}"></textarea>
+      <button type="button" class="btn small primary x-ok">${esc(t("save"))}</button>
+      <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+    $(".x-note", cell).focus();
+    $(".x-ok", cell).addEventListener("click", () => onPick("other", $(".x-note", cell).value.trim()));
+    $(".rm-cancel", cell).addEventListener("click", onCancel);
+  }));
 }
 async function renderDebts(view, demo, fresh = false, quiet = false) {
   if (!S.syrve.debts && !quiet) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
@@ -1436,8 +1462,8 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       <div class="panel-body small muted">
         <div>BOG: ${bank.configured.bog ? "✓" : "—"} · TBC: ${bank.configured.tbc ? "✓ " + esc(t("tbc_auto")) : "—"}</div>
         <div>${esc(t("history_note"))}</div>
-        ${(bank.linkedTins || []).length ? `<div style="margin-top:10px"><b>${esc(t("linked"))}</b></div>
-          ${bank.linkedTins.map(l => `<div class="linked">${esc(l.tin)} → ${l.to === "ignore" ? esc(t("not_supplier")) : esc(l.name)} <button class="icon-btn unlink" data-kind="${esc(l.kind || "tin")}" data-tin="${esc(l.tin)}" title="${esc(t("delete"))}">✕</button></div>`).join("")}` : ""}
+        ${(r.linkedTins || []).length ? `<div style="margin-top:10px"><b>${esc(t("linked"))}</b></div>
+          ${r.linkedTins.map(l => `<div class="linked">${esc(l.tin)} → ${l.to === "ignore" ? esc(t("not_supplier")) : l.to.startsWith("x:") ? `${esc(t("not_supplier"))} · ${esc(t("cat_" + l.to.slice(2)))}` : esc(l.name)} <button class="icon-btn unlink" data-kind="${esc(l.kind || "tin")}" data-tin="${esc(l.tin)}" title="${esc(t("delete"))}">✕</button></div>`).join("")}` : ""}
       </div>
     </details>`;
 
@@ -1474,16 +1500,48 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       ${list.length ? `<tfoot><tr><td colspan="5">${esc(t("total_owed"))}</td><td class="r num">${money(total)}</td>${extra ? "<td></td>" : ""}</tr></tfoot>` : ""}
     </table></div></div>`;
   } else {
-    // "rs მოსული": one category at a time — its suppliers (payments split by share) and its products
+    // "rs მოსული": one section at a time — its suppliers (payments split by share), its products, and the payments
+    // to recipients that are not suppliers but were given this category (outsourcing has only those)
     const ct = C.totals[dc] || { amount: 0, paid: 0, returns: 0, owed: 0, n: 0 };
-    cards = card(t("cat_owed"), money(ct.owed), esc(t("cat_" + dc)), ct.owed > 0 ? "hero bad" : "hero") +
-      card(t("cat_goods"), money(ct.amount), `${ct.n} ${esc(t("suppliers").toLowerCase())}`) +
-      card(t("cat_paid"), money(ct.paid), ct.returns ? `${esc(t("returns_col"))} ${money(ct.returns)}` : "") + reviewCard;
-    const sups = C.suppliers.filter(s => s.c[dc] && match(s));
-    const prods = C.products.filter(p => p.cat === dc && (!q || p.name.toLowerCase().includes(q) || p.sellers.some(n => String(n).toLowerCase().includes(q))));
-    const shown = prods.slice(0, 300);
-    body = `<div class="seg debt-cats">${DEBT_CATS.map(k => `<button type="button" data-dc="${k}" class="${k === dc ? "on" : ""}">${esc(t("cat_" + k))} · ${money(C.totals[k]?.owed || 0)}</button>`).join("")}</div>
-      <div class="muted small" style="margin:-6px 0 14px">${esc(t("cats_hint"))}${C.unsplit ? " " + esc(t("cat_unsplit").replace("{a}", money(C.unsplit))) : ""}</div>
+    const ET = C.expenseTotals || {};
+    const EX = ((C.expenses || {})[dc] || []).filter(x => match({ name: x.name, tin: x.tin || x.iban, rsName: x.comment }));
+    const U = (C.unsorted || []).filter(x => match({ name: x.name, tin: x.tin || x.iban, rsName: x.purpose }));
+    const xAttrs = x => `data-xrk="${esc(x.rk)}" data-scope="${esc(x.scope)}" data-tin="${esc(x.tin || "")}" data-iban="${esc(x.iban || "")}" data-comment="${esc(x.comment || "")}" data-cat="${dc}"`;
+    const who = x => `<b>${esc(x.name || "—")}</b><div class="muted small">${x.tin ? esc(t("tax_id")) + " " + esc(x.tin) : esc(x.iban || "")}</div>
+      <div class="muted small clip" title="${esc(x.purpose || "")}">${esc(t("last"))} ${esc(x.last || "")} · ${esc(x.purpose || "")}</div>`;
+    cards = dc === "outsource"
+      ? card(t("nw_card"), money(ET.outsource || 0), esc(t("cat_outsource")), "hero") + card(t("recipient"), String(EX.length)) + reviewCard
+      : card(t("cat_owed"), money(ct.owed), esc(t("cat_" + dc)), ct.owed > 0 ? "hero bad" : "hero") +
+        card(t("cat_goods"), money(ct.amount), `${ct.n} ${esc(t("suppliers").toLowerCase())}`) +
+        card(t("cat_paid"), money(ct.paid), ct.returns ? `${esc(t("returns_col"))} ${money(ct.returns)}` : "") +
+        card(t("nw_card"), money(ET[dc] || 0), `${EX.length} ${esc(t("recipients_n"))}`);
+    const unsortedHtml = U.length ? `<div class="panel">
+        <div class="panel-head"><h3>⚠ ${esc(t("unsorted_title"))} · ${U.length}</h3><span class="muted small">${esc(t("unsorted_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit review"><tbody>${U.map(x => `<tr ${xAttrs(x)}>
+          <td>${who(x)}</td><td class="r num">${x.count}</td><td class="r num nowrap"><b>${money(x.amount)}</b></td>
+          <td class="r nowrap"><button type="button" class="btn small primary ux-pick">${esc(t("who_q"))}</button>
+            <button type="button" class="icon-btn ex-back" title="${esc(t("back_review"))}">↩</button></td></tr>`).join("")}</tbody></table></div>
+      </div>` : "";
+    const expenseHtml = `<div class="panel">
+        <div class="panel-head"><h3>${esc(t("nw_title"))} · ${EX.length} · ${money(ET[dc] || 0)}</h3><span class="muted small">${esc(t("nw_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit">
+          <thead><tr><th>${esc(t("recipient"))}</th><th class="r">${esc(t("payments_col"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("comment"))}</th><th>${esc(t("category"))}</th></tr></thead>
+          <tbody>${EX.length ? EX.map(x => `<tr ${xAttrs(x)}>
+            <td>${who(x)}</td><td class="r num">${x.count}</td><td class="r num nowrap"><b>${money(x.amount)}</b></td>
+            <td class="small">${esc(x.comment || "")}${dc === "other" ? ` <button type="button" class="icon-btn ex-note" title="${esc(t("comment"))}">✎</button>` : ""}</td>
+            <td class="nowrap"><select class="ex-sel">${EXPENSE_CATS.map(k => `<option value="${k}" ${k === dc ? "selected" : ""}>${esc(t("cat_" + k))}</option>`).join("")}</select>
+              <button type="button" class="icon-btn ex-back" title="${esc(t("back_review"))}">↩</button></td></tr>`).join("")
+            : `<tr><td colspan="5" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div>
+      </div>`;
+    const sectionTotal = k => k === "outsource" ? ET.outsource || 0 : C.totals[k]?.owed || 0;
+    body = unsortedHtml + `<div class="seg debt-cats">${DEBT_CATS.map(k => `<button type="button" data-dc="${k}" class="${k === dc ? "on" : ""}">${esc(t("cat_" + k))} · ${money(sectionTotal(k))}</button>`).join("")}</div>`;
+    if (dc === "outsource") body += expenseHtml;
+    else {
+      const sups = C.suppliers.filter(s => s.c[dc] && match(s));
+      const prods = C.products.filter(p => p.cat === dc && (!q || p.name.toLowerCase().includes(q) || p.sellers.some(n => String(n).toLowerCase().includes(q))));
+      const shown = prods.slice(0, 300);
+      body += `<div class="muted small" style="margin:-6px 0 14px">${esc(t("cats_hint"))}${C.unsplit ? " " + esc(t("cat_unsplit").replace("{a}", money(C.unsplit))) : ""}</div>
       <div class="panel"><div class="table-wrap"><table>
         <thead><tr><th>${esc(t("supplier"))}</th><th>${esc(t("tax_id"))}</th><th class="r">${esc(t("cat_goods"))}</th><th class="r">${esc(t("cat_paid"))}</th><th class="r">${esc(t("cat_returns"))}</th><th class="r">${esc(t("cat_owed"))}</th></tr></thead>
         <tbody>${sups.length ? sups.map(s => { const v = s.c[dc]; return `<tr><td>${esc(s.name)}</td><td class="muted num">${esc(s.tin || "")}</td>
@@ -1493,17 +1551,19 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
           : `<tr><td colspan="6" class="empty">${esc(t("no_debts"))}</td></tr>`}</tbody>
         ${sups.length ? `<tfoot><tr><td colspan="5">${esc(t("cat_owed"))}</td><td class="r num">${money(ct.owed)}</td></tr></tfoot>` : ""}
       </table></div></div>
+      ${expenseHtml}
       <div class="panel"><div class="panel-head"><h3>${esc(t("products"))} · ${prods.length}</h3><span class="muted small">${esc(t("products_hint"))}</span></div>
         <div class="table-wrap"><table class="edit">
           <thead><tr><th>${esc(t("products"))}</th><th>${esc(t("supplier"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("category"))}</th></tr></thead>
           <tbody>${shown.length ? shown.map(p => `<tr><td>${esc(p.name)}${p.manual ? ` <span class="pill neutral">${esc(t("manual_cat"))}</span>` : ""}</td>
             <td class="muted small">${esc(p.sellers.join(", "))}</td><td class="r num">${money(p.amount)}</td>
-            <td class="nowrap"><select class="cat-sel" data-key="${esc(p.key)}">${DEBT_CATS.map(k => `<option value="${k}" ${k === p.cat ? "selected" : ""}>${esc(t("cat_" + k))}</option>`).join("")}</select>
+            <td class="nowrap"><select class="cat-sel" data-key="${esc(p.key)}">${PRODUCT_CATS.map(k => `<option value="${k}" ${k === p.cat ? "selected" : ""}>${esc(t("cat_" + k))}</option>`).join("")}</select>
               ${p.manual ? `<button class="icon-btn cat-auto" data-key="${esc(p.key)}" title="${esc(t("reset_auto"))}">↺</button>` : ""}</td></tr>`).join("")
             : `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
         </table></div>
         ${prods.length > shown.length ? `<div class="muted small" style="padding:10px 16px">${esc(t("showing_of").replace("{a}", shown.length).replace("{b}", prods.length))}</div>` : ""}
       </div>`;
+    }
   }
 
   view.innerHTML = demo + head(t("tab_debts"), t("debts_sub"),
@@ -1538,10 +1598,16 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       list.forEach(x => { const [a, , o] = col(x); out.push([x.name, x.tin || "", a || 0, x.returns || 0, x.paid || 0, o, ...(dt === "syrve" ? [x.syrveBalance ?? ""] : [])]); });
       out.push([t("total_owed"), "", "", "", "", totals[dt] || 0]);
     } else {
-      out = [[`${t("dt_cats")} · ${t("cat_" + dc)}`], [t("supplier"), t("tax_id"), t("cat_goods"), t("cat_paid"), t("cat_returns"), t("cat_owed")]];
-      C.suppliers.filter(s => s.c[dc] && match(s)).forEach(s => { const v = s.c[dc]; out.push([s.name, s.tin || "", v.amount, v.paid, v.returns, v.owed]); });
-      out.push([], [t("products"), t("supplier"), t("amount"), t("category")]);
-      C.products.filter(p => p.cat === dc).forEach(p => out.push([p.name, p.sellers.join(", "), p.amount, t("cat_" + p.cat)]));
+      out = [[`${t("dt_cats")} · ${t("cat_" + dc)}`]];
+      if (dc !== "outsource") {
+        out.push([t("supplier"), t("tax_id"), t("cat_goods"), t("cat_paid"), t("cat_returns"), t("cat_owed")]);
+        C.suppliers.filter(s => s.c[dc] && match(s)).forEach(s => { const v = s.c[dc]; out.push([s.name, s.tin || "", v.amount, v.paid, v.returns, v.owed]); });
+        out.push([], [t("products"), t("supplier"), t("amount"), t("category")]);
+        C.products.filter(p => p.cat === dc).forEach(p => out.push([p.name, p.sellers.join(", "), p.amount, t("cat_" + p.cat)]));
+        out.push([]);
+      }
+      out.push([t("nw_title")], [t("recipient"), t("tax_id"), t("payments_col"), t("amount"), t("comment")]);
+      ((C.expenses || {})[dc] || []).forEach(x => out.push([x.name, x.tin || x.iban || "", x.count, x.amount, x.comment || ""]));
     }
     exportXlsx(`debts-${dt}${col ? "" : "-" + dc}-${todayISO()}.xlsx`, t("tab_debts"), out);
   });
@@ -1554,6 +1620,33 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
   $$(".cat-sel", view).forEach(sel => sel.addEventListener("change", () => setCat(sel.dataset.key, sel.value)));
   $$(".cat-auto", view).forEach(b => b.addEventListener("click", () => setCat(b.dataset.key, "")));
 
+  // "rs მოსული": recipients that are not suppliers — give / change a category, edit the comment, or send back to review.
+  // The decision keeps its scope (this tax ID, this account, or only these payments), so every tab follows it.
+  const xBody = (tr, supplierId, comment) => ({ ...(tr.dataset.scope === "tin" ? { scope: "tin", tin: tr.dataset.tin } : tr.dataset.scope === "iban" ? { scope: "iban", iban: tr.dataset.iban } : { scope: "once", rk: tr.dataset.xrk }), supplierId, comment });
+  const xSave = async body => {
+    try { await api("/bank/review", { method: "POST", body }); toast(t("saved")); S.syrve.debts = null; await renderDebts(view, demo, false, true); }
+    catch (e) { toast(e.message); }
+  };
+  $$("tr[data-xrk]", view).forEach(tr => {
+    const pick = $(".ux-pick", tr);
+    if (pick) pick.addEventListener("click", () => {
+      const cell = pick.parentElement, original = cell.innerHTML;
+      expenseChooser(cell, (cat, comment) => xSave(xBody(tr, "x:" + cat, comment)), () => { cell.innerHTML = original; renderDebts(view, demo, false, true); });
+    });
+    const sel = $(".ex-sel", tr);
+    if (sel) sel.addEventListener("change", () => xSave(xBody(tr, "x:" + sel.value)));
+    const back = $(".ex-back", tr);
+    if (back) back.addEventListener("click", () => xSave(xBody(tr, null)));
+    const edit = $(".ex-note", tr);
+    if (edit) edit.addEventListener("click", () => {
+      const cell = edit.parentElement;
+      cell.innerHTML = `<div class="remember"><textarea class="x-note" rows="2" maxlength="300" placeholder="${esc(t("comment_ph"))}">${esc(tr.dataset.comment || "")}</textarea>
+        <button type="button" class="btn small primary x-ok">${esc(t("save"))}</button></div>`;
+      $(".x-note", cell).focus();
+      $(".x-ok", cell).addEventListener("click", () => xSave(xBody(tr, "x:" + tr.dataset.cat, $(".x-note", cell).value.trim())));
+    });
+  });
+
   const reload = async () => { S.syrve.debts = null; await renderDebts(view, demo, false, true); };
 
   // review actions
@@ -1565,10 +1658,10 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       try { await api("/bank/review", { method: "POST", body }); toast(t("saved")); await reload(); }
       catch (e) { toast(e.message); }
     };
-    const ask = supplierId => {
+    const ask = (supplierId, comment) => {
       const { tin, iban, name, rk, count } = tr.dataset;
-      const always = tin ? { scope: "tin", tin, supplierId } : iban ? { scope: "iban", iban, supplierId } : null;
-      const once = { scope: "once", rk, supplierId };
+      const always = tin ? { scope: "tin", tin, supplierId, comment } : iban ? { scope: "iban", iban, supplierId, comment } : null;
+      const once = { scope: "once", rk, supplierId, comment };
       if (!always) return save(once);
       cell.innerHTML = `<div class="remember"><div class="q">${esc(t("remember_q").replace("{name}", name))}</div>
         <button class="btn small primary rm-yes">${esc(t("remember_yes"))}</button>
@@ -1584,7 +1677,10 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
         if (!v) { toast(t("choose_supplier")); return; }
         ask(v);
       });
-      $(".rv-ignore", cell).addEventListener("click", () => ask("ignore"));
+      $(".rv-ignore", cell).addEventListener("click", () => {
+        if (dt !== "cats") return ask("ignore");
+        expenseChooser(cell, (cat, comment) => ask("x:" + cat, comment), () => { cell.innerHTML = original; wire(); });
+      });
     };
     wire();
   });
@@ -1933,6 +2029,13 @@ function demoApi(path, opts) {
       }
       cats.suppliers.push(e);
     }
+    const x = (rk, name, tin, iban, count, amount, purpose, comment = "", scope = tin ? "tin" : "iban") => ({ rk, scope, name, tin, iban, count, amount, last: todayISO(), purpose, comment });
+    cats.expenses = { supplies: [x("t:01008011111", "ი/მ ნინო კაპანაძე", "01008011111", "", 3, 240, "ხელსახოცები")],
+      equipment: [x("i:GE29TB0000000000000777", "Giorgi Beridze", "", "GE29TB0000000000000777", 1, 1850, "მაცივარი (მეორადი)")],
+      other: [x("t:406111222", "შპს სახლი", "406111222", "", 2, 3000, "ქირა ოქტომბერი", "ქირა")],
+      outsource: [x("t:405333444", "შპს კლინ სერვისი", "405333444", "", 4, 1200, "დალაგება")] };
+    cats.expenseTotals = Object.fromEntries(Object.entries(cats.expenses).map(([k, v]) => [k, r2(v.reduce((a, y) => a + y.amount, 0))]));
+    cats.unsorted = [x("t:01017050319", "ინდივიდუალური მეწარმე ელენე რატიშვილი", "01017050319", "", 15, 16700, "მარკეტინგი")];
     const since = ymNow() + "-01";
     return { asOf: todayISO(), total: sum(s => s.owed), suppliers, cats, tgSince: since,
       totals: { rs: sum(s => s.owed), syrve: sum(s => s.owedInv), tg: sum(s => s.owedTg), cats: r2(DEBT_CATS.reduce((a, k) => a + cats.totals[k].owed, 0)) },
@@ -1950,7 +2053,7 @@ function demoApi(path, opts) {
         { rk: "t:01001055555", name: "Giorgi Beridze", tin: "01001055555", iban: "GE33TB0000000000000003", count: 2, amount: 250, last: ymNow() + "-12", purpose: "transfer", bank: "TBC", reason: "unknown", suggestion: null, rsName: "" },
       ] },
       options: suppliers.map(s => ({ id: s.id, name: s.name })),
-      linkedTins: [{ tin: "206000111", to: "ignore", name: "" }],
+      linkedTins: [{ tin: "206000111", to: "ignore", name: "" }, { tin: "406111222", to: "x:other", name: "" }],
       bank: { configured: { bog: true, tbc: true }, settings: { historyFrom: "2026-03-01", bogAccounts: ["GE00BG0000000000000001"] }, lastSyncAt: new Date().toISOString(), errors: {}, cursors: {}, payments: 412, matched: 371, ignored: 39 } };
   }
   if (path.startsWith("/bank/")) return { ok: true, done: true };

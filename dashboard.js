@@ -19,7 +19,10 @@ import { syncTelegramApproved, categorizer, loadCategories, saveCategory, CATEGO
 import { runProbe } from "./rsprobe.js";
 
 const DATA_KEYS = ["fixed", "variable", "ratings", "tasks"];
-const LINKS_KEY = "dash:bank:links"; // { byTin, byIban, byTx: { key: supplierId | "ignore" } } — the CEO's remembered decisions
+// The CEO's remembered decisions: { byTin, byIban, byTx: { key: target }, comments: { "tin:…" | "iban:…" | "rk:…": text } }
+// target: a supplier id, "ignore" (not a supplier) or "x:<category>" (not a supplier: an expense, see EXPENSE_CATS)
+const LINKS_KEY = "dash:bank:links";
+const EXPENSE_CATS = ["supplies", "equipment", "other", "outsource"];
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" };
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: JSON_HEADERS });
 
@@ -490,7 +493,9 @@ async function syrveMonthly(env) {
 //   Syrve:     Syrve incoming invoices (syrveinv.js); Syrve's own balance is a grey comparison column.
 //   Telegram:  waybills approved in the Telegram bot (debtsrc.js), plus a waybill-by-waybill comparison with rs.ge.
 //   rs მოსული: the rs.ge goods lines by category (food / consumables / equipment / other); each supplier's
-//              payments and returns are split between its categories by their share of its goods.
+//              payments and returns are split between its categories by their share of its goods. Recipients the
+//              CEO marks "not a supplier" can get an expense category (consumables / fixed assets / other /
+//              outsource): their payments are listed there as "without a waybill" and never count as supplier payments.
 // Everything counts from the bank "history from" date.
 // Payments are not entered in Syrve, so Syrve's balance is the sum of all Syrve invoices.
 async function syrveDebts(env) {
@@ -555,33 +560,46 @@ const isTreasury = r => String(r.bankCode || "").toUpperCase() === "TRESGE22" ||
 
 async function loadLinks(env) {
   const l = (await env.STORE.get(LINKS_KEY, "json")) || {};
-  return { byTin: l.byTin || {}, byIban: l.byIban || {}, byTx: l.byTx || {} };
+  return { byTin: l.byTin || {}, byIban: l.byIban || {}, byTx: l.byTx || {}, comments: l.comments || {} };
 }
 
-// body: { txId, tin, supplierId | "ignore" | null, scope: "tin" | "tx" }
+// body: { scope: "tin" | "iban" | "once" | "tx", tin | iban | rk | txId, supplierId: target | null (forget), comment? }
 async function saveReview(env, body) {
   const links = await loadLinks(env);
   const target = body.supplierId === null ? null : String(body.supplierId || "").toLowerCase();
   if (body.supplierId !== null && !target) return { error: "supplierId required" };
+  if (target && target.startsWith("x:") && !EXPENSE_CATS.includes(target.slice(2))) return { error: "bad category" };
+  let noteKey = "";
   if (body.scope === "once") {
     // only the payments we have now; future payments to this recipient will be asked about again
     const rk = String(body.rk || "");
-    if (!rk || target === null) return { error: "rk and supplierId required" };
-    const settings = await loadBankSettings(env);
-    for (const r of await loadRecipientPayments(env, settings.historyFrom, rk)) links.byTx[r[0]] = { to: target, cents: r[2], rk };
+    if (!rk) return { error: "rk required" };
+    noteKey = "rk:" + rk;
+    if (target === null) {
+      for (const [id, v] of Object.entries(links.byTx)) if (v && v.rk === rk) delete links.byTx[id];
+    } else {
+      const settings = await loadBankSettings(env);
+      for (const r of await loadRecipientPayments(env, settings.historyFrom, rk)) links.byTx[r[0]] = { to: target, cents: r[2], rk };
+    }
   } else if (body.scope === "iban") {
     const iban = String(body.iban || "").trim().toUpperCase();
     if (!iban) return { error: "iban required" };
+    noteKey = "iban:" + iban;
     if (target === null) delete links.byIban[iban]; else links.byIban[iban] = target;
   } else if (body.scope === "tin") {
     const tin = String(body.tin || "").trim();
     if (!tin) return { error: "tin required" };
+    noteKey = "tin:" + tin;
     if (target === null) delete links.byTin[tin]; else links.byTin[tin] = target;
   } else {
     const txId = String(body.txId || "").trim();
     if (!txId) return { error: "txId required" };
     if (target === null) delete links.byTx[txId]; else links.byTx[txId] = target;
   }
+  // a note on an expense ("სხვა ხარჯი: rent", …); dropped when the recipient is no longer an expense
+  const comment = String(body.comment ?? "").trim().slice(0, 300);
+  if (noteKey && target?.startsWith("x:") && comment) links.comments[noteKey] = comment;
+  else if (noteKey && (!target?.startsWith("x:") || body.comment !== undefined)) delete links.comments[noteKey];
   await env.STORE.put(LINKS_KEY, JSON.stringify(links));
   await bumpVersion(env);
   return { ok: true };
@@ -628,8 +646,11 @@ async function buildDebts(env, syrve, tg) {
   const decide = rk => {
     const [name = "", tin = "", iban = "", bankCode = "", ownFlag = 0] = recipients[rk] || [];
     const own = ownFlag || (tin && ownTins.has(tin)) || (iban && ownIbans.has(iban.toUpperCase()));
-    const forced = (tin ? links.byTin[tin] : undefined) ?? (iban ? links.byIban[iban.toUpperCase()] : undefined);
-    if (forced === "ignore") return { skip: true };
+    const byT = tin ? links.byTin[tin] : undefined;
+    const forced = byT ?? (iban ? links.byIban[iban.toUpperCase()] : undefined);
+    const scope = byT !== undefined ? "tin" : "iban";
+    if (forced === "ignore") return { skip: true, unsorted: scope }; // "not a supplier", no category yet
+    if (forced?.startsWith("x:")) return { skip: true, expense: forced.slice(2), scope };
     if (forced && valid(forced)) return { supplierId: forced };
     if (own || isTreasury({ name, iban, bankCode }) || (!tin && !iban)) return { skip: true }; // own transfers, taxes, fees
     if (tin && sellers[tin]) return { supplierId: "tin:" + tin }; // the seller's tax ID on our rs.ge waybills
@@ -660,20 +681,37 @@ async function buildDebts(env, syrve, tg) {
 
   const paid = {};
   const review = [];
+  // payments to recipients the CEO marked "not a supplier": with a category (expenses) or still without one (unsorted)
+  const expenses = Object.fromEntries(EXPENSE_CATS.map(k => [k, {}]));
+  const unsorted = {};
+  const note = (into, rk, scope, n, amount, last, purpose) => {
+    const [name = "", tin = "", iban = ""] = recipients[rk] || [];
+    const key = scope === "tin" ? "tin:" + tin : scope === "iban" ? "iban:" + iban.toUpperCase() : "rk:" + rk;
+    const x = into[key] = into[key] || { rk, scope, name, tin, iban, count: 0, amount: 0, last, purpose, comment: links.comments[key] || "" };
+    x.count += n;
+    x.amount = Math.round((x.amount + amount) * 100) / 100;
+    if (last > x.last) { x.last = last; x.purpose = purpose; }
+  };
   let ignored = 0, matched = 0, reviewAmount = 0, payments = 0;
   for (const [rk, a] of Object.entries(agg)) {
     const [count, tetri, last, purpose, banks] = a;
     payments += count;
     const singles = txByRk[rk] || [];
     for (const v of singles) {
-      if (v.to === "ignore") ignored++;
+      if (v.to === "ignore") { ignored++; note(unsorted, rk, "once", 1, v.cents / 100, last, purpose); }
+      else if (v.to?.startsWith("x:") && expenses[v.to.slice(2)]) { ignored++; note(expenses[v.to.slice(2)], rk, "once", 1, v.cents / 100, last, purpose); }
       else if (valid(v.to)) { paid[v.to] = (paid[v.to] || 0) + v.cents / 100; matched++; }
     }
     const restCount = count - singles.length;
     const restAmount = (tetri - singles.reduce((x, v) => x + v.cents, 0)) / 100;
     if (restCount <= 0) continue;
     const d = decide(rk);
-    if (d.skip) { ignored += restCount; continue; }
+    if (d.skip) {
+      ignored += restCount;
+      if (d.unsorted) note(unsorted, rk, d.unsorted, restCount, restAmount, last, purpose);
+      else if (d.expense && expenses[d.expense]) note(expenses[d.expense], rk, d.scope, restCount, restAmount, last, purpose);
+      continue;
+    }
     if (d.supplierId) { paid[d.supplierId] = (paid[d.supplierId] || 0) + restAmount; matched += restCount; continue; }
     reviewAmount += restAmount;
     const [name = "", tin = "", iban = ""] = recipients[rk] || [];
@@ -801,7 +839,7 @@ async function buildDebts(env, syrve, tg) {
     ...syrve.suppliers.map(s => ({ id: s.id, name: s.name })),
     ...Object.entries(sellers).filter(([tin]) => !syrveTins.has(tin)).map(([tin, s]) => ({ id: "tin:" + tin, name: `${s.name || tin} (rs.ge ${tin})` })),
   ].sort((a, b) => a.name.localeCompare(b.name));
-  const targetName = to => to === "ignore" ? "" : sup[to]?.name || (to.startsWith("tin:") ? rsName[to.slice(4)] || to.slice(4) : to);
+  const targetName = to => to === "ignore" || to.startsWith("x:") ? "" : sup[to]?.name || (to.startsWith("tin:") ? rsName[to.slice(4)] || to.slice(4) : to);
 
   review.sort((a, b) => b.amount - a.amount); // biggest first: one decision clears the most money
   return {
@@ -811,7 +849,11 @@ async function buildDebts(env, syrve, tg) {
     totals: { rs: sumPos(x => x.owed), syrve: sumPos(x => x.owedInv), tg: sumPos(x => x.owedTg),
       cats: r2(CATEGORIES.reduce((a, k) => a + catTotals[k].owed, 0)) },
     suppliers: list,
-    cats: { totals: catTotals, suppliers: catSuppliers, products: productList, unsplit },
+    cats: { totals: catTotals, suppliers: catSuppliers, products: productList, unsplit,
+      // not suppliers: payments without a waybill per expense category, and those still without a category
+      expenses: Object.fromEntries(EXPENSE_CATS.map(k => [k, Object.values(expenses[k]).sort((a, b) => b.amount - a.amount)])),
+      expenseTotals: Object.fromEntries(EXPENSE_CATS.map(k => [k, r2(Object.values(expenses[k]).reduce((a, x) => a + x.amount, 0))])),
+      unsorted: Object.values(unsorted).sort((a, b) => b.amount - a.amount) },
     compare,
     tgSince: tg?.since || "",
     review: { count: review.length, payments: review.reduce((a, x) => a + x.count, 0), amount: Math.round(reviewAmount * 100) / 100, items: review.slice(0, 150) },
