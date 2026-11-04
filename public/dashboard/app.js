@@ -79,7 +79,7 @@ const T = {
     cost_fallback: "Syrve-ს თვითღირებულება მიუწვდომელია — ნაცვლად ცვლადი ხარჯების „საქონელი“ აკლდება.",
     income_by_month: "შემოსავალი თვეების მიხედვით",
     total_owed: "სულ გადასახდელი", suppliers: "მომწოდებლები", supplier: "მომწოდებელი", owed: "გადასახდელი",
-    debts_sub: "rs.ge-ს ზედნადებები − დაბრუნებები − BOG / TBC გადარიცხვები. გადარიცხვა მომწოდებელს ჯერ საიდენტიფიკაციო კოდით უკავშირდება, მერე სახელით — მხოლოდ თქვენი დადასტურებით.", search: "ძებნა",
+    debts_sub: "rs.ge-ს ზედნადებები − დაბრუნებები − BOG / TBC გადარიცხვები. გადარიცხვა მომწოდებელს საიდენტიფიკაციო კოდით უკავშირდება; კოდის გარეშე გადარიცხვა — ზუსტი სახელით, მსგავსი სახელით კი მხოლოდ თქვენი დადასტურებით. ბანკის საკომისიოები არ ითვლება.", search: "ძებნა",
     no_debts: "ვალები არ არის",
     platform: "პლატფორმა", rating: "რეიტინგი", reviews: "შეფასებები", latest: "ბოლო",
     ratings_sub: "მიტანის აპლიკაციების რეიტინგები. შეიყვანეთ ციფრები აპლიკაციიდან.", history: "ისტორია",
@@ -140,7 +140,7 @@ const T = {
     rs_confirmed: "დადასტ. rs.ge-ზე",
     undo: "გაუქმება",
     debt_ok: "გადარიცხვა არ არის — ვალი დადასტურებულია",
-    how_code: "ს/კ-ით",
+    how_code: "ს/კ-ით", how_name: "ზუსტი სახელით", not_this: "ეს არ არის ამ მომწოდებლის",
     how_dec: "თქვენი გადაწყვეტილებით",
     showing_tx: "ნაჩვენებია {a} / {b} გადარიცხვა",
     st_over: "ზედმეტი",
@@ -239,7 +239,7 @@ const T = {
     cost_fallback: "Syrve's cost price isn't available — 'goods' from Variable costs is subtracted instead.",
     income_by_month: "Income by month",
     total_owed: "Total owed", suppliers: "Suppliers", supplier: "Supplier", owed: "Owed",
-    debts_sub: "rs.ge waybills − returns − BOG / TBC transfers. A transfer goes to a supplier by identification code first, by name only after you confirm.", search: "Search",
+    debts_sub: "rs.ge waybills − returns − BOG / TBC transfers. A transfer goes to a supplier by identification code; one without a code by exact name, by a similar name only after you confirm. Bank fees don't count.", search: "Search",
     no_debts: "No debts",
     platform: "Platform", rating: "Rating", reviews: "Reviews", latest: "Latest",
     ratings_sub: "Delivery app ratings. Enter the numbers from each app.", history: "History",
@@ -300,7 +300,7 @@ const T = {
     rs_confirmed: "confirmed on rs.ge",
     undo: "Undo",
     debt_ok: "No transfer — the debt is confirmed",
-    how_code: "by code",
+    how_code: "by code", how_name: "by exact name", not_this: "Not this supplier's",
     how_dec: "your decision",
     showing_tx: "Showing {a} of {b} transfers",
     st_over: "Overpaid",
@@ -1424,7 +1424,8 @@ function debtDetailHtml(s) {
   const txRows = s.transfers.map(([id, date, amount, who, purpose, how, scope, rk]) => `<tr><td class="muted">${esc(date)}</td><td class="r num">${money(amount)}</td>
     <td>${esc(who)}<div class="muted small clip" title="${esc(purpose)}">${esc(purpose)}</div></td>
     <td><span class="pill ${how === "code" ? "good" : "neutral"}">${esc(t("how_" + how))}</span>
-      ${how === "dec" ? `<button type="button" class="icon-btn dx-undo" data-rk="${esc(rk)}" data-scope="${esc(scope)}" data-id="${esc(id)}" title="${esc(t("undo"))}">↩</button>` : ""}</td></tr>`).join("");
+      ${how === "dec" ? `<button type="button" class="icon-btn dx-undo" data-rk="${esc(rk)}" data-scope="${esc(scope)}" data-id="${esc(id)}" title="${esc(t("undo"))}">↩</button>` : ""}
+      ${how === "name" ? `<button type="button" class="icon-btn dx-notthis" data-rk="${esc(rk)}" data-tin="${esc(s.tin)}" title="${esc(t("not_this"))}">✕</button>` : ""}</td></tr>`).join("");
   const mRows = s.manualList.map(m => `<tr><td class="muted">${esc(m.date)}</td><td class="r num">${money(m.amount)}</td>
     <td>${esc(t("manual_paid"))}${m.comment ? `<div class="muted small">${esc(m.comment)}</div>` : ""}</td>
     <td><button type="button" class="icon-btn dx-mdel" data-id="${esc(m.id)}" title="${esc(t("delete"))}">✕</button></td></tr>`).join("");
@@ -1654,6 +1655,8 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
     decide(b.dataset.scope === "tx" ? { kind: "undo", ids: [b.dataset.id] } : { kind: "undo", rk: b.dataset.rk, scope: "rcp" })));
   $$(".dx-mdel", view).forEach(b => b.addEventListener("click", () => { if (confirmDel()) decide({ kind: "manualDel", id: b.dataset.id }); }));
   $$(".dx-debt-off", view).forEach(b => b.addEventListener("click", () => decide({ kind: "debt", tin: b.dataset.tin, on: false })));
+  // an automatic exact-name match that is wrong: "not this supplier" (its transfers go to subtab 2)
+  $$(".dx-notthis", view).forEach(b => b.addEventListener("click", () => decide({ kind: "reject", rk: b.dataset.rk, tins: [b.dataset.tin] })));
 
   // "only these N transfers" or this recipient always (future transfers too)
   const askScope = (cell, tr, to, comment, back) => {
@@ -2181,7 +2184,7 @@ function demoApi(path, opts) {
     const wbs = (tin, list) => list.map(([days, amount], i) => [`0${tin.slice(0, 4)}${String(812 + i * 37)}`, d(days), amount, i % 4 === 0 ? 1 : 0]);
     // [code, name, waybills [daysAgo, amount], returns, transfers, payments outside the bank, debt confirmed]
     const spec = [
-      ["204567891", "შპს ნიკორა", [[2, 2420.5], [9, 3100], [16, 3400], [23, 3500]], 0, tx("t:204567891", "შპს ნიკორა", [[5, 4000, "ზედნადები 0457812"], [19, 5000, "ოქტომბრის ზედნადებები"]]), [], ""],
+      ["204567891", "შპს ნიკორა", [[2, 2420.5], [9, 3100], [16, 3400], [23, 3500]], 0, [...tx("t:204567891", "შპს ნიკორა", [[5, 4000, "ზედნადები 0457812"], [19, 5000, "ოქტომბრის ზედნადებები"]]), ...tx("i:GE29TB0000000000000123", "შპს „ნიკორა“", [[12, 500, "ზედნადები"]], "name")], [], ""],
       ["205123456", "შპს სანტე ჯი-ემ-თი პროდაქტს", [[3, 1780], [10, 2200], [17, 2200]], 60, tx("t:205123456", "Sante GMT Products", [[6, 2500, "invoice"], [20, 1500, "invoice"]]), [], ""],
       ["400112233", "შპს ორი ნაბიჯი", [[4, 1200], [12, 1260], [25, 1000]], 0, [], [], ""],
       ["211334455", "შპს მეტრო", [[8, 890.4]], 0, [], [], todayISO()],

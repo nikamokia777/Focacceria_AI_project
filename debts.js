@@ -2,13 +2,17 @@
 //
 // Waybills: every active rs.ge waybill (confirmed on rs.ge or not) from the bank "history from" date
 // (waybills.js), minus the return waybills we issued to the seller. Transfers: outgoing BOG / TBC
-// payments (bank.js), without transfers between our own accounts, taxes / treasury, bank fees (no code,
-// no account) and salaries (employees typed in the Employees tab, by personal ID or IBAN).
+// payments (bank.js), without transfers between our own accounts, taxes / treasury, salaries (employees
+// typed in the Employees tab, by personal ID or IBAN) and bank fees: entries with no code and no account,
+// TBC's "გადარიცხვის საკომისიო", and BOG's fee for a transfer to another bank (booked as its own entry of
+// up to 5 ₾, same recipient and day as the transfer).
 //
 // A transfer counts for a supplier (a waybill seller):
 //   1. by identification code: the recipient's code is the seller's code;
-//   2. by name: only after the CEO picks that version (subtab 3);
-//   3. by another CEO decision (a code typed in subtab 2 or 3).
+//   2. by exact name, when the transfer has no code at all (banks don't send it for transfers to another
+//      bank): the recipient's name is exactly one seller's name, apart from შპს / ი/მ and punctuation;
+//   3. by a similar name: only after the CEO picks that version (subtab 3);
+//   4. by another CEO decision (a code typed in subtab 2 or 3).
 // Subtabs: 1 debt per supplier · 2 transfers without a waybill · 3 problems (recipients that match a
 // supplier by name only; suppliers with no transfer at all) · 4 overpayments (paid more than the waybills).
 //
@@ -38,6 +42,8 @@ const today = env => new Date(Date.now() + Number(env.TZ_OFFSET ?? 4) * 3600000)
 const isTreasury = (name, iban, bankCode) =>
   String(bankCode || "").toUpperCase() === "TRESGE22" || /^GE\d{2}NB/i.test(iban || "") || /სახაზინო|treasury/i.test(name || "");
 const CODE = /^[0-9A-Za-z]{2,20}$/;
+const FEE_CENTS = 500; // BOG's fee entries for transfers to another bank are a few tetri to a few lari
+const isFeePurpose = p => /^გადარიცხვის საკომისიო/.test(String(p || "").trim());
 const cleanCode = v => String(v ?? "").replace(/\s+/g, "");
 
 export async function loadDecisions(env) {
@@ -105,12 +111,28 @@ export async function buildDebts(env) {
     return sellerKeys.filter(s => similarKey(k, s.key) && !(dec.sup[s.tin]?.no || []).includes(rk))
       .sort((a, b) => sameKey(b.key, k) - sameKey(a.key, k)).map(s => s.tin);
   })();
+  // exact name: the only seller whose name is the recipient's (apart from legal forms and punctuation)
+  const exactMemo = {};
+  const exactOf = rk => exactMemo[rk] ??= (() => {
+    const name = (recipients[rk] || [])[0];
+    if (!name) return "";
+    const k = nameKey(name);
+    const hits = sellerKeys.filter(s => sameKey(k, s.key) && !(dec.sup[s.tin]?.no || []).includes(rk));
+    return hits.length === 1 ? hits[0].tin : "";
+  })();
+
+  // bank fees: TBC's "გადარიცხვის საკომისიო"; BOG's is a small entry next to a bigger transfer
+  // to the same recipient on the same day
+  const biggest = {};
+  for (const [, date, cents, rk] of payments) { const k = rk + "|" + date; if (cents > (biggest[k] || 0)) biggest[k] = cents; }
+  const isFee = (id, date, cents, rk, purpose) => isFeePurpose(purpose)
+    || (String(id).startsWith("bog:") && cents <= FEE_CENTS && biggest[rk + "|" + date] > FEE_CENTS);
 
   const groups = { open: {}, wait: {}, other: {}, name: {} };
   let counted = 0, skipped = 0;
   for (const [id, date, cents, rk, purpose = ""] of payments) {
     if (settings.historyFrom && date < settings.historyFrom) continue;
-    if (skip(rk)) { skipped++; continue; }
+    if (skip(rk) || isFee(id, date, cents, rk, purpose)) { skipped++; continue; }
     counted++;
     const amount = cents / 100;
     const [name = "", tin = "", iban = ""] = recipients[rk] || [];
@@ -118,6 +140,7 @@ export async function buildDebts(env) {
     const scope = txd ? "tx" : rd ? "rcp" : "";
     let t = d ? target(d.to) : null, how = t ? "dec" : "";
     if (!t && tin && sellers.has(tin)) { t = { tin }; how = "code"; }
+    if (!t && !tin && exactOf(rk)) { t = { tin: exactOf(rk) }; how = "name"; }
     if (t?.tin) {
       const x = row(t.tin);
       if (!x.name) x.name = name || t.tin;
