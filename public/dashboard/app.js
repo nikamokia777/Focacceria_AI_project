@@ -86,7 +86,17 @@ const T = {
     wolt: "Wolt", glovo: "Glovo", bolt: "Bolt Food", no_rating: "ჯერ არ არის", vs_prev: "წინასთან შედარებით",
     working_today: "დღეს მუშაობს", calendar: "კალენდარი", shift: "ცვლა", on_shift: "ცვლაზეა",
     finished: "დაასრულა", not_arrived: "ჯერ არ მოსულა", nobody_today: "დღეს ცვლები არ არის",
-    employees_sub: "გრაფიკი და გამოცხადება Syrve-დან.", prev: "‹", next: "›",
+    employees_sub: "თანამშრომლები, გრაფიკი და ზეგანაკვეთური — ხელით.", prev: "‹", next: "›",
+    employee: "თანამშრომელი", role: "როლი", pay_type: "ანაზღაურება", pay_hour: "საათობრივი", pay_shift: "ცვლაზე", pay_month: "თვიური",
+    rate: "განაკვეთი", pid: "პირადი ნომერი", iban: "ანგარიში (IBAN)", count_from: "ითვლება", active: "აქტიური", inactive: "გათიშული",
+    emp_list: "თანამშრომლები", add_emp: "+ თანამშრომელი", emp_deactivated: "ცვლები აქვს — გაითიშა, ისტორია რჩება",
+    emp_hint: "ანაზღაურება: საათობრივი = საათები × განაკვეთი, ცვლაზე = სამუშაო დღეები × განაკვეთი, თვიური = სრული თანხა ყოველ თვეს. „ითვლება“ — თარიღი, საიდანაც ითვლება ხელფასი და გადარიცხვები (ცარიელი = პირველი ცვლიდან). პირადი ნომრით ან ანგარიშით ბანკის გადარიცხვები ავტომატურად უკავშირდება.",
+    day_shifts: "ცვლები", add_shift: "+ ცვლა", from_t: "დან", to_t: "მდე", hours: "საათი", overtime: "ზეგანაკვეთური", note: "შენიშვნა",
+    month_summary: "თვის ჯამი", shifts_n: "ცვლა", days_n: "დღე", click_day: "დააჭირეთ დღეს ცვლების ჩასაწერად", starts: "იწყება",
+    add_emp_first: "ჯერ დაამატეთ თანამშრომელი ქვემოთ, სიაში.", bad_time: "დრო ჩაწერეთ ასე: 09:00",
+    dt_staff: "თანამშრომლები", cat_staff: "თანამშრომელი", staff_owed: "თანამშრომლებს გადასახდელი", earned: "გამომუშავებული", no_start: "თარიღი არ არის",
+    staff_hint: "გამომუშავებული (გრაფიკით) + ზეგანაკვეთური − ბანკის გადარიცხვები, თითოეულის „ითვლება“ თარიღიდან. გადარიცხვა უკავშირდება პირადი ნომრით / ანგარიშით, ან „ვინ არის ეს?“ → თანამშრომელი.",
+    staff_none: "თანამშრომლები ჯერ არ არის — დაამატეთ „თანამშრომლების“ ჩანართში.",
     days: ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვი"],
     months: ["იანვარი", "თებერვალი", "მარტი", "აპრილი", "მაისი", "ივნისი", "ივლისი", "აგვისტო", "სექტემბერი", "ოქტომბერი", "ნოემბერი", "დეკემბერი"],
     daily_tasks: "ყოველდღიური დავალებები", overall_tasks: "ზოგადი დავალებები", task: "დავალება",
@@ -205,7 +215,17 @@ const T = {
     wolt: "Wolt", glovo: "Glovo", bolt: "Bolt Food", no_rating: "No rating yet", vs_prev: "vs previous",
     working_today: "Working today", calendar: "Calendar", shift: "Shift", on_shift: "On shift",
     finished: "Finished", not_arrived: "Not arrived yet", nobody_today: "No shifts today",
-    employees_sub: "Schedule and attendance from Syrve.", prev: "‹", next: "›",
+    employees_sub: "Employees, schedule and overtime — typed in by hand.", prev: "‹", next: "›",
+    employee: "Employee", role: "Role", pay_type: "Pay", pay_hour: "Hourly", pay_shift: "Per shift", pay_month: "Monthly",
+    rate: "Rate", pid: "Personal ID", iban: "Account (IBAN)", count_from: "Counted from", active: "Active", inactive: "Inactive",
+    emp_list: "Employees", add_emp: "+ Employee", emp_deactivated: "Has shifts — switched off, history kept",
+    emp_hint: "Pay: hourly = hours × rate, per shift = working days × rate, monthly = the full amount every month. \"Counted from\" is the date salary and transfers count from (empty = from the first shift). Bank transfers are matched by personal ID or account automatically.",
+    day_shifts: "Shifts", add_shift: "+ Shift", from_t: "From", to_t: "To", hours: "Hours", overtime: "Overtime", note: "Note",
+    month_summary: "Month total", shifts_n: "Shifts", days_n: "days", click_day: "Click a day to enter its shifts", starts: "Starts",
+    add_emp_first: "First add an employee in the list below.", bad_time: "Type the time like 09:00",
+    dt_staff: "Employees", cat_staff: "Employee", staff_owed: "Owed to employees", earned: "Earned", no_start: "No date",
+    staff_hint: "Earned (from the schedule) + overtime − bank transfers, from each one's \"counted from\" date. Transfers are matched by personal ID / account, or by \"Who is this?\" → Employee.",
+    staff_none: "No employees yet — add them in the Employees tab.",
     days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
     daily_tasks: "Daily tasks", overall_tasks: "Overall tasks", task: "Task",
@@ -276,6 +296,8 @@ const S = {
   syrve: {},         // live, monthly, debts, employees:<month>
   varMonth: ymNow(),
   empMonth: ymNow(),
+  empDay: "",                                      // Employees: the day whose shifts are being edited
+  staffOpen: "",                                   // Debts → Employees: the employee whose months are shown
   debtQuery: "",
   debtTab: store.get("dash_debt_tab") || "rs",     // rs | syrve | tg | cats
   debtCat: store.get("dash_debt_cat") || "food",   // the category shown in "rs მოსული"
@@ -350,6 +372,7 @@ const DEFAULTS = {
   variable: () => ({ entries: [] }),
   ratings: () => ({ entries: [] }),
   tasks: () => ({ daily: [], overall: [] }),
+  staff: () => ({ employees: [], shifts: [] }),
 };
 
 async function loadData(key) {
@@ -530,28 +553,24 @@ function card(label, value, hint = "", cls = "") {
 }
 function confirmDel() { return confirm(t("confirm_delete")); }
 
-// "who works today" list — used by the Employees tab and by Main
-function whoWorksToday(tdata) {
-  const today = tdata.today || todayISO();
+// "who works today" list — used by the Employees tab and by Main (the shifts typed in the Employees tab)
+function whoWorksToday(staff, day = todayISO()) {
   const now = new Date();
   const nowHM = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  const todayShifts = tdata.shifts.filter(s => (s.from || "").slice(0, 10) === today).sort((a, b) => (a.from || "").localeCompare(b.from || ""));
-  const att = tdata.attendance.filter(a => (a.from || "").slice(0, 10) === today);
+  const byId = Object.fromEntries((staff.employees || []).map(e => [e.id, e]));
+  const list = (staff.shifts || []).filter(s => s.day === day && byId[s.emp]).sort((a, b) => (a.from || "").localeCompare(b.from || ""));
   const statusOf = s => {
-    const a = att.filter(x => x.employeeId === s.employeeId);
-    if (!a.length) return `<span class="pill neutral">○ ${esc(t("not_arrived"))}</span>`;
-    const open = a.find(x => !x.to || hhmm(x.to) > nowHM || (x.to || "").slice(0, 10) > today);
-    return open
-      ? `<span class="pill good">● ${esc(t("on_shift"))} · ${esc(hhmm(open.from))}</span>`
-      : `<span class="pill neutral">✓ ${esc(t("finished"))} · ${esc(hhmm(a[a.length - 1].to))}</span>`;
+    if (nowHM < s.from) return `<span class="pill neutral">○ ${esc(t("starts"))} ${esc(s.from)}</span>`;
+    if (s.to > s.from && nowHM >= s.to) return `<span class="pill neutral">✓ ${esc(t("finished"))} · ${esc(s.to)}</span>`;
+    return `<span class="pill good">● ${esc(t("on_shift"))}</span>`;
   };
-  const initials = name => String(name).split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase() || "?";
-  const html = todayShifts.length ? `<div class="today-list">${todayShifts.map(s => `
-    <div class="person"><div class="who"><span class="avatar">${esc(initials(s.name))}</span>
-      <div><div><b>${esc(s.name)}</b></div><div class="muted small">${esc(t("shift"))} ${esc(hhmm(s.from))}–${esc(hhmm(s.to))}${s.department ? " · " + esc(s.department) : ""}</div></div></div>
-      ${statusOf(s)}</div>`).join("")}</div>`
+  const initials = name => String(name).split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").replace(/[a-z]/g, c => c.toUpperCase()) || "?"; // Georgian letters stay as they are (no Mtavruli);
+  const html = list.length ? `<div class="today-list">${list.map(s => { const e = byId[s.emp]; return `
+    <div class="person"><div class="who"><span class="avatar">${esc(initials(e.name))}</span>
+      <div><div><b>${esc(e.name || "?")}</b></div><div class="muted small">${esc(t("shift"))} ${esc(s.from)}–${esc(s.to)}${e.role ? " · " + esc(e.role) : ""}${s.note ? " · " + esc(s.note) : ""}</div></div></div>
+      ${statusOf(s)}</div>`; }).join("")}</div>`
     : `<div class="empty">${esc(t("nobody_today"))}</div>`;
-  return { html, count: todayShifts.length };
+  return { html, count: list.length };
 }
 
 // totals shared by the cost tabs and Main
@@ -586,7 +605,7 @@ async function renderMain(view, demo, fresh = false) {
   const [fx, vr, rt, tk, live, monthly, debts, emp] = await Promise.allSettled([
     loadData("fixed"), loadData("variable"), loadData("ratings"), loadData("tasks"),
     loadSyrve("live", "", fresh), loadSyrve("monthly", "", fresh), loadSyrve("debts", "", fresh),
-    loadSyrve("employees", "?month=" + ym, fresh),
+    loadData("staff"),
   ]);
   const ok = r => r.status === "fulfilled";
   const failed = r => `<div class="value muted">—</div><div class="hint bad-text">${esc(t("load_failed"))}${r.reason ? ": " + esc(r.reason.message) : ""}</div>`;
@@ -1337,7 +1356,7 @@ async function renderDishDetail(view, id, range, fresh) {
 // Telegram (with a waybill-by-waybill comparison with rs.ge) / "rs მოსული": the rs.ge goods by category,
 // each supplier's payments split between its categories by share.
 // Payments the app can't match safely wait in "To review" until the CEO assigns them.
-const DEBT_TABS = ["rs", "syrve", "tg", "cats"];
+const DEBT_TABS = ["rs", "syrve", "tg", "cats", "staff"];
 const DEBT_CATS = ["food", "supplies", "equipment", "other", "outsource"]; // the sections of "rs მოსული"
 const PRODUCT_CATS = ["food", "supplies", "equipment", "other"];           // a product's category
 const EXPENSE_CATS = ["supplies", "equipment", "other", "outsource"];      // a recipient that is not a supplier
@@ -1373,13 +1392,22 @@ function compareHtml(cmp, match) {
   </div>`;
 }
 // "Who is this?" for a recipient that is not a supplier: one of EXPENSE_CATS; "other" also asks for a comment.
-// onPick(cat, comment) — comment is undefined unless "other" was chosen.
-function expenseChooser(cell, onPick, onCancel) {
+// "Employee" asks which one (emps: the active employees). onPick(cat, comment, employeeId) — comment only for "other".
+function expenseChooser(cell, onPick, onCancel, emps = []) {
   cell.innerHTML = `<div class="remember"><div class="q">${esc(t("who_q"))}</div>
-    ${EXPENSE_CATS.map(k => `<button type="button" class="btn small" data-x="${k}">${esc(t("cat_" + k))}</button>`).join("")}
+    ${[...EXPENSE_CATS, "staff"].map(k => `<button type="button" class="btn small" data-x="${k}">${esc(t("cat_" + k))}</button>`).join("")}
     <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
   $(".rm-cancel", cell).addEventListener("click", onCancel);
   $$("[data-x]", cell).forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.x === "staff") {
+      cell.innerHTML = `<div class="remember"><div class="q">${esc(t("cat_staff"))}</div>
+        ${emps.length ? `<select class="x-emp">${emps.map(e => `<option value="${esc(e.id)}">${esc(e.name)}${e.role ? " · " + esc(e.role) : ""}</option>`).join("")}</select>
+          <button type="button" class="btn small primary x-ok">${esc(t("save"))}</button>` : `<div class="muted small">${esc(t("staff_none"))}</div>`}
+        <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+      if (emps.length) $(".x-ok", cell).addEventListener("click", () => onPick("staff", undefined, $(".x-emp", cell).value));
+      $(".rm-cancel", cell).addEventListener("click", onCancel);
+      return;
+    }
     if (b.dataset.x !== "other") return onPick(b.dataset.x);
     cell.innerHTML = `<div class="remember"><div class="q">${esc(t("cat_other"))}</div>
       <textarea class="x-note" rows="2" maxlength="300" placeholder="${esc(t("comment_ph"))}"></textarea>
@@ -1463,7 +1491,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
         <div>BOG: ${bank.configured.bog ? "✓" : "—"} · TBC: ${bank.configured.tbc ? "✓ " + esc(t("tbc_auto")) : "—"}</div>
         <div>${esc(t("history_note"))}</div>
         ${(r.linkedTins || []).length ? `<div style="margin-top:10px"><b>${esc(t("linked"))}</b></div>
-          ${r.linkedTins.map(l => `<div class="linked">${esc(l.tin)} → ${l.to === "ignore" ? esc(t("not_supplier")) : l.to.startsWith("x:") ? `${esc(t("not_supplier"))} · ${esc(t("cat_" + l.to.slice(2)))}` : esc(l.name)} <button class="icon-btn unlink" data-kind="${esc(l.kind || "tin")}" data-tin="${esc(l.tin)}" title="${esc(t("delete"))}">✕</button></div>`).join("")}` : ""}
+          ${r.linkedTins.map(l => `<div class="linked">${esc(l.tin)} → ${l.to === "ignore" ? esc(t("not_supplier")) : l.to.startsWith("x:") ? `${esc(t("not_supplier"))} · ${esc(t("cat_" + l.to.slice(2)))}` : l.to.startsWith("e:") ? `${esc(t("cat_staff"))} · ${esc(l.name)}` : esc(l.name)} <button class="icon-btn unlink" data-kind="${esc(l.kind || "tin")}" data-tin="${esc(l.tin)}" title="${esc(t("delete"))}">✕</button></div>`).join("")}` : ""}
       </div>
     </details>`;
 
@@ -1499,6 +1527,31 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       <tbody>${rows || `<tr><td colspan="${extra ? 7 : 6}" class="empty">${esc(t(dt === "tg" && !r.tgSince ? "tg_none" : "no_debts"))}</td></tr>`}</tbody>
       ${list.length ? `<tfoot><tr><td colspan="5">${esc(t("total_owed"))}</td><td class="r num">${money(total)}</td>${extra ? "<td></td>" : ""}</tr></tfoot>` : ""}
     </table></div></div>`;
+  } else if (dt === "staff") {
+    // employees: earned (their shifts × pay) + overtime − salary transfers, each from their start date
+    const ST = r.staff || { employees: [], total: 0 };
+    const emps = ST.employees.filter(e => match({ name: e.name, tin: (e.accounts || []).map(a => a.tin || a.iban).join(" "), rsName: e.role }));
+    cards = card(t("staff_owed"), money(ST.total || 0), "", ST.total > 0 ? "hero bad" : "hero") +
+      card(t("emp_list"), String(ST.employees.length)) + reviewCard + bankCard;
+    const monthsHtml = e => `<table class="mini"><thead><tr><th>${esc(t("month"))}</th><th class="r">${esc(t("shifts_n"))}</th><th class="r">${esc(t("hours"))}</th><th class="r">${esc(t("earned"))}</th><th class="r">${esc(t("overtime"))}</th><th class="r">${esc(t("paid_bank"))}</th></tr></thead>
+      <tbody>${e.months.map(m => `<tr><td>${esc(monthLabel(m.ym))}</td><td class="r num">${m.shifts}</td><td class="r num">${fmtHours(m.hours)}</td><td class="r num">${money(m.earned)}</td>
+        <td class="r num">${m.overtime ? money(m.overtime) : "—"}</td><td class="r num">${m.paid ? money(m.paid) : "—"}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody></table>`;
+    body = `<div class="muted small" style="margin:-6px 0 14px">${esc(t("staff_hint"))}</div>` +
+      (ST.employees.length ? "" : `<div class="notice">${esc(t("staff_none"))} <a href="#employees">→</a></div>`) +
+      `<div class="panel"><div class="table-wrap"><table>
+        <thead><tr><th>${esc(t("employee"))}</th><th>${esc(t("pay_type"))}</th><th>${esc(t("count_from"))}</th><th class="r">${esc(t("shifts_n"))} / ${esc(t("hours"))}</th><th class="r">${esc(t("earned"))}</th><th class="r">${esc(t("overtime"))}</th><th class="r">${esc(t("paid_bank"))}</th><th class="r">${esc(t("owed"))}</th></tr></thead>
+        <tbody>${emps.length ? emps.map(e => { const open = S.staffOpen === e.id; return `<tr class="pick" data-staff="${esc(e.id)}">
+          <td><b>${esc(e.name)}</b>${e.active ? "" : ` <span class="pill neutral">${esc(t("inactive"))}</span>`}<div class="muted small">${esc(e.role)}</div>
+            ${(e.accounts || []).length ? `<div class="muted small">🏦 ${e.accounts.map(a => esc(a.tin || a.iban)).join(", ")}</div>` : ""}</td>
+          <td class="small">${esc(t("pay_" + e.pay))} · ${money(e.rate)}</td>
+          <td class="muted">${e.start ? esc(e.start) : `<span class="pill warn">${esc(t("no_start"))}</span>`}</td>
+          <td class="r num">${e.shifts} / ${fmtHours(e.hours)}</td><td class="r num">${money(e.earned)}</td>
+          <td class="r num">${e.overtime ? money(e.overtime) : "—"}</td><td class="r num">${e.paid ? money(e.paid) : "—"}</td>
+          <td class="r num nowrap">${owedCell(e.owed)} <span class="muted">${open ? "▴" : "▾"}</span></td></tr>
+          ${open ? `<tr class="sub"><td colspan="8">${monthsHtml(e)}</td></tr>` : ""}`; }).join("")
+          : `<tr><td colspan="8" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        ${emps.length ? `<tfoot><tr><td colspan="7">${esc(t("staff_owed"))}</td><td class="r num">${money(ST.total || 0)}</td></tr></tfoot>` : ""}
+      </table></div></div>`;
   } else {
     // "rs მოსული": one section at a time — its suppliers (payments split by share), its products, and the payments
     // to recipients that are not suppliers but were given this category (outsourcing has only those)
@@ -1578,6 +1631,8 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
   const rerender = () => renderDebts(view, demo, false, true).catch(e => toast(e.message));
   $$("[data-dt]", view).forEach(b => b.addEventListener("click", () => { S.debtTab = b.dataset.dt; store.set("dash_debt_tab", S.debtTab); rerender(); }));
   $$("[data-dc]", view).forEach(b => b.addEventListener("click", () => { S.debtCat = b.dataset.dc; store.set("dash_debt_cat", S.debtCat); rerender(); }));
+  const activeEmps = ((r.staff || {}).employees || []).filter(e => e.active);
+  $$("tr[data-staff]", view).forEach(tr => tr.addEventListener("click", () => { S.staffOpen = S.staffOpen === tr.dataset.staff ? "" : tr.dataset.staff; rerender(); }));
   const cmpBtn = $("#tgCompare", view);
   if (cmpBtn) cmpBtn.addEventListener("click", () => { S.debtCompare = !S.debtCompare; rerender(); });
   // rs.ge months and Syrve months arrive a few per request: ask again until all are in (or 20 tries)
@@ -1597,6 +1652,10 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       out = [[t("dt_" + dt)], [t("supplier"), t("tax_id"), t("col_" + dt), t("returns_col"), t("paid_bank"), t("owed"), ...(dt === "syrve" ? [t("syrve_balance")] : [])]];
       list.forEach(x => { const [a, , o] = col(x); out.push([x.name, x.tin || "", a || 0, x.returns || 0, x.paid || 0, o, ...(dt === "syrve" ? [x.syrveBalance ?? ""] : [])]); });
       out.push([t("total_owed"), "", "", "", "", totals[dt] || 0]);
+    } else if (dt === "staff") {
+      out = [[t("dt_staff")], [t("employee"), t("role"), t("pay_type"), t("rate"), t("count_from"), t("shifts_n"), t("hours"), t("earned"), t("overtime"), t("paid_bank"), t("owed")]];
+      ((r.staff || {}).employees || []).forEach(e => out.push([e.name, e.role, t("pay_" + e.pay), e.rate, e.start, e.shifts, e.hours, e.earned, e.overtime, e.paid, e.owed]));
+      out.push([t("staff_owed"), "", "", "", "", "", "", "", "", "", (r.staff || {}).total || 0]);
     } else {
       out = [[`${t("dt_cats")} · ${t("cat_" + dc)}`]];
       if (dc !== "outsource") {
@@ -1609,7 +1668,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       out.push([t("nw_title")], [t("recipient"), t("tax_id"), t("payments_col"), t("amount"), t("comment")]);
       ((C.expenses || {})[dc] || []).forEach(x => out.push([x.name, x.tin || x.iban || "", x.count, x.amount, x.comment || ""]));
     }
-    exportXlsx(`debts-${dt}${col ? "" : "-" + dc}-${todayISO()}.xlsx`, t("tab_debts"), out);
+    exportXlsx(`debts-${dt}${dt === "cats" ? "-" + dc : ""}-${todayISO()}.xlsx`, t("tab_debts"), out);
   });
 
   // "rs მოსული": move a product to another category (↺ = automatic again)
@@ -1631,7 +1690,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
     const pick = $(".ux-pick", tr);
     if (pick) pick.addEventListener("click", () => {
       const cell = pick.parentElement, original = cell.innerHTML;
-      expenseChooser(cell, (cat, comment) => xSave(xBody(tr, "x:" + cat, comment)), () => { cell.innerHTML = original; renderDebts(view, demo, false, true); });
+      expenseChooser(cell, (cat, comment, emp) => xSave(xBody(tr, cat === "staff" ? "e:" + emp : "x:" + cat, comment)), () => { cell.innerHTML = original; renderDebts(view, demo, false, true); }, activeEmps);
     });
     const sel = $(".ex-sel", tr);
     if (sel) sel.addEventListener("change", () => xSave(xBody(tr, "x:" + sel.value)));
@@ -1678,8 +1737,8 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
         ask(v);
       });
       $(".rv-ignore", cell).addEventListener("click", () => {
-        if (dt !== "cats") return ask("ignore");
-        expenseChooser(cell, (cat, comment) => ask("x:" + cat, comment), () => { cell.innerHTML = original; wire(); });
+        if (dt !== "cats" && dt !== "staff") return ask("ignore");
+        expenseChooser(cell, (cat, comment, emp) => ask(cat === "staff" ? "e:" + emp : "x:" + cat, comment), () => { cell.innerHTML = original; wire(); }, activeEmps);
       });
     };
     wire();
@@ -1791,49 +1850,156 @@ async function renderRatings(view, demo) {
 }
 
 // ====================== 7. EMPLOYEES ======================
-async function renderEmployees(view, demo, fresh = false) {
-  const ym = S.empMonth;
-  view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
-  const q = "?month=" + ym;
-  const [r, rToday] = await Promise.all([
-    loadSyrve("employees", q, fresh),
-    ym === ymNow() ? null : loadSyrve("employees", "?month=" + ymNow(), fresh),
-  ]);
-  const tdata = rToday || r;
-  const today = tdata.today || todayISO();
-  const { html: todayHtml, count: todayCount } = whoWorksToday(tdata);
-  const todayShifts = { length: todayCount };
+// Everything here is typed in by hand (saved as data "staff"): the employees (role, pay, personal ID / bank
+// account for matching salary transfers, the date their salary counts from) and the shifts in the calendar
+// (any number per day, from–to, overtime ₾, note). Debts → Employees turns them into what each one is owed.
+const PAY_TYPES = ["hour", "shift", "month"];
+const empHours = s => { // a shift that ends before it starts goes past midnight
+  const mins = x => { const m = String(x || "").match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+  const a = mins(s.from), b = mins(s.to);
+  return isNaN(a) || isNaN(b) || a === b ? 0 : (b > a ? b - a : b + 1440 - a) / 60;
+};
+const fmtHours = h => (Math.round(h * 100) / 100).toLocaleString(S.lang === "ka" ? "ka-GE" : "en-US");
 
-  // calendar
+async function renderEmployees(view, demo) {
+  const d = await loadData("staff");
+  d.employees = d.employees || []; d.shifts = d.shifts || [];
+  const ym = S.empMonth;
+  const today = todayISO();
+  const byId = Object.fromEntries(d.employees.map(e => [e.id, e]));
+  const active = d.employees.filter(e => e.active !== false);
+  const { html: todayHtml, count: todayCount } = whoWorksToday(d);
+  const save = () => { saveData("staff"); renderEmployees(view, demo); };
+
+  // calendar: click a day to edit its shifts
   const [y, m] = ym.split("-").map(Number);
-  const first = new Date(y, m - 1, 1);
-  const lead = (first.getDay() + 6) % 7; // Monday first
+  const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Monday first
   const daysIn = new Date(y, m, 0).getDate();
   const byDay = {};
-  r.shifts.forEach(s => { const k = (s.from || "").slice(0, 10); (byDay[k] = byDay[k] || []).push(s); });
+  d.shifts.forEach(s => { if (byId[s.emp]) (byDay[s.day] = byDay[s.day] || []).push(s); });
+  const sortShifts = list => list.sort((a, b) => (a.from || "").localeCompare(b.from || "") || (byId[a.emp]?.name || "").localeCompare(byId[b.emp]?.name || ""));
   let cells = t("days").map(dn => `<div class="cal-head">${esc(dn)}</div>`).join("");
   for (let i = 0; i < lead; i++) cells += `<div class="cal-day out"></div>`;
   for (let dd = 1; dd <= daysIn; dd++) {
     const k = `${ym}-${pad(dd)}`;
-    const list = (byDay[k] || []).sort((a, b) => (a.from || "").localeCompare(b.from || ""));
-    const shown = list.slice(0, 4);
-    cells += `<div class="cal-day ${k === today ? "today" : ""}"><div class="d">${dd}</div>
-      ${shown.map(s => `<div class="who" title="${esc(s.name)} ${esc(hhmm(s.from))}–${esc(hhmm(s.to))}">${esc(hhmm(s.from))} ${esc(s.name)}</div>`).join("")}
+    const list = sortShifts(byDay[k] || []);
+    const shown = list.slice(0, 5);
+    cells += `<div class="cal-day pick ${k === today ? "today" : ""} ${k === S.empDay ? "sel" : ""}" data-day="${k}"><div class="d">${dd}</div>
+      ${shown.map(s => `<div class="who" title="${esc(byId[s.emp].name)} ${esc(s.from)}–${esc(s.to)}${n(s.ot) ? " · +" + money(s.ot) : ""}">${esc(s.from)} ${esc(byId[s.emp].name)}${n(s.ot) ? " +" : ""}</div>`).join("")}
       ${list.length > shown.length ? `<div class="more">+${list.length - shown.length}</div>` : ""}</div>`;
   }
   const trail = (7 - ((lead + daysIn) % 7)) % 7;
   for (let i = 0; i < trail; i++) cells += `<div class="cal-day out"></div>`;
 
-  view.innerHTML = demo + head(t("tab_employees"), t("employees_sub"), `<button class="btn" id="empRefresh">${esc(t("refresh"))}</button>`) +
-    `<div class="panel"><div class="panel-head"><h3>${esc(t("working_today"))} · ${esc(today)}</h3><span class="muted small">${todayShifts.length}</span></div>
+  // the chosen day's shifts
+  const dayList = S.empDay ? sortShifts(d.shifts.filter(s => s.day === S.empDay && byId[s.emp])) : [];
+  const empOptions = sel => d.employees.filter(e => e.active !== false || e.id === sel)
+    .map(e => `<option value="${esc(e.id)}" ${e.id === sel ? "selected" : ""}>${esc(e.name || "?")}${e.role ? " · " + esc(e.role) : ""}</option>`).join("");
+  const dayHtml = !S.empDay ? "" : `<div class="panel" id="dayPanel"><div class="panel-head"><h3>${esc(t("day_shifts"))} · ${esc(S.empDay)}</h3>
+      <div class="actions"><button class="btn small primary" id="shiftAdd" ${active.length ? "" : "disabled"}>${esc(t("add_shift"))}</button><button class="btn small ghost" id="dayClose">✕</button></div></div>
+      ${active.length ? "" : `<div class="notice">${esc(t("add_emp_first"))}</div>`}
+      <div class="table-wrap"><table class="edit">
+        <thead><tr><th>${esc(t("employee"))}</th><th>${esc(t("from_t"))}</th><th>${esc(t("to_t"))}</th><th class="r">${esc(t("hours"))}</th><th class="r">${esc(t("overtime"))} ₾</th><th>${esc(t("note"))}</th><th></th></tr></thead>
+        <tbody>${dayList.length ? dayList.map(s => `<tr data-shift="${esc(s.id)}">
+          <td><select data-f="emp">${empOptions(s.emp)}</select></td>
+          <td><input type="time" data-f="from" value="${esc(s.from)}"></td>
+          <td><input type="time" data-f="to" value="${esc(s.to)}"></td>
+          <td class="r num">${fmtHours(empHours(s))}</td>
+          <td><input type="number" min="0" step="0.01" class="num" data-f="ot" value="${n(s.ot) || ""}" placeholder="0"></td>
+          <td><input type="text" data-f="note" value="${esc(s.note || "")}" maxlength="200"></td>
+          <td class="r"><button class="icon-btn shift-del" title="${esc(t("delete"))}">✕</button></td></tr>`).join("")
+          : `<tr><td colspan="7" class="empty">${esc(t("nobody_today"))}</td></tr>`}</tbody>
+      </table></div></div>`;
+
+  // this month per employee
+  const monthShifts = d.shifts.filter(s => (s.day || "").slice(0, 7) === ym && byId[s.emp]);
+  const sumRows = d.employees.map(e => {
+    const mine = monthShifts.filter(s => s.emp === e.id);
+    return { e, shifts: mine.length, days: new Set(mine.map(s => s.day)).size, hours: mine.reduce((a, s) => a + empHours(s), 0), ot: mine.reduce((a, s) => a + n(s.ot), 0) };
+  }).filter(x => x.shifts);
+
+  // employees list
+  const empRows = d.employees.map(e => `<tr data-emp="${esc(e.id)}" class="${e.active === false ? "muted" : ""}">
+      <td><input type="text" data-f="name" value="${esc(e.name || "")}" maxlength="80"></td>
+      <td><input type="text" data-f="role" value="${esc(e.role || "")}" maxlength="60"></td>
+      <td><select data-f="pay">${PAY_TYPES.map(p => `<option value="${p}" ${p === (e.pay || "month") ? "selected" : ""}>${esc(t("pay_" + p))}</option>`).join("")}</select></td>
+      <td><input type="number" min="0" step="0.01" class="num" data-f="rate" value="${n(e.rate) || ""}" placeholder="0"></td>
+      <td><input type="text" data-f="pid" value="${esc(e.pid || "")}" maxlength="20"></td>
+      <td><input type="text" data-f="iban" value="${esc(e.iban || "")}" maxlength="34" placeholder="GE00…"></td>
+      <td><input type="date" data-f="from" value="${esc(e.from || "")}"></td>
+      <td><input type="checkbox" data-f="active" ${e.active !== false ? "checked" : ""}></td>
+      <td class="r"><button class="icon-btn emp-del" title="${esc(t("delete"))}">✕</button></td></tr>`).join("");
+
+  view.innerHTML = demo + head(t("tab_employees"), t("employees_sub"), "") +
+    `<div class="panel"><div class="panel-head"><h3>${esc(t("working_today"))} · ${esc(today)}</h3><span class="muted small">${todayCount}</span></div>
       <div class="panel-body">${todayHtml}</div></div>
     <div class="panel"><div class="panel-head"><h3>${esc(t("calendar"))}</h3>
-      <div class="actions"><button class="btn small" id="empPrev">${t("prev")}</button><b>${esc(monthLabel(ym))}</b><button class="btn small" id="empNext">${t("next")}</button></div></div>
-      <div class="calendar">${cells}</div></div>`;
+      <div class="actions"><span class="muted small">${esc(t("click_day"))}</span><button class="btn small" id="empPrev">${t("prev")}</button><b>${esc(monthLabel(ym))}</b><button class="btn small" id="empNext">${t("next")}</button></div></div>
+      <div class="calendar">${cells}</div></div>
+    ${dayHtml}
+    <div class="panel"><div class="panel-head"><h3>${esc(t("month_summary"))} · ${esc(monthLabel(ym))}</h3></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>${esc(t("employee"))}</th><th>${esc(t("role"))}</th><th class="r">${esc(t("shifts_n"))}</th><th class="r">${esc(t("hours"))}</th><th class="r">${esc(t("overtime"))}</th></tr></thead>
+        <tbody>${sumRows.length ? sumRows.map(x => `<tr><td>${esc(x.e.name || "?")}</td><td class="muted">${esc(x.e.role || "")}</td>
+          <td class="r num">${x.shifts}${x.days !== x.shifts ? ` <span class="muted small">(${x.days} ${esc(t("days_n"))})</span>` : ""}</td>
+          <td class="r num">${fmtHours(x.hours)}</td><td class="r num">${x.ot ? money(x.ot) : "—"}</td></tr>`).join("")
+          : `<tr><td colspan="5" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+      </table></div></div>
+    <div class="panel"><div class="panel-head"><h3>${esc(t("emp_list"))} · ${d.employees.length}</h3>
+      <div class="actions"><button class="btn small primary" id="empAdd">${esc(t("add_emp"))}</button></div></div>
+      <div class="table-wrap"><table class="edit">
+        <thead><tr><th>${esc(t("name"))}</th><th>${esc(t("role"))}</th><th>${esc(t("pay_type"))}</th><th>${esc(t("rate"))} ₾</th><th>${esc(t("pid"))}</th><th>${esc(t("iban"))}</th><th>${esc(t("count_from"))}</th><th>${esc(t("active"))}</th><th></th></tr></thead>
+        <tbody>${empRows || `<tr><td colspan="9" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+      </table></div>
+      <div class="panel-body muted small">${esc(t("emp_hint"))}</div></div>`;
 
-  $("#empPrev", view).addEventListener("click", () => { S.empMonth = ymShift(ym, -1); renderEmployees(view, demo); });
-  $("#empNext", view).addEventListener("click", () => { S.empMonth = ymShift(ym, 1); renderEmployees(view, demo); });
-  $("#empRefresh", view).addEventListener("click", () => renderEmployees(view, demo, true).catch(e => toast(e.message)));
+  $("#empPrev", view).addEventListener("click", () => { S.empMonth = ymShift(ym, -1); S.empDay = ""; renderEmployees(view, demo); });
+  $("#empNext", view).addEventListener("click", () => { S.empMonth = ymShift(ym, 1); S.empDay = ""; renderEmployees(view, demo); });
+  $$("[data-day]", view).forEach(c => c.addEventListener("click", () => {
+    S.empDay = c.dataset.day; renderEmployees(view, demo).then(() => $("#dayPanel")?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+  }));
+  if (S.empDay) {
+    $("#dayClose", view).addEventListener("click", () => { S.empDay = ""; renderEmployees(view, demo); });
+    $("#shiftAdd", view).addEventListener("click", () => {
+      const last = dayList[dayList.length - 1];
+      const busy = new Set(dayList.map(s => s.emp));
+      const emp = (active.find(e => !busy.has(e.id)) || active[0]).id;
+      d.shifts.push({ id: uid(), emp, day: S.empDay, from: last?.from || "10:00", to: last?.to || "18:00", ot: 0, note: "" });
+      save();
+    });
+    $$("tr[data-shift]", view).forEach(tr => {
+      const s = d.shifts.find(x => x.id === tr.dataset.shift);
+      $$("[data-f]", tr).forEach(inp => inp.addEventListener("change", () => {
+        const f = inp.dataset.f;
+        if ((f === "from" || f === "to") && !/^\d{2}:\d{2}$/.test(inp.value)) { toast(t("bad_time")); inp.value = s[f]; return; }
+        s[f] = f === "ot" ? Math.max(0, n(inp.value)) : inp.value.trim();
+        save();
+      }));
+      $(".shift-del", tr).addEventListener("click", () => { d.shifts = d.shifts.filter(x => x !== s); save(); });
+    });
+  }
+  $("#empAdd", view).addEventListener("click", () => {
+    d.employees.push({ id: uid(), name: "", role: "", pay: "month", rate: 0, pid: "", iban: "", from: "", active: true });
+    saveData("staff");
+    renderEmployees(view, demo).then(() => { const rows = $$("tr[data-emp]", view); $("[data-f=name]", rows[rows.length - 1])?.focus(); });
+  });
+  $$("tr[data-emp]", view).forEach(tr => {
+    const e = byId[tr.dataset.emp];
+    $$("[data-f]", tr).forEach(inp => inp.addEventListener("change", () => {
+      const f = inp.dataset.f;
+      if (f === "active") e.active = inp.checked;
+      else if (f === "rate") e.rate = Math.max(0, n(inp.value));
+      else if (f === "iban") e.iban = inp.value.replace(/\s+/g, "").toUpperCase();
+      else e[f] = inp.value.trim();
+      save();
+    }));
+    $(".emp-del", tr).addEventListener("click", () => {
+      // someone with shifts is switched off instead: their shifts and salary history stay
+      if (d.shifts.some(s => s.emp === e.id)) { e.active = false; toast(t("emp_deactivated")); }
+      else d.employees = d.employees.filter(x => x !== e);
+      save();
+    });
+  });
 }
 
 // ====================== 8. TASKS ======================
@@ -1934,6 +2100,16 @@ function demoApi(path, opts) {
         { id: "r1", date: ymShift(ymNow(), -1) + "-15", platform: "wolt", rating: 4.5, reviews: 812, comment: "" },
         { id: "r2", date: todayISO(), platform: "wolt", rating: 4.6, reviews: 845, comment: "" },
         { id: "r3", date: todayISO(), platform: "glovo", rating: 4.7, reviews: 214, comment: "" },
+      ] },
+      staff: { employees: [
+        { id: "e1", name: "ნინო ბერიძე", role: "მზარეული", pay: "month", rate: 1800, pid: "01001012345", iban: "", from: ymShift(ymNow(), -1) + "-01", active: true },
+        { id: "e2", name: "გიორგი კაპანაძე", role: "მიმტანი", pay: "hour", rate: 9, pid: "", iban: "GE11TB0000000000000222", from: "", active: true },
+        { id: "e3", name: "ანა ლომიძე", role: "პიცაიოლო", pay: "shift", rate: 90, pid: "", iban: "", from: "", active: true },
+      ], shifts: [
+        ...[1, 2, 3, 4, 6, 8, 9].map(dd => ({ id: "s1" + dd, emp: "e1", day: `${ymNow()}-${pad(dd)}`, from: "09:00", to: "17:00", ot: 0, note: "" })),
+        ...[1, 3, 4, 5, 7].map(dd => ({ id: "s2" + dd, emp: "e2", day: `${ymNow()}-${pad(dd)}`, from: "16:00", to: "00:30", ot: dd === 3 ? 25 : 0, note: dd === 3 ? "დაგვიანებული დახურვა" : "" })),
+        ...[2, 4, 6].map(dd => ({ id: "s3" + dd, emp: "e3", day: `${ymNow()}-${pad(dd)}`, from: "11:00", to: "23:00", ot: 0, note: "" })),
+        { id: "st", emp: "e2", day: todayISO(), from: "12:00", to: "20:00", ot: 0, note: "" },
       ] },
       tasks: { daily: [
         { id: "d1", title: "Open checklist", assignee: "Nino", done: { [todayISO()]: true } },
@@ -2039,6 +2215,16 @@ function demoApi(path, opts) {
     const since = ymNow() + "-01";
     return { asOf: todayISO(), total: sum(s => s.owed), suppliers, cats, tgSince: since,
       totals: { rs: sum(s => s.owed), syrve: sum(s => s.owedInv), tg: sum(s => s.owedTg), cats: r2(DEBT_CATS.reduce((a, k) => a + cats.totals[k].owed, 0)) },
+      staff: { total: 2061.5, employees: [
+        { id: "e1", name: "ნინო ბერიძე", role: "მზარეული", pay: "month", rate: 1800, start: ymShift(ymNow(), -1) + "-01", active: true, hours: 56, shifts: 7, days: 7,
+          earned: 3600, overtime: 0, paid: 1800, owed: 1800, accounts: [{ rk: "t:01001012345", name: "ნინო ბერიძე", tin: "01001012345", iban: "", scope: "auto" }],
+          months: [{ ym: ymShift(ymNow(), -1), hours: 0, shifts: 0, days: 0, earned: 1800, overtime: 0, paid: 1800 }, { ym: ymNow(), hours: 56, shifts: 7, days: 7, earned: 1800, overtime: 0, paid: 0 }] },
+        { id: "e3", name: "ანა ლომიძე", role: "პიცაიოლო", pay: "shift", rate: 90, start: ymNow() + "-02", active: true, hours: 36, shifts: 3, days: 3,
+          earned: 270, overtime: 0, paid: 0, owed: 270, accounts: [], months: [{ ym: ymNow(), hours: 36, shifts: 3, days: 3, earned: 270, overtime: 0, paid: 0 }] },
+        { id: "e2", name: "გიორგი კაპანაძე", role: "მიმტანი", pay: "hour", rate: 9, start: ymNow() + "-01", active: true, hours: 50.5, shifts: 6, days: 6,
+          earned: 454.5, overtime: 25, paid: 488, owed: -8.5, accounts: [{ rk: "i:GE11TB0000000000000222", name: "Giorgi Kapanadze", tin: "", iban: "GE11TB0000000000000222", scope: "tin" }],
+          months: [{ ym: ymNow(), hours: 50.5, shifts: 6, days: 6, earned: 454.5, overtime: 25, paid: 488 }] },
+      ] },
       compare: { since, counts: { onlyTg: 1, onlyRs: 3, diff: 1 },
         suppliers: [{ key: "205123456", name: "Sante GMT", tg: 0, rs: 980, nTg: 0, nRs: 2, gap: 980 }, { key: "204567891", name: "Nikora", tg: 2100, rs: 2350, nTg: 5, nRs: 5, gap: 250 },
           { key: "400112233", name: "Ori Nabiji", tg: 640, rs: 640, nTg: 2, nRs: 1, gap: 0 }],

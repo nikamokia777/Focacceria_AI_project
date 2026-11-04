@@ -11,16 +11,19 @@
 
 import { listOutgoingWaybills } from "./rsge.js";
 import { buildMenu, buildDish, buildMenuMonthly } from "./menu.js";
-import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadBankData, loadRecipientPayments, syncStep, bumpVersion, loadVersion } from "./bank.js";
+import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, loadBankData, loadRecipientPayments, loadPaymentsOf, syncStep, bumpVersion, loadVersion } from "./bank.js";
 import { loadLog, loadBasePrices } from "./store.js";
 import { syncWaybills, waybillTotals } from "./waybills.js";
 import { syncInvoices, invoiceTotals } from "./syrveinv.js";
 import { syncTelegramApproved, categorizer, loadCategories, saveCategory, CATEGORIES } from "./debtsrc.js";
 import { runProbe } from "./rsprobe.js";
 
-const DATA_KEYS = ["fixed", "variable", "ratings", "tasks"];
+// staff = { employees: [{ id, name, role, pay: "hour" | "shift" | "month", rate, pid, iban, from, active }],
+//           shifts: [{ id, emp, day: "YYYY-MM-DD", from: "HH:MM", to: "HH:MM", ot: overtime ₾, note }] } — typed in the Employees tab
+const DATA_KEYS = ["fixed", "variable", "ratings", "tasks", "staff"];
 // The CEO's remembered decisions: { byTin, byIban, byTx: { key: target }, comments: { "tin:…" | "iban:…" | "rk:…": text } }
-// target: a supplier id, "ignore" (not a supplier) or "x:<category>" (not a supplier: an expense, see EXPENSE_CATS)
+// target: a supplier id, "ignore" (not a supplier), "x:<category>" (not a supplier: an expense, see EXPENSE_CATS)
+//         or "e:<employee id>" (an employee: salary payments, see the Debts → Employees view)
 const LINKS_KEY = "dash:bank:links";
 const EXPENSE_CATS = ["supplies", "equipment", "other", "outsource"];
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" };
@@ -42,6 +45,7 @@ export async function handleDashboard(request, env, path) {
         const text = JSON.stringify(body.value ?? null);
         if (text.length > 1_000_000) return json({ error: "Too much data" }, 400);
         await env.STORE.put(kvKey, text);
+        if (parts[1] === "staff") await bumpVersion(env); // the Debts → Employees view depends on it
         return json({ ok: true });
       }
       return json({ error: "Method not allowed" }, 405);
@@ -569,6 +573,7 @@ async function saveReview(env, body) {
   const target = body.supplierId === null ? null : String(body.supplierId || "").toLowerCase();
   if (body.supplierId !== null && !target) return { error: "supplierId required" };
   if (target && target.startsWith("x:") && !EXPENSE_CATS.includes(target.slice(2))) return { error: "bad category" };
+  if (target && target.startsWith("e:") && !/^e:[\w-]{1,40}$/.test(target)) return { error: "bad employee" };
   let noteKey = "";
   if (body.scope === "once") {
     // only the payments we have now; future payments to this recipient will be asked about again
@@ -641,6 +646,16 @@ async function buildDebts(env, syrve, tg) {
 
   // our own company: TBC doesn't flag transfers between our accounts, so recognise them by
   // our tax ID (seen as the sender on BOG, or COMPANY_TIN) and by our BOG account numbers
+  // employees (typed in the Employees tab): their transfers are salaries, matched by personal ID or account
+  const staff = (await env.STORE.get("dash:data:staff", "json")) || {};
+  const emps = (staff.employees || []).filter(e => e && e.id);
+  const empById = Object.fromEntries(emps.map(e => [e.id, e]));
+  const empByPid = {}, empByIban = {};
+  for (const e of emps) {
+    const pid = String(e.pid || "").trim(), iban = String(e.iban || "").replace(/\s+/g, "").toUpperCase();
+    if (pid) empByPid[pid] = e;
+    if (iban) empByIban[iban] = e;
+  }
   const ownTins = new Set([String(env.COMPANY_TIN || "").trim(), ...Object.values(recipients).filter(r => r[4] && r[1]).map(r => r[1])].filter(Boolean));
   const ownIbans = new Set((settings.bogAccounts || []).map(x => x.toUpperCase()));
   const decide = rk => {
@@ -651,6 +666,9 @@ async function buildDebts(env, syrve, tg) {
     const scope = byT !== undefined ? "tin" : "iban";
     if (forced === "ignore") return { skip: true, unsorted: scope }; // "not a supplier", no category yet
     if (forced?.startsWith("x:")) return { skip: true, expense: forced.slice(2), scope };
+    if (forced?.startsWith("e:")) return { skip: true, employee: forced.slice(2), scope };
+    const emp = (tin && empByPid[tin]) || (iban && empByIban[iban.toUpperCase()]);
+    if (emp && forced === undefined) return { skip: true, employee: emp.id, scope: "auto" };
     if (forced && valid(forced)) return { supplierId: forced };
     if (own || isTreasury({ name, iban, bankCode }) || (!tin && !iban)) return { skip: true }; // own transfers, taxes, fees
     if (tin && sellers[tin]) return { supplierId: "tin:" + tin }; // the seller's tax ID on our rs.ge waybills
@@ -675,6 +693,10 @@ async function buildDebts(env, syrve, tg) {
     return { reason: c.length > 1 || exact.length > 1 ? "several_matches" : c.length ? "name_only" : "unknown", suggestion: (exact[0] || c[0])?.id || null };
   };
 
+  // salary payments: recipients that are employees (empRk) and single payments given to one (empTx: txId → employee)
+  const empRk = {}, empTx = new Map(), empRks = new Set();
+  const txIdOf = new Map(Object.entries(links.byTx).filter(([, v]) => v && typeof v === "object").map(([id, v]) => [v, id]));
+  const txOf = v => txIdOf.get(v);
   // single-payment decisions ("only these payments"), grouped by recipient
   const txByRk = {};
   for (const v of Object.values(links.byTx)) if (v && typeof v === "object" && v.rk) (txByRk[v.rk] = txByRk[v.rk] || []).push(v);
@@ -699,6 +721,7 @@ async function buildDebts(env, syrve, tg) {
     const singles = txByRk[rk] || [];
     for (const v of singles) {
       if (v.to === "ignore") { ignored++; note(unsorted, rk, "once", 1, v.cents / 100, last, purpose); }
+      else if (v.to?.startsWith("e:")) { ignored++; empTx.set(txOf(v), v.to.slice(2)); empRks.add(rk); }
       else if (v.to?.startsWith("x:") && expenses[v.to.slice(2)]) { ignored++; note(expenses[v.to.slice(2)], rk, "once", 1, v.cents / 100, last, purpose); }
       else if (valid(v.to)) { paid[v.to] = (paid[v.to] || 0) + v.cents / 100; matched++; }
     }
@@ -710,6 +733,7 @@ async function buildDebts(env, syrve, tg) {
       ignored += restCount;
       if (d.unsorted) note(unsorted, rk, d.unsorted, restCount, restAmount, last, purpose);
       else if (d.expense && expenses[d.expense]) note(expenses[d.expense], rk, d.scope, restCount, restAmount, last, purpose);
+      else if (d.employee) { empRk[rk] = { emp: d.employee, scope: d.scope }; empRks.add(rk); }
       continue;
     }
     if (d.supplierId) { paid[d.supplierId] = (paid[d.supplierId] || 0) + restAmount; matched += restCount; continue; }
@@ -839,7 +863,54 @@ async function buildDebts(env, syrve, tg) {
     ...syrve.suppliers.map(s => ({ id: s.id, name: s.name })),
     ...Object.entries(sellers).filter(([tin]) => !syrveTins.has(tin)).map(([tin, s]) => ({ id: "tin:" + tin, name: `${s.name || tin} (rs.ge ${tin})` })),
   ].sort((a, b) => a.name.localeCompare(b.name));
-  const targetName = to => to === "ignore" || to.startsWith("x:") ? "" : sup[to]?.name || (to.startsWith("tin:") ? rsName[to.slice(4)] || to.slice(4) : to);
+  const targetName = to => to === "ignore" || to.startsWith("x:") ? "" : to.startsWith("e:") ? empById[to.slice(2)]?.name || "?" : sup[to]?.name || (to.startsWith("tin:") ? rsName[to.slice(4)] || to.slice(4) : to);
+
+  // Employees: earned (from the shifts typed in the Employees tab and each one's pay) + overtime − salary transfers,
+  // all from the employee's start date ("count from", else the first shift). Pay: per hour (hours × rate),
+  // per shift (working days × rate) or per month (the full rate for every month from the start, this one included).
+  const nowYm = localDate(env).slice(0, 7);
+  const nextYm = ym => { let [y, m] = ym.split("-").map(Number); if (++m > 12) { m = 1; y++; } return `${y}-${String(m).padStart(2, "0")}`; };
+  const minutes = x => { const m = String(x || "").match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+  const hoursOf = sh => { // a shift that ends before it starts goes past midnight
+    const a = minutes(sh.from), b = minutes(sh.to);
+    if (isNaN(a) || isNaN(b) || a === b) return 0;
+    return (b > a ? b - a : b + 1440 - a) / 60;
+  };
+  const salaryRows = await loadPaymentsOf(env, settings.historyFrom, empRks);
+  const shiftsAll = (staff.shifts || []).filter(sh => sh && empById[sh.emp] && /^\d{4}-\d{2}-\d{2}$/.test(sh.day || ""));
+  const staffList = emps.map(e => {
+    const mine = shiftsAll.filter(sh => sh.emp === e.id);
+    const start = /^\d{4}-\d{2}-\d{2}$/.test(e.from || "") ? e.from : mine.map(sh => sh.day).sort()[0] || "";
+    const rate = Math.max(0, Number(e.rate) || 0);
+    const months = {};
+    const mon = ym => months[ym] = months[ym] || { ym, hours: 0, days: new Set(), shifts: 0, earned: 0, overtime: 0, paid: 0 };
+    for (const sh of mine) {
+      if (!start || sh.day < start) continue;
+      const m = mon(sh.day.slice(0, 7)), h = hoursOf(sh);
+      m.hours += h; m.shifts++; m.days.add(sh.day);
+      m.overtime += Math.max(0, Number(sh.ot) || 0);
+      if (e.pay === "hour") m.earned += h * rate;
+    }
+    if (e.pay === "shift") for (const m of Object.values(months)) m.earned = m.days.size * rate;
+    if (e.pay === "month" && start) for (let ym = start.slice(0, 7); ym <= nowYm; ym = nextYm(ym)) mon(ym).earned = rate;
+    // salary transfers: from recipients that are this employee (except single payments given elsewhere), and single payments given to them
+    const accounts = {};
+    for (const [id, date, cents, rk] of salaryRows) {
+      const who = empTx.has(id) ? empTx.get(id) : empRk[rk] && !links.byTx[id] ? empRk[rk].emp : null;
+      if (who !== e.id) continue;
+      const [name = "", tin = "", iban = ""] = recipients[rk] || [];
+      accounts[rk] = accounts[rk] || { rk, name, tin, iban, scope: empTx.has(id) ? "once" : empRk[rk].scope };
+      if (start && date >= start) mon(date.slice(0, 7)).paid += cents / 100;
+    }
+    const list = Object.values(months).sort((a, b) => a.ym.localeCompare(b.ym)).map(m => ({
+      ym: m.ym, hours: r2(m.hours), shifts: m.shifts, days: m.days.size, earned: r2(m.earned), overtime: r2(m.overtime), paid: r2(m.paid) }));
+    const sum = k => r2(list.reduce((a, m) => a + m[k], 0));
+    const earned = sum("earned"), overtime = sum("overtime"), paid = sum("paid");
+    return { id: e.id, name: e.name || "?", role: e.role || "", pay: ["hour", "shift", "month"].includes(e.pay) ? e.pay : "month", rate, start,
+      active: e.active !== false, hours: sum("hours"), shifts: sum("shifts"), days: sum("days"), earned, overtime, paid,
+      owed: r2(earned + overtime - paid), months: list, accounts: Object.values(accounts) };
+  }).sort((a, b) => b.owed - a.owed);
+  const staffView = { employees: staffList, total: r2(staffList.reduce((a, x) => a + Math.max(0, x.owed), 0)) };
 
   review.sort((a, b) => b.amount - a.amount); // biggest first: one decision clears the most money
   return {
@@ -855,6 +926,7 @@ async function buildDebts(env, syrve, tg) {
       expenseTotals: Object.fromEntries(EXPENSE_CATS.map(k => [k, r2(Object.values(expenses[k]).reduce((a, x) => a + x.amount, 0))])),
       unsorted: Object.values(unsorted).sort((a, b) => b.amount - a.amount) },
     compare,
+    staff: staffView,
     tgSince: tg?.since || "",
     review: { count: review.length, payments: review.reduce((a, x) => a + x.count, 0), amount: Math.round(reviewAmount * 100) / 100, items: review.slice(0, 150) },
     options,

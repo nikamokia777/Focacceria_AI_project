@@ -92,6 +92,19 @@ export async function loadRecipientPayments(env, historyFrom, rk) {
   return out;
 }
 
+// all stored payments of several recipients (a Set of recipient keys), each year read once — employees' salaries
+export async function loadPaymentsOf(env, historyFrom, rks) {
+  if (!rks.size) return [];
+  const y0 = Number((historyFrom || "2015").slice(0, 4));
+  const y1 = new Date().getUTCFullYear();
+  const out = [];
+  for (let y = y0; y <= y1; y++) {
+    const rows = await env.STORE.get(TX_PREFIX + y, "json");
+    if (rows) for (const r of rows) if (rks.has(r[3])) out.push(r);
+  }
+  return out;
+}
+
 async function savePayments(env, list) {
   const rcp = (await env.STORE.get(RCP_KEY, "json")) || {};
   let rcpChanged = false;
