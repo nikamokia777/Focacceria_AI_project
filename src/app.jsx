@@ -127,7 +127,9 @@ const T = {
       prioNames: { red: "მაღალი პრიორიტეტი", yellow: "საშუალო პრიორიტეტი", cyan: "დაბალი პრიორიტეტი" },
       refresh: "↻ განახლება",
       col: { prio: "პრიორიტეტი", name: "პროდუქტი", syrve: "Syrve", live: "რეალური", min: "მინიმუმი", inv: "ინვენტ. სხვაობა", status: "სტატუსი" },
-      kpi: { products: "პროდუქტი", low: "იწურება", lastInv: "ბოლო ინვენტარიზაცია", asOf: "Syrve განახლდა" },
+      kpi: { products: "პროდუქტი", low: "იწურება", lastInv: "ბოლო ინვენტარიზაცია", asOf: "Syrve განახლდა", endOfDay: "ნაშთი დღის ბოლოს" },
+      today: "დღეს", yesterday: "გუშინ", date: "თარიღი",
+      pastNote: "წარსული დღე: Syrve-ს ნაშთი ამ დღის ბოლოს (როგორც Syrve Office-ის „Stock balance“). რეალური, მინიმუმი და შეტყობინებები მხოლოდ დღევანდელზეა.",
       noInv: "2 თვეში არ ყოფილა",
       invDoc: (n, c) => `${n ? "№ " + n + " · " : ""}${c} პოზიციაში სხვაობა`,
       manual: "ხელით", resetCorr: "Syrve-ს რიცხვზე დაბრუნება",
@@ -258,7 +260,9 @@ const T = {
       prioNames: { red: "High priority", yellow: "Moderate priority", cyan: "Low priority" },
       refresh: "↻ Refresh",
       col: { prio: "Priority", name: "Product", syrve: "Syrve", live: "Real", min: "Minimum", inv: "Reconciliation Δ", status: "Status" },
-      kpi: { products: "Products", low: "Running low", lastInv: "Last reconciliation", asOf: "Syrve updated" },
+      kpi: { products: "Products", low: "Running low", lastInv: "Last reconciliation", asOf: "Syrve updated", endOfDay: "Stock at end of day" },
+      today: "Today", yesterday: "Yesterday", date: "Date",
+      pastNote: "A past day: Syrve's stock at the end of that day (like Syrve Office's \"Stock balance\"). Real amounts, minimums and alarms are for today only.",
       noInv: "none in 2 months",
       invDoc: (n, c) => `${n ? "№ " + n + " · " : ""}${c} item(s) differed`,
       manual: "manual", resetCorr: "Back to the Syrve number",
@@ -938,11 +942,11 @@ const PRIO_RANK = { red: 0, yellow: 1, cyan: 2 };
 const MAX_STOCK_ROWS = 300;
 const isLow = (it) => it.min !== null && it.live <= it.min;
 
-function PrioPicker({ t, value, onChange }) {
+function PrioPicker({ t, value, onChange, readOnly }) {
   return (
     <div className="prio-pick">
       {PRIORITIES.map((p) => (
-        <button key={p} className={"prio-dot p-" + p + (value === p ? " on" : "")} title={t.stock.prioNames[p]}
+        <button key={p} className={"prio-dot p-" + p + (value === p ? " on" : "")} title={t.stock.prioNames[p]} disabled={readOnly}
           aria-label={t.stock.prioNames[p]} aria-pressed={value === p} onClick={() => onChange(value === p ? "" : p)} />
       ))}
     </div>
@@ -962,7 +966,7 @@ function NumInput({ value, placeholder, title, onSave }) {
   );
 }
 
-function StockLink({ t, item, products, onSave }) {
+function StockLink({ t, item, products, onSave, readOnly }) {
   const [editing, setEditing] = useState(false);
   if (editing) {
     const value = item.noLink ? "none" : item.link && !item.link.auto ? String(item.link.id) : "";
@@ -978,10 +982,13 @@ function StockLink({ t, item, products, onSave }) {
   return (
     <div className="muted small">
       {item.link ? <>{t.stock.linked} {item.link.name}{item.link.auto && <span className="tag">{t.stock.autoLinked}</span>}</> : t.stock.noLink}
-      {" "}<button className="link-btn" onClick={() => setEditing(true)}>{t.stock.changeLink}</button>
+      {!readOnly && <>{" "}<button className="link-btn" onClick={() => setEditing(true)}>{t.stock.changeLink}</button></>}
     </div>
   );
 }
+
+// "YYYY-MM-DD" moved by n days
+const shiftDay = (day, n) => new Date(Date.parse(day + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 
 function StorageTab({ t, guard }) {
   const [data, setData] = useState(null);
@@ -989,50 +996,82 @@ function StorageTab({ t, guard }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
+  const [day, setDay] = useState(""); // "" = today (live), otherwise a past "YYYY-MM-DD"
+  const seq = useRef(0); // only the latest answer may fill the table
 
   const load = useCallback(async (fresh) => {
+    const n = ++seq.current;
     setBusy(true);
-    try { setData(await guard(() => api("/api/stock" + (fresh ? "?fresh=1" : "")))); setErr(""); }
-    catch (e) { setErr(e.message); }
-    setBusy(false);
-  }, [guard]);
+    const qs = new URLSearchParams();
+    if (day) qs.set("date", day);
+    if (fresh) qs.set("fresh", "1");
+    try {
+      const r = await guard(() => api("/api/stock" + (qs.toString() ? "?" + qs : "")));
+      if (n === seq.current) { setData(r); setErr(""); }
+    } catch (e) { if (n === seq.current) setErr(e.message); }
+    if (n === seq.current) setBusy(false);
+  }, [guard, day]);
   useEffect(() => {
     load(false);
+    if (day) return; // a past day doesn't change
     // Syrve numbers change with every sale; the server reuses them for a minute
     const id = setInterval(() => { if (document.visibilityState === "visible") load(false); }, 60000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, day]);
 
+  // the server answers an edit with today's stock; on a past day that day is loaded again
   const save = async (body) => {
-    try { setData(await guard(() => api("/api/stock", body))); setErr(""); }
-    catch (e) { setErr(e.message); }
+    try {
+      const r = await guard(() => api("/api/stock", body));
+      if (day) await load(false);
+      else { seq.current++; setData(r); setErr(""); setBusy(false); }
+    } catch (e) { setErr(e.message); }
   };
 
   if (!data) {
     return <div className="card">{err ? <div className="empty error-text">{t.stock.error}{err}</div> : <Empty>{t.loading}</Empty>}</div>;
   }
 
+  const live = data.live !== false;
+  const today = data.today || new Date().toISOString().slice(0, 10);
+  const yesterday = shiftDay(today, -1);
+  const pickDay = (v) => setDay(!v || v >= today ? "" : v);
+  const f = !live && (filter === "low" || filter === "min") ? "" : filter; // no minimums on a past day
+
   const qn = norm(q);
   const rows = data.items
     .filter((it) => !qn || norm(it.name).includes(qn) || norm(it.group).includes(qn) || norm(it.link?.name).includes(qn))
-    .filter((it) => !filter || (filter === "low" ? isLow(it) : filter === "min" ? it.min !== null : it.prio === filter))
+    .filter((it) => !f || (f === "low" ? isLow(it) : f === "min" ? it.min !== null : it.prio === f))
     .sort((a, b) => (isLow(b) - isLow(a)) || ((PRIO_RANK[a.prio] ?? 3) - (PRIO_RANK[b.prio] ?? 3)) || a.name.localeCompare(b.name));
   const lowCount = data.items.filter(isLow).length;
   const inv = data.inventory;
 
   return (
     <>
+      <div className="toolbar stock-days">
+        <div className="segmented">
+          <button className={!day ? "on" : ""} onClick={() => setDay("")}>{t.stock.today}</button>
+          <button className={day === yesterday ? "on" : ""} onClick={() => setDay(yesterday)}>{t.stock.yesterday}</button>
+        </div>
+        <input type="date" className="input" title={t.stock.date} aria-label={t.stock.date} max={today}
+          value={day || today} onChange={(e) => pickDay(e.target.value)} />
+        {busy && <span className="muted small">{t.loading}</span>}
+      </div>
+
       <div className="kpis">
         <div className="card kpi"><div className="kpi-label">{t.stock.kpi.products}</div><div className="kpi-value">{data.items.length}</div></div>
-        <div className="card kpi"><div className="kpi-label">{t.stock.kpi.low}</div><div className={"kpi-value" + (lowCount ? " red-text" : "")}>{lowCount}</div></div>
+        {live && <div className="card kpi"><div className="kpi-label">{t.stock.kpi.low}</div><div className={"kpi-value" + (lowCount ? " red-text" : "")}>{lowCount}</div></div>}
         <div className="card kpi">
           <div className="kpi-label">{t.stock.kpi.lastInv}</div>
           <div className="kpi-value">{inv ? fmtDate(inv.date, true).slice(0, 10) : "—"}</div>
           <div className="muted small">{inv ? t.stock.invDoc(inv.num, inv.count) : t.stock.noInv}</div>
         </div>
-        <div className="card kpi"><div className="kpi-label">{t.stock.kpi.asOf}</div><div className="kpi-value">{fmtDate(data.asOf).slice(6)}</div></div>
+        {live
+          ? <div className="card kpi"><div className="kpi-label">{t.stock.kpi.asOf}</div><div className="kpi-value">{fmtDate(data.asOf).slice(6)}</div></div>
+          : <div className="card kpi"><div className="kpi-label">{t.stock.kpi.endOfDay}</div><div className="kpi-value">{fmtDate(data.day + "T00:00", true).slice(0, 10)}</div></div>}
       </div>
 
+      {!live && <div className="card notice muted small">{t.stock.pastNote}</div>}
       {err && <div className="card notice error-text">{t.stock.error}{err}</div>}
       {data.alarmProblem === "no_group" && <div className="card notice">{t.stock.noGroup}</div>}
       {data.inventoryError && <div className="card notice muted small">{t.stock.invError}{data.inventoryError}</div>}
@@ -1040,10 +1079,10 @@ function StorageTab({ t, guard }) {
       <div className="card table-card">
         <div className="toolbar inner">
           <input className="input grow" placeholder={t.stock.search} value={q} onChange={(e) => setQ(e.target.value)} />
-          <select className="input" value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <select className="input" value={f} onChange={(e) => setFilter(e.target.value)}>
             <option value="">{t.stock.all}</option>
-            <option value="low">{t.stock.low}</option>
-            <option value="min">{t.stock.withMin}</option>
+            {live && <option value="low">{t.stock.low}</option>}
+            {live && <option value="min">{t.stock.withMin}</option>}
             {PRIORITIES.map((p) => <option key={p} value={p}>{t.stock.prioNames[p]}</option>)}
           </select>
           {data.stores.length > 1 && (
@@ -1055,13 +1094,14 @@ function StorageTab({ t, guard }) {
           <button className="btn-outline" disabled={busy} onClick={() => load(true)}>{t.stock.refresh}</button>
         </div>
         <div className="table-scroll">
-          <table className="table stock-table">
+          <table className={"table stock-table" + (live ? "" : " past")}>
             <thead>
               <tr>
                 <th>{t.stock.col.prio}</th><th>{t.stock.col.name}</th>
-                <th className="r">{t.stock.col.syrve}</th><th className="r" title={t.stock.corrHint}>{t.stock.col.live}</th>
-                <th className="r" title={t.stock.minHint}>{t.stock.col.min}</th>
-                <th className="r">{t.stock.col.inv}</th><th>{t.stock.col.status}</th>
+                <th className="r">{t.stock.col.syrve}</th>
+                {live && <th className="r" title={t.stock.corrHint}>{t.stock.col.live}</th>}
+                {live && <th className="r" title={t.stock.minHint}>{t.stock.col.min}</th>}
+                <th className="r">{t.stock.col.inv}</th>{live && <th>{t.stock.col.status}</th>}
               </tr>
             </thead>
             <tbody>
@@ -1069,13 +1109,13 @@ function StorageTab({ t, guard }) {
                 const low = isLow(it);
                 return (
                   <tr key={it.id} className={low ? "row-low" : ""}>
-                    <td><PrioPicker t={t} value={it.prio} onChange={(prio) => save({ id: it.id, prio })} /></td>
+                    <td><PrioPicker t={t} value={it.prio} readOnly={!live} onChange={(prio) => save({ id: it.id, prio })} /></td>
                     <td>
                       <div className="strong">{it.name}{it.group && <span className="tag">{it.group}</span>}</div>
-                      <StockLink t={t} item={it} products={data.products} onSave={(link) => save({ id: it.id, link })} />
+                      <StockLink t={t} item={it} products={data.products} readOnly={!live} onSave={(link) => save({ id: it.id, link })} />
                     </td>
-                    <td className="r mono muted nowrap">{qtyStr(it.syrve)} {it.unit}</td>
-                    <td className="r nowrap">
+                    <td className={"r mono nowrap" + (live ? " muted" : "")}>{qtyStr(it.syrve)} {it.unit}</td>
+                    {live && <td className="r nowrap">
                       <NumInput value={it.live} title={t.stock.corrHint} onSave={(live) => save({ id: it.id, live })} />
                       <span className="unit-label">{it.unit}</span>
                       {it.corr !== 0 && (
@@ -1084,16 +1124,16 @@ function StorageTab({ t, guard }) {
                           {" "}<button className="link-btn" title={t.stock.resetCorr} onClick={() => save({ id: it.id, clearCorr: true })}>↺</button>
                         </div>
                       )}
-                    </td>
-                    <td className="r nowrap">
+                    </td>}
+                    {live && <td className="r nowrap">
                       <NumInput value={it.min} placeholder="—" title={t.stock.minHint} onSave={(min) => save({ id: it.id, min })} />
                       <span className="unit-label">{it.unit}</span>
-                    </td>
+                    </td>}
                     <td className="r mono nowrap">{it.inv === null ? <span className="muted">—</span> : <span className={it.inv < 0 ? "red-text" : ""}>{it.inv > 0 ? "+" : ""}{qtyStr(it.inv)}</span>}</td>
-                    <td className="nowrap">
+                    {live && <td className="nowrap">
                       {it.alarm ? <span className={"pill alarm-" + it.alarm}>{t.stock.alarm[it.alarm]}</span>
                         : low ? <span className="pill alarm-low">{t.stock.alarm.low}</span> : null}
-                    </td>
+                    </td>}
                   </tr>
                 );
               })}

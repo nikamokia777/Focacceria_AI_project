@@ -8,11 +8,15 @@
 // alarm in the employees' group with Approve / Disapprove (see telegram.js). The alarm
 // fires once and re-arms when the amount is above the minimum again.
 //
+// A past day (calendar) is read-only: Syrve's stock at the end of that day, like Syrve Office's
+// "Stock balance as of <day>"; corrections, minimums and alarms belong to today only.
+//
 // KV keys:
-//   stock:cfg           { store, items: { <syrveProductId>: { min, prio, link, corr, corrAt } } }
-//   stock:alarms        { <syrveProductId>: { token, state: "open" | "approved" | "rejected", at } }
-//   stockalarm:<token>  one alarm message in Telegram (telegram.js)
-//   dash:cache:stock    the last Syrve answer (reused for 1 minute)
+//   stock:cfg                 { store, items: { <syrveProductId>: { min, prio, link, corr, corrAt } } }
+//   stock:alarms              { <syrveProductId>: { token, state: "open" | "approved" | "rejected", at } }
+//   stockalarm:<token>        one alarm message in Telegram (telegram.js)
+//   dash:cache:stock2         today's Syrve answer (reused for 1 minute)
+//   dash:cache:stock2:<day>   a past day's Syrve answer (reused for 10 minutes)
 
 import { withSyrve, xmlRecords, nowLocal, localDate, ddmmyyyy } from "./dashboard.js";
 import { loadBasePrices } from "./store.js";
@@ -21,8 +25,9 @@ import { sendStockAlarm } from "./telegram.js";
 
 const CFG_KEY = "stock:cfg";
 const ALARMS_KEY = "stock:alarms";
-const CACHE_KEY = "dash:cache:stock";
-const CACHE_TTL = 60;          // seconds
+const CACHE_KEY = "dash:cache:stock2";
+const CACHE_TTL = 60;          // seconds, today
+const PAST_CACHE_TTL = 600;    // seconds, a past day
 const INVENTORY_DAYS = 62;     // how far back to look for reconciliations
 const MAX_ALARMS_PER_RUN = 10; // stay within Cloudflare's per-request limit on outgoing calls
 const PRIORITIES = ["red", "yellow", "cyan"];
@@ -32,6 +37,14 @@ const STOCK_TYPES = new Set(["GOODS", "PREPARED"]);
 const num = (v) => Number(String(v ?? "").replace(",", ".")) || 0;
 const round3 = (n) => Math.round(n * 1000) / 1000;
 const localStamp = (env) => nowLocal(env).toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM", restaurant time
+const addDays = (day, n) => new Date(Date.parse(day + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+
+// The day the Storage tab shows: "YYYY-MM-DD" before today, anything else (missing, future) = today.
+export function stockDay(env, day) {
+  const today = localDate(env);
+  day = String(day || "");
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) && !isNaN(Date.parse(day)) && day < today ? day : today;
+}
 
 // Syrve dates come as "2026-10-01T23:00:00(+04:00)" or "01.10.2026 23:00" → "YYYY-MM-DDTHH:MM"
 function stamp(s) {
@@ -56,13 +69,18 @@ export const saveAlarms = (env, alarms) => env.STORE.put(ALARMS_KEY, JSON.string
 
 // ── Syrve ────────────────────────────────────────────────────────────────────
 
-async function fetchSyrve(env) {
-  const now = nowLocal(env);
-  const asOf = now.toISOString().slice(0, 19);
-  const from = localDate(env, new Date(now.getTime() - INVENTORY_DAYS * 86400000));
+// Syrve's stock at the end of `day` (today = everything booked so far).
+async function fetchSyrve(env, day) {
+  const live = day === localDate(env);
+  const asOf = live ? nowLocal(env).toISOString().slice(0, 19) : day + "T23:59:59";
+  const from = addDays(day, -INVENTORY_DAYS);
+  // Asked with the current time, balance/stores answered with yesterday's closing stock
+  // (checked against Syrve Office on 4 Nov 2026), so the end of `day` is asked as the start
+  // of the next day — the same numbers as Syrve Office's "Stock balance as of <day>".
+  const timestamp = addDays(day, 1) + "T00:00:00";
 
   return withSyrve(env, async (get) => {
-    const balances = JSON.parse(await get("/v2/reports/balance/stores", { timestamp: asOf }));
+    const balances = JSON.parse(await get("/v2/reports/balance/stores", { timestamp }));
     const bal = {}; // productId → { storeId: amount }
     for (const b of balances) {
       const p = String(b.product || "").toLowerCase();
@@ -96,7 +114,7 @@ async function fetchSyrve(env) {
     let inventoryError = "";
     try {
       const xml = await get("/reports/storeOperations", {
-        dateFrom: ddmmyyyy(from), dateTo: ddmmyyyy(localDate(env)),
+        dateFrom: ddmmyyyy(from), dateTo: ddmmyyyy(day),
         documentTypes: "INCOMING_INVENTORY", productDetalization: "true", showCostCorrections: "false",
       });
       const docs = new Map();
@@ -117,31 +135,38 @@ async function fetchSyrve(env) {
       inventoryError = String(e.message || e).slice(0, 200);
     }
 
-    return { asOf, products, bal, stores, inventories, inventoryError };
+    return { day, asOf, products, bal, stores, inventories, inventoryError };
   });
 }
 
-// The cached Syrve answer; `keep: false` reads fresh data without writing the cache (cron).
-async function syrveStock(env, { fresh = false, keep = true } = {}) {
+// The cached Syrve answer for `day` (default today); `keep: false` reads fresh data without
+// writing the cache (cron).
+async function syrveStock(env, { fresh = false, keep = true, day = localDate(env) } = {}) {
+  const live = day === localDate(env);
+  const key = live ? CACHE_KEY : CACHE_KEY + ":" + day;
   if (!fresh) {
-    const hit = await env.STORE.get(CACHE_KEY, "json");
-    if (hit && Date.now() - hit._at < CACHE_TTL * 1000) return hit;
+    const hit = await env.STORE.get(key, "json");
+    if (hit && hit.day === day && Date.now() - hit._at < (live ? CACHE_TTL : PAST_CACHE_TTL) * 1000) return hit;
   }
-  const value = await fetchSyrve(env);
+  const value = await fetchSyrve(env, day);
   value._at = Date.now();
-  if (keep) await env.STORE.put(CACHE_KEY, JSON.stringify(value), { expirationTtl: 3600 });
+  if (keep) await env.STORE.put(key, JSON.stringify(value), { expirationTtl: 3600 });
   return value;
 }
 
 // ── the Storage list ─────────────────────────────────────────────────────────
 
+// opts: { day: "YYYY-MM-DD" (default today), fresh, keep }
 export async function buildStock(env, opts = {}) {
+  const day = stockDay(env, opts.day);
+  const live = day === localDate(env);
   const [syrve, cfg, alarms, products] = await Promise.all([
-    syrveStock(env, opts), loadCfg(env), loadAlarms(env), loadBasePrices(env),
+    syrveStock(env, { ...opts, day }), loadCfg(env), loadAlarms(env), loadBasePrices(env),
   ]);
   const store = syrve.stores.some((s) => s.id === cfg.store) ? cfg.store : "";
+  // the last reconciliation on or before the day
   const invs = syrve.inventories
-    .filter((d) => !store || !d.store || d.store === store)
+    .filter((d) => (!store || !d.store || d.store === store) && d.date.slice(0, 10) <= day)
     .sort((a, b) => b.date.localeCompare(a.date));
   const lastInv = invs[0] || null;
 
@@ -157,24 +182,25 @@ export async function buildStock(env, opts = {}) {
     const bal = syrve.bal[id] || {};
     const amount = round3(store ? num(bal[store]) : Object.values(bal).reduce((a, b) => a + b, 0));
     // a newer reconciliation replaces the manual correction
-    if (c.corrAt && lastInv && lastInv.date > c.corrAt) {
+    if (live && c.corrAt && lastInv && lastInv.date > c.corrAt) {
       delete c.corr; delete c.corrAt; cfgChanged = true;
     }
-    const corr = num(c.corr);
-    const min = c.min ?? null;
+    // a past day is Syrve's number only: corrections, minimums and alarms are about today
+    const corr = live ? num(c.corr) : 0;
+    const min = live ? c.min ?? null : null;
     let link = null, auto = false;
     if (c.link && c.link !== "none") link = byId.get(Number(c.link)) || null;
     else if (!c.link) {
-      link = byName.get(normName(name)) || (min !== null ? matchProduct(products, name) : null);
+      link = byName.get(normName(name)) || (c.min != null ? matchProduct(products, name) : null);
       auto = !!link;
     }
     return {
       id, name, unit, group,
-      syrve: amount, corr: round3(corr), corrAt: c.corrAt || null, live: round3(amount + corr),
+      syrve: amount, corr: round3(corr), corrAt: live ? c.corrAt || null : null, live: round3(amount + corr),
       min, prio: c.prio || "",
       link: link ? { id: link.id, name: link.name, auto } : null, noLink: c.link === "none",
       inv: lastInv && lastInv.d[id] !== undefined ? lastInv.d[id] : null,
-      alarm: alarms[id]?.state || "",
+      alarm: live ? alarms[id]?.state || "" : "",
     };
   });
   if (cfgChanged) {
@@ -183,7 +209,7 @@ export async function buildStock(env, opts = {}) {
   }
 
   return {
-    asOf: syrve.asOf, store, stores: syrve.stores, items,
+    day, live, today: localDate(env), asOf: syrve.asOf, store, stores: syrve.stores, items,
     inventory: lastInv ? { num: lastInv.num, date: lastInv.date, count: Object.keys(lastInv.d).length } : null,
     inventoryError: syrve.inventoryError,
     products: products.map((p) => ({ id: p.id, name: p.name })),

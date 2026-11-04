@@ -248,6 +248,11 @@
     .prio-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; opacity: .28; padding: 0; }
     .prio-dot:hover { opacity: .6; }
     .prio-dot.on { opacity: 1; border-color: var(--dark); }
+    .prio-dot:disabled { cursor: default; }
+    .prio-dot:disabled:not(.on):hover { opacity: .28; }
+    .table-card .table.stock-table.past { min-width: 640px; }
+    .stock-days { align-items: center; }
+    .stock-days .segmented { margin-bottom: 0; }
     .p-red { background: #e5484d; }
     .p-yellow { background: #f5c518; }
     .p-cyan { background: #22c3d6; }

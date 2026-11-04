@@ -199,8 +199,13 @@ const T = {
         products: "პროდუქტი",
         low: "იწურება",
         lastInv: "ბოლო ინვენტარიზაცია",
-        asOf: "Syrve განახლდა"
+        asOf: "Syrve განახლდა",
+        endOfDay: "ნაშთი დღის ბოლოს"
       },
+      today: "დღეს",
+      yesterday: "გუშინ",
+      date: "თარიღი",
+      pastNote: "წარსული დღე: Syrve-ს ნაშთი ამ დღის ბოლოს (როგორც Syrve Office-ის „Stock balance“). რეალური, მინიმუმი და შეტყობინებები მხოლოდ დღევანდელზეა.",
       noInv: "2 თვეში არ ყოფილა",
       invDoc: (n, c) => `${n ? "№ " + n + " · " : ""}${c} პოზიციაში სხვაობა`,
       manual: "ხელით",
@@ -418,8 +423,13 @@ const T = {
         products: "Products",
         low: "Running low",
         lastInv: "Last reconciliation",
-        asOf: "Syrve updated"
+        asOf: "Syrve updated",
+        endOfDay: "Stock at end of day"
       },
+      today: "Today",
+      yesterday: "Yesterday",
+      date: "Date",
+      pastNote: "A past day: Syrve's stock at the end of that day (like Syrve Office's \"Stock balance\"). Real amounts, minimums and alarms are for today only.",
       noInv: "none in 2 months",
       invDoc: (n, c) => `${n ? "№ " + n + " · " : ""}${c} item(s) differed`,
       manual: "manual",
@@ -1344,7 +1354,8 @@ const isLow = it => it.min !== null && it.live <= it.min;
 function PrioPicker({
   t,
   value,
-  onChange
+  onChange,
+  readOnly
 }) {
   return React.createElement("div", {
     className: "prio-pick"
@@ -1352,6 +1363,7 @@ function PrioPicker({
     key: p,
     className: "prio-dot p-" + p + (value === p ? " on" : ""),
     title: t.stock.prioNames[p],
+    disabled: readOnly,
     "aria-label": t.stock.prioNames[p],
     "aria-pressed": value === p,
     onClick: () => onChange(value === p ? "" : p)
@@ -1389,7 +1401,8 @@ function StockLink({
   t,
   item,
   products,
-  onSave
+  onSave,
+  readOnly
 }) {
   const [editing, setEditing] = useState(false);
   if (editing) {
@@ -1416,11 +1429,12 @@ function StockLink({
     className: "muted small"
   }, item.link ? React.createElement(React.Fragment, null, t.stock.linked, " ", item.link.name, item.link.auto && React.createElement("span", {
     className: "tag"
-  }, t.stock.autoLinked)) : t.stock.noLink, " ", React.createElement("button", {
+  }, t.stock.autoLinked)) : t.stock.noLink, !readOnly && React.createElement(React.Fragment, null, " ", React.createElement("button", {
     className: "link-btn",
     onClick: () => setEditing(true)
-  }, t.stock.changeLink));
+  }, t.stock.changeLink)));
 }
+const shiftDay = (day, n) => new Date(Date.parse(day + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 function StorageTab({
   t,
   guard
@@ -1430,27 +1444,42 @@ function StorageTab({
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
+  const [day, setDay] = useState("");
+  const seq = useRef(0);
   const load = useCallback(async fresh => {
+    const n = ++seq.current;
     setBusy(true);
+    const qs = new URLSearchParams();
+    if (day) qs.set("date", day);
+    if (fresh) qs.set("fresh", "1");
     try {
-      setData(await guard(() => api("/api/stock" + (fresh ? "?fresh=1" : ""))));
-      setErr("");
+      const r = await guard(() => api("/api/stock" + (qs.toString() ? "?" + qs : "")));
+      if (n === seq.current) {
+        setData(r);
+        setErr("");
+      }
     } catch (e) {
-      setErr(e.message);
+      if (n === seq.current) setErr(e.message);
     }
-    setBusy(false);
-  }, [guard]);
+    if (n === seq.current) setBusy(false);
+  }, [guard, day]);
   useEffect(() => {
     load(false);
+    if (day) return;
     const id = setInterval(() => {
       if (document.visibilityState === "visible") load(false);
     }, 60000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, day]);
   const save = async body => {
     try {
-      setData(await guard(() => api("/api/stock", body)));
-      setErr("");
+      const r = await guard(() => api("/api/stock", body));
+      if (day) await load(false);else {
+        seq.current++;
+        setData(r);
+        setErr("");
+        setBusy(false);
+      }
     } catch (e) {
       setErr(e.message);
     }
@@ -1462,11 +1491,36 @@ function StorageTab({
       className: "empty error-text"
     }, t.stock.error, err) : React.createElement(Empty, null, t.loading));
   }
+  const live = data.live !== false;
+  const today = data.today || new Date().toISOString().slice(0, 10);
+  const yesterday = shiftDay(today, -1);
+  const pickDay = v => setDay(!v || v >= today ? "" : v);
+  const f = !live && (filter === "low" || filter === "min") ? "" : filter;
   const qn = norm(q);
-  const rows = data.items.filter(it => !qn || norm(it.name).includes(qn) || norm(it.group).includes(qn) || norm(it.link?.name).includes(qn)).filter(it => !filter || (filter === "low" ? isLow(it) : filter === "min" ? it.min !== null : it.prio === filter)).sort((a, b) => isLow(b) - isLow(a) || (PRIO_RANK[a.prio] ?? 3) - (PRIO_RANK[b.prio] ?? 3) || a.name.localeCompare(b.name));
+  const rows = data.items.filter(it => !qn || norm(it.name).includes(qn) || norm(it.group).includes(qn) || norm(it.link?.name).includes(qn)).filter(it => !f || (f === "low" ? isLow(it) : f === "min" ? it.min !== null : it.prio === f)).sort((a, b) => isLow(b) - isLow(a) || (PRIO_RANK[a.prio] ?? 3) - (PRIO_RANK[b.prio] ?? 3) || a.name.localeCompare(b.name));
   const lowCount = data.items.filter(isLow).length;
   const inv = data.inventory;
   return React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "toolbar stock-days"
+  }, React.createElement("div", {
+    className: "segmented"
+  }, React.createElement("button", {
+    className: !day ? "on" : "",
+    onClick: () => setDay("")
+  }, t.stock.today), React.createElement("button", {
+    className: day === yesterday ? "on" : "",
+    onClick: () => setDay(yesterday)
+  }, t.stock.yesterday)), React.createElement("input", {
+    type: "date",
+    className: "input",
+    title: t.stock.date,
+    "aria-label": t.stock.date,
+    max: today,
+    value: day || today,
+    onChange: e => pickDay(e.target.value)
+  }), busy && React.createElement("span", {
+    className: "muted small"
+  }, t.loading)), React.createElement("div", {
     className: "kpis"
   }, React.createElement("div", {
     className: "card kpi"
@@ -1474,7 +1528,7 @@ function StorageTab({
     className: "kpi-label"
   }, t.stock.kpi.products), React.createElement("div", {
     className: "kpi-value"
-  }, data.items.length)), React.createElement("div", {
+  }, data.items.length)), live && React.createElement("div", {
     className: "card kpi"
   }, React.createElement("div", {
     className: "kpi-label"
@@ -1488,13 +1542,21 @@ function StorageTab({
     className: "kpi-value"
   }, inv ? fmtDate(inv.date, true).slice(0, 10) : "—"), React.createElement("div", {
     className: "muted small"
-  }, inv ? t.stock.invDoc(inv.num, inv.count) : t.stock.noInv)), React.createElement("div", {
+  }, inv ? t.stock.invDoc(inv.num, inv.count) : t.stock.noInv)), live ? React.createElement("div", {
     className: "card kpi"
   }, React.createElement("div", {
     className: "kpi-label"
   }, t.stock.kpi.asOf), React.createElement("div", {
     className: "kpi-value"
-  }, fmtDate(data.asOf).slice(6)))), err && React.createElement("div", {
+  }, fmtDate(data.asOf).slice(6))) : React.createElement("div", {
+    className: "card kpi"
+  }, React.createElement("div", {
+    className: "kpi-label"
+  }, t.stock.kpi.endOfDay), React.createElement("div", {
+    className: "kpi-value"
+  }, fmtDate(data.day + "T00:00", true).slice(0, 10)))), !live && React.createElement("div", {
+    className: "card notice muted small"
+  }, t.stock.pastNote), err && React.createElement("div", {
     className: "card notice error-text"
   }, t.stock.error, err), data.alarmProblem === "no_group" && React.createElement("div", {
     className: "card notice"
@@ -1511,13 +1573,13 @@ function StorageTab({
     onChange: e => setQ(e.target.value)
   }), React.createElement("select", {
     className: "input",
-    value: filter,
+    value: f,
     onChange: e => setFilter(e.target.value)
   }, React.createElement("option", {
     value: ""
-  }, t.stock.all), React.createElement("option", {
+  }, t.stock.all), live && React.createElement("option", {
     value: "low"
-  }, t.stock.low), React.createElement("option", {
+  }, t.stock.low), live && React.createElement("option", {
     value: "min"
   }, t.stock.withMin), PRIORITIES.map(p => React.createElement("option", {
     key: p,
@@ -1540,18 +1602,18 @@ function StorageTab({
   }, t.stock.refresh)), React.createElement("div", {
     className: "table-scroll"
   }, React.createElement("table", {
-    className: "table stock-table"
+    className: "table stock-table" + (live ? "" : " past")
   }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, t.stock.col.prio), React.createElement("th", null, t.stock.col.name), React.createElement("th", {
     className: "r"
-  }, t.stock.col.syrve), React.createElement("th", {
+  }, t.stock.col.syrve), live && React.createElement("th", {
     className: "r",
     title: t.stock.corrHint
-  }, t.stock.col.live), React.createElement("th", {
+  }, t.stock.col.live), live && React.createElement("th", {
     className: "r",
     title: t.stock.minHint
   }, t.stock.col.min), React.createElement("th", {
     className: "r"
-  }, t.stock.col.inv), React.createElement("th", null, t.stock.col.status))), React.createElement("tbody", null, rows.slice(0, MAX_STOCK_ROWS).map(it => {
+  }, t.stock.col.inv), live && React.createElement("th", null, t.stock.col.status))), React.createElement("tbody", null, rows.slice(0, MAX_STOCK_ROWS).map(it => {
     const low = isLow(it);
     return React.createElement("tr", {
       key: it.id,
@@ -1559,6 +1621,7 @@ function StorageTab({
     }, React.createElement("td", null, React.createElement(PrioPicker, {
       t: t,
       value: it.prio,
+      readOnly: !live,
       onChange: prio => save({
         id: it.id,
         prio
@@ -1571,13 +1634,14 @@ function StorageTab({
       t: t,
       item: it,
       products: data.products,
+      readOnly: !live,
       onSave: link => save({
         id: it.id,
         link
       })
     })), React.createElement("td", {
-      className: "r mono muted nowrap"
-    }, qtyStr(it.syrve), " ", it.unit), React.createElement("td", {
+      className: "r mono nowrap" + (live ? " muted" : "")
+    }, qtyStr(it.syrve), " ", it.unit), live && React.createElement("td", {
       className: "r nowrap"
     }, React.createElement(NumInput, {
       value: it.live,
@@ -1598,7 +1662,7 @@ function StorageTab({
         id: it.id,
         clearCorr: true
       })
-    }, "↺"))), React.createElement("td", {
+    }, "↺"))), live && React.createElement("td", {
       className: "r nowrap"
     }, React.createElement(NumInput, {
       value: it.min,
@@ -1616,7 +1680,7 @@ function StorageTab({
       className: "muted"
     }, "—") : React.createElement("span", {
       className: it.inv < 0 ? "red-text" : ""
-    }, it.inv > 0 ? "+" : "", qtyStr(it.inv))), React.createElement("td", {
+    }, it.inv > 0 ? "+" : "", qtyStr(it.inv))), live && React.createElement("td", {
       className: "nowrap"
     }, it.alarm ? React.createElement("span", {
       className: "pill alarm-" + it.alarm

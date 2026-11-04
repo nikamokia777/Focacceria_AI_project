@@ -15,7 +15,8 @@
 //   GET/POST /api/order        the current order (POST { ops: [...] })
 //   GET      /api/log          History + Mistakes records
 //   POST     /api/log/action   { token, action: "resolve" | "reopen" }
-//   GET/POST /api/stock        the Storage tab: Syrve stock, minimums, priorities (POST { id, ... })
+//   GET/POST /api/stock        the Storage tab: Syrve stock, minimums, priorities (POST { id, ... });
+//                              GET ?date=YYYY-MM-DD = the end of a past day, read-only
 //   *        /api/dash/...     the Dashboard (costs, ratings, tasks, Syrve data) — see dashboard.js
 //
 // Everything else is served from the static files in /public.
@@ -130,16 +131,19 @@ async function handleLogAction(request, env) {
 }
 
 async function handleStock(request, env) {
-  let fresh = new URL(request.url).searchParams.get("fresh") === "1";
+  const params = new URL(request.url).searchParams;
+  const fresh = params.get("fresh") === "1";
+  let day = params.get("date") || "";
   if (request.method === "POST") {
     const body = await readJson(request);
     if (!body || typeof body !== "object") return json({ error: "Expected { id, ... }" }, 400);
     await updateStock(env, body);
+    day = ""; // edits are about today's stock
   } else if (request.method !== "GET") {
     return json({ error: "Method not allowed" }, 405);
   }
-  const data = await buildStock(env, { fresh });
-  data.alarmProblem = await checkStockAlarms(env, data);
+  const data = await buildStock(env, { fresh, day });
+  data.alarmProblem = data.live ? await checkStockAlarms(env, data) : "";
   return json(data);
 }
 
