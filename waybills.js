@@ -3,24 +3,22 @@
 // For every month since the bank "history from" date, per seller tax ID:
 //   confirmed / unconfirmed / rejected on rs.ge (the Debts tab counts every active waybill, i.e.
 //   confirmed + unconfirmed: the team doesn't confirm waybills on rs.ge), every waybill (number,
-//   amount, day, state) for the Telegram comparison, the goods lines' amounts per product (the
-//   "rs მოსული" tab), and the return waybills we issued to the seller (goods sent back).
-// Saved, deleted and cancelled waybills (status 0 or negative) don't count; rejected ones don't count as products.
+//   amount, day, state), and the return waybills we issued to the seller (goods sent back).
+// Saved, deleted and cancelled waybills (status 0 or negative) don't count.
 //
 // KV  dash:rsge:waybills  { v: 2, returnType, error, codes, months: { "YYYY-MM": { f: first day,
 //       s: { sellerTin: [name, confirmed, unconfirmed, rejected, nConfirmed, nUnconfirmed, nRejected] },
 //       w: [[number, sellerTin, amount, "YYYY-MM-DD", state: 1 confirmed | 0 not yet | -1 rejected]],
-//       g: { sellerTin: { productName: amount } },
 //       r: { pieceFirstDay: { buyerTin: [name, amount, n] } } } } }
-// rs.ge answers a month of received waybills (and of their goods) in one call each, but lists our own
-// waybills only 72 hours at a time (error -1064), so returns are read in 3-day pieces.
+// rs.ge answers a month of received waybills in one call, but lists our own waybills only 72 hours
+// at a time (error -1064), so returns are read in 3-day pieces.
 // Written only when something changed (KV free plan: ~1,000 writes a day).
 // Work is counted in rs.ge calls: the Debts page spends up to 24 per request (it asks again while
 // something is missing), the cron 6 per run. Missing data first (newest month first), then the
-// current month again (both lists + its last two return pieces), then an older month in turn,
+// current month again (its waybills + its last two return pieces), then an older month in turn,
 // because waybills get confirmed, rejected or cancelled later.
 
-import { listBuyerWaybills, listBuyerGoods, listOutgoingWaybillsStrict, listWaybillTypes, listErrorCodes, normalizeWaybillNumber } from "./rsge.js";
+import { listBuyerWaybills, listOutgoingWaybillsStrict, listWaybillTypes, listErrorCodes, normalizeWaybillNumber } from "./rsge.js";
 import { loadBankSettings, bumpVersion } from "./bank.js";
 
 const KEY = "dash:rsge:waybills";
@@ -66,10 +64,10 @@ export async function loadWaybills(env) {
   return { v: FORMAT, returnType: same ? d.returnType ?? null : null, error: same ? d.error || "" : "", codes: d.codes || {}, months: same ? d.months || {} : {} };
 }
 
-// received waybills + their goods lines, for one month (2 calls)
+// received waybills, for one month (1 call)
 async function readMonth(env, m) {
-  const [list, goods] = await Promise.all([listBuyerWaybills(env, m.from, m.to), listBuyerGoods(env, m.from, m.to)]);
-  const s = {}, w = [], g = {};
+  const list = await listBuyerWaybills(env, m.from, m.to);
+  const s = {}, w = [];
   for (const x of list) {
     if (!counts(x) || !x.sellerTin) continue;
     const st = stateOf(x.isConfirmed), i = st === 1 ? 0 : st === 0 ? 1 : 2;
@@ -79,13 +77,7 @@ async function readMonth(env, m) {
     y[4 + i]++;
     w.push([normalizeWaybillNumber(x.number) || x.number, x.sellerTin, r2(x.fullAmount), (x.createDate || "").slice(0, 10), st]);
   }
-  for (const x of goods) {
-    if (!counts(x) || !x.sellerTin || stateOf(x.isConfirmed) === -1) continue;
-    const name = x.name.replace(/\s+/g, " ").trim() || "—";
-    const y = g[x.sellerTin] = g[x.sellerTin] || {};
-    y[name] = r2((y[name] || 0) + x.amount);
-  }
-  return { s, w, g };
+  return { s, w };
 }
 
 // our return waybills in one 3-day piece (1 call)
@@ -121,14 +113,14 @@ export async function syncWaybills(env, { budget = 24, current = false, rotate =
   // work, most important first; a returns piece needs the return type, read once (1 call)
   const units = [];
   const newest = list.slice().reverse();
-  for (const m of newest) if (!kept[m.ym]?.s) units.push({ kind: "m", m, cost: 2 });
+  for (const m of newest) if (!kept[m.ym]?.s) units.push({ kind: "m", m, cost: 1 });
   if (needsReturns()) for (const m of newest) for (const p of piecesOf(m, end)) if (!kept[m.ym]?.r?.[p[0]]) units.push({ kind: "r", m, p, cost: 1 });
   const cur = list[list.length - 1];
   if (current && cur) {
-    units.push({ kind: "m", m: cur, cost: 2 });
+    units.push({ kind: "m", m: cur, cost: 1 });
     if (needsReturns()) for (const p of piecesOf(cur, end).slice(-2)) units.push({ kind: "r", m: cur, p, cost: 1 });
   }
-  if (rotate && list.length > 1) { const older = list.slice(0, -1); units.push({ kind: "m", m: older[Math.floor(Date.now() / RUN / 2) % older.length], cost: 2 }); }
+  if (rotate && list.length > 1) { const older = list.slice(0, -1); units.push({ kind: "m", m: older[Math.floor(Date.now() / RUN / 2) % older.length], cost: 1 }); }
   const run = [], seen = new Set();
   let spent = data.returnType === null ? 1 : 0;
   for (const u of units) {
@@ -151,7 +143,7 @@ export async function syncWaybills(env, { budget = 24, current = false, rotate =
       if (res.status === "rejected") { errors.push(res.reason); return; }
       if (res.value === null) return;
       const month = data.months[u.m.ym] = data.months[u.m.ym] || { f: u.m.from };
-      if (u.kind === "m") Object.assign(month, res.value);
+      if (u.kind === "m") { delete month.g; Object.assign(month, res.value); } // g: goods lines, no longer kept
       else (month.r = month.r || {})[u.p[0]] = res.value;
     });
   }
@@ -186,10 +178,10 @@ export async function scheduledWaybills(env) {
 
 // Everything stored, added up:
 // { sellers: { tin: { name, confirmed, unconfirmed, rejected, n… } }, returns: { tin: { name, amount, n } },
-//   waybills: [[number, tin, amount, day, state]], goods: { tin: { product: amount } } }
+//   waybills: [[number, tin, amount, day, state]] }
 export async function waybillTotals(env) {
   const { months } = await loadWaybills(env);
-  const sellers = {}, returns = {}, waybills = [], goods = {};
+  const sellers = {}, returns = {}, waybills = [];
   for (const m of Object.values(months)) {
     for (const [tin, [name, c, u, r, nc, nu, nr]] of Object.entries(m.s || {})) {
       const x = sellers[tin] = sellers[tin] || { name: "", confirmed: 0, unconfirmed: 0, rejected: 0, nConfirmed: 0, nUnconfirmed: 0, nRejected: 0 };
@@ -205,10 +197,6 @@ export async function waybillTotals(env) {
       }
     }
     waybills.push(...(m.w || []));
-    for (const [tin, products] of Object.entries(m.g || {})) {
-      const x = goods[tin] = goods[tin] || {};
-      for (const [name, a] of Object.entries(products)) x[name] = r2((x[name] || 0) + a);
-    }
   }
-  return { sellers, returns, waybills, goods };
+  return { sellers, returns, waybills };
 }

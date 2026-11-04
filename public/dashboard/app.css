@@ -334,7 +334,12 @@ details.bank-settings > summary { cursor: pointer; list-style: none; }
 details.bank-settings > summary::-webkit-details-marker { display: none; }
 details.bank-settings:not([open]) > summary { border-bottom: 0; }
 details.bank-settings textarea { width: 100%; resize: vertical; font-family: inherit; }
-.linked { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.debt-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; }
+.debt-detail > .notice { grid-column: 1 / -1; margin: 4px 0 0; }
+.debt-detail h4 { margin: 8px 0 4px; font-size: 12.5px; }
+@media (max-width: 800px) { .debt-detail { grid-template-columns: 1fr; } }
+td.rv-actions:has(.remember input) { width: 240px; }
+.remember input, .remember select { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: inherit; }
 .remember { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 150px; white-space: normal; }
 .remember .rm-cancel { align-self: flex-end; padding: 2px 8px; }
 .remember .btn { white-space: normal; text-align: center; }
@@ -396,8 +401,8 @@ tr.dish-detail-row > td { padding: 0 0 16px; background: var(--surface-2); }
 .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
 .mm-ctl { display: flex; gap: 8px; flex-wrap: wrap; }
 .mm-ctl .seg { margin-top: 0; }
-.seg.debt-views, .seg.debt-cats { margin: 0 0 14px; flex-wrap: wrap; max-width: 100%; }
-.seg.debt-views button + button, .seg.debt-cats button + button { border-left: 1px solid var(--line-strong); }
+.seg.debt-views { margin: 0 0 14px; flex-wrap: wrap; max-width: 100%; }
+.seg.debt-views button + button { border-left: 1px solid var(--line-strong); }
 table.rcp { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 table.rcp th { font-size: 11.5px; }
 table.rcp tr.semi td { background: #fbfaf6; font-weight: 600; }

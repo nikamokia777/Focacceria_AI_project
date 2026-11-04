@@ -79,8 +79,8 @@ const T = {
     cost_fallback: "Syrve-ს თვითღირებულება მიუწვდომელია — ნაცვლად ცვლადი ხარჯების „საქონელი“ აკლდება.",
     income_by_month: "შემოსავალი თვეების მიხედვით",
     total_owed: "სულ გადასახდელი", suppliers: "მომწოდებლები", supplier: "მომწოდებელი", owed: "გადასახდელი",
-    debts_sub: "რამდენი გვმართებს მომწოდებლებს: მიღებული საქონელი − დაბრუნებები − ბანკის გადარიცხვები.", search: "ძებნა",
-    prepaid: "წინასწარ გადახდილი", no_debts: "ვალები არ არის",
+    debts_sub: "rs.ge-ს ზედნადებები − დაბრუნებები − BOG / TBC გადარიცხვები. გადარიცხვა მომწოდებელს ჯერ საიდენტიფიკაციო კოდით უკავშირდება, მერე სახელით — მხოლოდ თქვენი დადასტურებით.", search: "ძებნა",
+    no_debts: "ვალები არ არის",
     platform: "პლატფორმა", rating: "რეიტინგი", reviews: "შეფასებები", latest: "ბოლო",
     ratings_sub: "მიტანის აპლიკაციების რეიტინგები. შეიყვანეთ ციფრები აპლიკაციიდან.", history: "ისტორია",
     wolt: "Wolt", glovo: "Glovo", bolt: "Bolt Food", no_rating: "ჯერ არ არის", vs_prev: "წინასთან შედარებით",
@@ -94,9 +94,6 @@ const T = {
     day_shifts: "ცვლები", add_shift: "+ ცვლა", from_t: "დან", to_t: "მდე", hours: "საათი", overtime: "ზეგანაკვეთური", note: "შენიშვნა",
     month_summary: "თვის ჯამი", shifts_n: "ცვლა", days_n: "დღე", click_day: "დააჭირეთ დღეს ცვლების ჩასაწერად", starts: "იწყება",
     add_emp_first: "ჯერ დაამატეთ თანამშრომელი ქვემოთ, სიაში.", bad_time: "დრო ჩაწერეთ ასე: 09:00",
-    dt_staff: "თანამშრომლები", cat_staff: "თანამშრომელი", staff_owed: "თანამშრომლებს გადასახდელი", earned: "გამომუშავებული", no_start: "თარიღი არ არის",
-    staff_hint: "გამომუშავებული (გრაფიკით) + ზეგანაკვეთური − ბანკის გადარიცხვები, თითოეულის „ითვლება“ თარიღიდან. გადარიცხვა უკავშირდება პირადი ნომრით / ანგარიშით, ან „ვინ არის ეს?“ → თანამშრომელი.",
-    staff_none: "თანამშრომლები ჯერ არ არის — დაამატეთ „თანამშრომლების“ ჩანართში.",
     days: ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვი"],
     months: ["იანვარი", "თებერვალი", "მარტი", "აპრილი", "მაისი", "ივნისი", "ივლისი", "აგვისტო", "სექტემბერი", "ოქტომბერი", "ნოემბერი", "დეკემბერი"],
     daily_tasks: "ყოველდღიური დავალებები", overall_tasks: "ზოგადი დავალებები", task: "დავალება",
@@ -108,36 +105,20 @@ const T = {
     expenses: "ხარჯები", left_to_pay_all: "სულ გადასასახდელი", debts_short: "ვალები", fixed_short: "ფიქს.",
     variable_short: "ცვლ.", avg_rating: "რეიტინგი", average: "საშუალო", vs_last_month: "წინა თვესთან",
     load_failed: "ვერ ჩაიტვირთა", unpaid_total: "გადაუხდელი", today: "დღეს",
-    dt_rs: "rs.ge ზედნადებები vs გადარიცხვა", dt_syrve: "Syrve vs გადარიცხვა", dt_tg: "Telegram დადასტურებული vs გადარიცხვა", dt_cats: "rs მოსული",
-    dv_main_hint: "ეს თანხა ჩანს მთავარ გვერდზე", col_rs: "rs.ge ზედნადებები", col_syrve: "Syrve-ს ზედნადებები", col_tg: "Telegram-ში დადასტურებული",
-    wb_count: "ზედნადები", returns_col: "დაბრუნება", syrve_balance: "Syrve-ს ბალანსი (შედარება)", confirmed_short: "დადასტ. rs.ge-ზე", rejected_tip: "rs.ge-ზე უარყოფილი (არ ითვლება)",
-    inv_loading: "იტვირთება Syrve-ს ზედნადებები… {a} / {b} თვე", inv_error: "Syrve-ს ზედნადებები",
-    tg_since: "Telegram-ის ბოტი ზედნადებებს {d}-დან იწერს, გადარიცხვები კი {f}-დან ითვლება — ამიტომ ადრე გადახდილი მომწოდებლები აქ „წინასწარ გადახდილად“ ჩანს.",
-    tg_none: "Telegram-ში დადასტურებული ზედნადებები ჯერ არ არის.",
-    cmp_btn: "⇄ შედარება rs.ge-სთან", cmp_hide: "✕ შედარების დამალვა", cmp_title: "Telegram vs rs.ge ზედნადებები ({d}-დან)",
-    cmp_only_tg: "მხოლოდ Telegram-ში", cmp_only_rs: "მხოლოდ rs.ge-ზე (Telegram-ში არ დადასტურებულა)", cmp_diff: "თანხა განსხვავდება",
-    cmp_missing: "rs.ge-ზე ვერ მოიძებნა", cmp_rejected: "rs.ge-ზე უარყოფილია", cmp_gap: "სხვაობა (rs.ge − Telegram)", cmp_all_match: "ყველაფერი ემთხვევა",
-    cat_food: "საკვები და სასმელი", cat_supplies: "სახარჯი მასალა", cat_equipment: "ძირითადი საშუალება", cat_other: "სხვა ხარჯი", cat_outsource: "აუთსორსინგი",
-    who_q: "ვინ არის ეს?", comment_ph: "კომენტარი (მაგ. ქირა, რემონტი)…", nw_title: "გადახდები ზედნადების გარეშე", nw_card: "ზედნადების გარეშე გადახდილი",
-    nw_hint: "მომწოდებლები არ არიან — მომწოდებლების ვალს არ ცვლის", unsorted_title: "არ არის მომწოდებელი — კატეგორიის გარეშე",
-    unsorted_hint: "აირჩიეთ, რა ხარჯია — დაიმახსოვრება ამ ს/კ-ზე ან ანგარიშზე", back_review: "გადასამოწმებელში დაბრუნება", recipients_n: "მიმღები",
-    cat_goods: "მიღებული საქონელი", cat_paid: "გადახდილი (წილით)", cat_returns: "დაბრუნება (წილით)", cat_owed: "ვალი (წილით)", cat_share: "მომწოდებლის საქონლიდან",
-    cats_hint: "თითო მომწოდებლის გადახდები და დაბრუნებები მის კატეგორიებს შორის ნაწილდება მისი საქონლის წილის მიხედვით.",
-    cat_unsplit: "გადახდები მომწოდებლებზე, რომლებსაც rs.ge-ზე პროდუქცია არ აქვთ ({a}), კატეგორიებში არ ითვლება.",
-    products_hint: "კატეგორია ავტომატურად ირჩევა სახელით — შეცვლა შეგიძლიათ, დაიმახსოვრება", manual_cat: "ხელით", reset_auto: "ავტომატურზე დაბრუნება",
+    dv_main_hint: "ეს თანხა ჩანს მთავარ გვერდზე",
+    wb_count: "ზედნადები", returns_col: "დაბრუნება",
+    cat_other: "სხვა ხარჯი",
+    who_q: "ვინ არის ეს?", comment_ph: "კომენტარი (მაგ. ქირა, რემონტი)…",
     rsge_not_connected: "rs.ge არ არის დაკავშირებული: Cloudflare-ში საჭიროა RSGE_SERVICE_USER და RSGE_SERVICE_PASSWORD.",
     rsge_need_start: "ქვემოთ, ბანკის პარამეტრებში მიუთითეთ თარიღი — ზედნადებებიც და გადარიცხვებიც ამ თარიღიდან ითვლება.",
     rsge_loading: "იტვირთება rs.ge-ს ზედნადებები… {a} / {b} თვე", rsge_no_returns: "rs.ge-ზე „უკან დაბრუნების“ ტიპი ვერ ვიპოვე — დაბრუნებები არ აკლდება.",
-    syrve_col_error: "Syrve-ს სვეტი ახლა მიუწვდომელია", paid_bank: "გადახდილი (ბანკი)", tax_id: "ს/კ", to_review: "გადასამოწმებელი",
-    review_sub: "მიმღებები, რომელთა გადახდები ავტომატურად ვერ დავაკავშირე მომწოდებელს", recipient: "მიმღები", why: "მიზეზი",
-    why_name_differs: "ს/კ ემთხვევა, სახელი განსხვავდება", why_several_matches: "რამდენიმე შესაძლო მომწოდებელი",
-    why_not_in_syrve: "rs.ge-ზეა, Syrve-ში ვერ ვიპოვე", why_name_only: "მხოლოდ სახელი ემთხვევა", why_unknown: "უცნობი მიმღები", why_tin_differs: "სახელი ემთხვევა, ს/კ განსხვავდება",
-    remember_q: "დავიმახსოვრო „{name}“-ის მომავალი გადახდებისთვისაც?", remember_yes: "კი, ყოველთვის", remember_these: "მხოლოდ ეს {n} გადახდა",
-    payments_col: "გადახდები", last: "ბოლო",
-    choose_supplier: "აირჩიეთ მომწოდებელი", all_with_tin: "ამ ს/კ-ის ყველა გადახდა", confirm: "დადასტურება",
-    not_supplier: "არ არის მომწოდებელი", showing_of: "ნაჩვენებია {a} / {b} მიმღები", bank: "ბანკი", last_sync: "ბოლო სინქრ.",
+    paid_bank: "გადახდილი (ბანკი)", tax_id: "ს/კ",
+    recipient: "მიმღები",
+    last: "ბოლო",
+    confirm: "დადასტურება",
+    bank: "ბანკი", last_sync: "ბოლო სინქრ.",
     bank_settings: "ბანკის პარამეტრები", history_from: "ისტორია თარიღიდან", bog_accounts: "BOG ანგარიშები (IBAN, თითო ხაზზე)",
-    save: "შენახვა", tbc_auto: "TBC-ის GEL ანგარიშები ავტომატურად იკითხება", payments_loaded: "გადახდა", matched: "დაკავშირებული",
+    save: "შენახვა", tbc_auto: "TBC-ის GEL ანგარიშები ავტომატურად იკითხება", payments_loaded: "გადახდა",
     ignored: "გამოტოვებული", bank_not_connected: "ბანკი არ არის დაკავშირებული",
     bank_secrets_hint: "Cloudflare-ში დაამატეთ Secret-ები: BOG_CLIENT_ID, BOG_CLIENT_SECRET და/ან TBC_CLIENT_ID, TBC_CLIENT_SECRET.",
     need_start: "ქვემოთ, ბანკის პარამეტრებში მიუთითეთ თარიღი, საიდანაც ითვლება ზედნადებები და გადარიცხვები, და BOG-ის ანგარიშები.",
@@ -147,7 +128,57 @@ const T = {
     err_tbc_unknown_id: "TBC ამ Client ID-ს არ იცნობს (არც სვაპით). შექმენით ახალი ინტეგრაცია TBC ბიზნეს ინტერნეტბანკში (API ინტეგრაცია, SMS დადასტურებით) და ჩასვით ახალი Client ID და Secret Cloudflare-ში.",
     err_tbc_bad_keys: "TBC გასაღებებს არ იღებს. შეამოწმეთ, რომ ინტეგრაცია აქტიურია და SMS-ით დადასტურებულია, დაკავშირებული მომხმარებელი აქტიურია და აქვს „ისტორიის ნახვის“ უფლება.",
     err_tbc_down: "TBC-ის სერვერი ახლა არ პასუხობს — მოგვიანებით თავად სცდის.",
-    note_tbc_swapped: "Client ID და Secret Cloudflare-ში ადგილებშია არეული — აპი ავტომატურად ასწორებს, მაგრამ სასურველია გაასწოროთ.", linked: "დამახსოვრებული გადაწყვეტილებები",
+    note_tbc_swapped: "Client ID და Secret Cloudflare-ში ადგილებშია არეული — აპი ავტომატურად ასწორებს, მაგრამ სასურველია გაასწოროთ.",
+    dt_debts: "ვალები",
+    dt_nowb: "ზედნადების გარეშე",
+    dt_problems: "პრობლემები",
+    dt_over: "ზედმეტი გადახდა",
+    col_waybills: "ზედნადებები",
+    transfers: "გადარიცხვები",
+    paid_all: "გადახდილი",
+    manual_paid: "ბანკის გარეშე",
+    rs_confirmed: "დადასტ. rs.ge-ზე",
+    undo: "გაუქმება",
+    debt_ok: "გადარიცხვა არ არის — ვალი დადასტურებულია",
+    how_code: "ს/კ-ით",
+    how_dec: "თქვენი გადაწყვეტილებით",
+    showing_tx: "ნაჩვენებია {a} / {b} გადარიცხვა",
+    st_over: "ზედმეტი",
+    st_problem: "პრობლემა",
+    st_debt_ok: "ვალი დადასტ.",
+    only_these: "მხოლოდ ეს გადარიცხვები",
+    nw_open: "გადარიცხვები ზედნადების გარეშე",
+    nw_open_hint: "მიმღების ს/კ არცერთ ზედნადებზე არ არის და სახელითაც არცერთ მომწოდებელს არ ჰგავს",
+    nw_wait: "ველოდებით ზედნადებს",
+    nw_wait_hint: "ზედნადები იქმნება — როცა ამ კოდით rs.ge-ზე გამოჩნდება, გადარიცხვები ავტომატურად ჩაითვლება",
+    other_hint: "ზედნადები არ არის — მომწოდებლების ვალს არ ცვლის",
+    code_ph: "საიდენტიფიკაციო კოდი",
+    pr_name: "სახელი ემთხვევა, ს/კ — არა",
+    pr_name_hint: "ითვლება მხოლოდ მას შემდეგ, რაც ვერსიას დაადასტურებთ",
+    versions: "ვერსიები",
+    no_version: "ვერსია არ არის — კოდი ხელით",
+    none_of_these: "არცერთი არ არის",
+    pr_none: "გადარიცხვა საერთოდ არ არის",
+    pr_none_hint: "მომწოდებლები, რომლებსაც ზედნადებები აქვთ, მაგრამ არცერთი გადარიცხვა",
+    looks_like: "ჰგავს:",
+    see_above: "იხ. ზემოთ",
+    type_manually: "ხელით შეყვანა",
+    confirm_debt: "გადარიცხვა არ არის — ვალს ვადასტურებ",
+    over_hint: "მომწოდებლები, რომლებსაც ზედნადებებზე მეტი გადაუხადეთ.",
+    excess: "ზედმეტი",
+    scope_q: "რომელ გადარიცხვებს ეხება „{name}“-ზე?",
+    scope_all: "ამ მიმღების ყველა (მომავალიც)",
+    scope_once: "მხოლოდ ეს {n} გადარიცხვა",
+    code_q: "მომწოდებლის საიდენტიფიკაციო კოდი (როგორც ზედნადებზეა)",
+    code_next: "შემდეგი",
+    code_unknown: "კოდით {code} ზედნადები ჯერ არ არის. რა ხდება?",
+    opt_wait: "ზედნადები იქმნება",
+    opt_never: "ზედნადები არ იქნება → სხვა ხარჯი",
+    opt_find: "ზედნადები მოიძებნება",
+    opt_none: "ზედნადები არ არის → სხვა ხარჯი",
+    manual_code: "მიმღების კოდი, თუ ბანკში სხვა კოდით უხდით",
+    manual_pay: "გადახდა ბანკის გარეშე (მაგ. ნაღდი)",
+    manual_need: "ჩაწერეთ კოდი ან თანხა", tx_n: "გადარიცხვა",
   },
   en: {
     dashboard: "Dashboard", home: "← Home", password: "Password", login: "Log in", logout: "Log out",
@@ -208,8 +239,8 @@ const T = {
     cost_fallback: "Syrve's cost price isn't available — 'goods' from Variable costs is subtracted instead.",
     income_by_month: "Income by month",
     total_owed: "Total owed", suppliers: "Suppliers", supplier: "Supplier", owed: "Owed",
-    debts_sub: "What we owe suppliers: goods received − returns − bank transfers.", search: "Search",
-    prepaid: "Prepaid", no_debts: "No debts",
+    debts_sub: "rs.ge waybills − returns − BOG / TBC transfers. A transfer goes to a supplier by identification code first, by name only after you confirm.", search: "Search",
+    no_debts: "No debts",
     platform: "Platform", rating: "Rating", reviews: "Reviews", latest: "Latest",
     ratings_sub: "Delivery app ratings. Enter the numbers from each app.", history: "History",
     wolt: "Wolt", glovo: "Glovo", bolt: "Bolt Food", no_rating: "No rating yet", vs_prev: "vs previous",
@@ -223,9 +254,6 @@ const T = {
     day_shifts: "Shifts", add_shift: "+ Shift", from_t: "From", to_t: "To", hours: "Hours", overtime: "Overtime", note: "Note",
     month_summary: "Month total", shifts_n: "Shifts", days_n: "days", click_day: "Click a day to enter its shifts", starts: "Starts",
     add_emp_first: "First add an employee in the list below.", bad_time: "Type the time like 09:00",
-    dt_staff: "Employees", cat_staff: "Employee", staff_owed: "Owed to employees", earned: "Earned", no_start: "No date",
-    staff_hint: "Earned (from the schedule) + overtime − bank transfers, from each one's \"counted from\" date. Transfers are matched by personal ID / account, or by \"Who is this?\" → Employee.",
-    staff_none: "No employees yet — add them in the Employees tab.",
     days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
     daily_tasks: "Daily tasks", overall_tasks: "Overall tasks", task: "Task",
@@ -237,36 +265,20 @@ const T = {
     expenses: "expenses", left_to_pay_all: "Left to pay", debts_short: "debts", fixed_short: "fixed",
     variable_short: "variable", avg_rating: "Rating", average: "average", vs_last_month: "vs last month",
     load_failed: "Couldn't load", unpaid_total: "Unpaid", today: "Today",
-    dt_rs: "rs.ge waybills vs transfers", dt_syrve: "Syrve vs transfers", dt_tg: "Telegram approved vs transfers", dt_cats: "rs received",
-    dv_main_hint: "This amount is shown on the Main page", col_rs: "rs.ge waybills", col_syrve: "Syrve invoices", col_tg: "Approved in Telegram",
-    wb_count: "waybills", returns_col: "Returns", syrve_balance: "Syrve balance (compare)", confirmed_short: "confirmed on rs.ge", rejected_tip: "Rejected on rs.ge (not counted)",
-    inv_loading: "Loading Syrve invoices… {a} / {b} months", inv_error: "Syrve invoices",
-    tg_since: "The Telegram bot records waybills from {d}, while transfers count from {f} — so suppliers paid earlier show as prepaid here.",
-    tg_none: "No waybills approved in Telegram yet.",
-    cmp_btn: "⇄ Compare with rs.ge", cmp_hide: "✕ Hide comparison", cmp_title: "Telegram vs rs.ge waybills (from {d})",
-    cmp_only_tg: "Only in Telegram", cmp_only_rs: "Only on rs.ge (not approved in Telegram)", cmp_diff: "Amount differs",
-    cmp_missing: "not found on rs.ge", cmp_rejected: "rejected on rs.ge", cmp_gap: "Difference (rs.ge − Telegram)", cmp_all_match: "Everything matches",
-    cat_food: "Food & drink", cat_supplies: "Consumables", cat_equipment: "Fixed assets", cat_other: "Other expenses", cat_outsource: "Outsourcing",
-    who_q: "Who is this?", comment_ph: "Comment (e.g. rent, repairs)…", nw_title: "Payments without a waybill", nw_card: "Paid without a waybill",
-    nw_hint: "Not suppliers — doesn't change any supplier's debt", unsorted_title: "Not a supplier — no category yet",
-    unsorted_hint: "Choose what kind of expense it is — remembered for this tax ID or account", back_review: "Back to review", recipients_n: "recipients",
-    cat_goods: "Goods received", cat_paid: "Paid (by share)", cat_returns: "Returns (by share)", cat_owed: "Owed (by share)", cat_share: "of the supplier's goods",
-    cats_hint: "Each supplier's payments and returns are split between its categories by their share of its goods.",
-    cat_unsplit: "Payments to suppliers without rs.ge goods ({a}) aren't counted in the categories.",
-    products_hint: "The category is chosen automatically by name — change it and it is remembered", manual_cat: "by hand", reset_auto: "Back to automatic",
+    dv_main_hint: "This amount is shown on the Main page",
+    wb_count: "waybills", returns_col: "Returns",
+    cat_other: "Other expenses",
+    who_q: "Who is this?", comment_ph: "Comment (e.g. rent, repairs)…",
     rsge_not_connected: "rs.ge isn't connected: Cloudflare needs RSGE_SERVICE_USER and RSGE_SERVICE_PASSWORD.",
     rsge_need_start: "In Bank settings below, set the start date — waybills and transfers are both counted from it.",
     rsge_loading: "Loading rs.ge waybills… {a} / {b} months", rsge_no_returns: "rs.ge has no “return” waybill type — returns aren't subtracted.",
-    syrve_col_error: "The Syrve column isn't available right now", paid_bank: "Paid (bank)", tax_id: "Tax ID", to_review: "To review",
-    review_sub: "Recipients whose payments the app couldn't match to a supplier on its own", recipient: "Recipient", why: "Why",
-    why_name_differs: "Tax ID matches, name differs", why_several_matches: "Several possible suppliers",
-    why_not_in_syrve: "On rs.ge, not found in Syrve", why_name_only: "Only the name matches", why_unknown: "Unknown recipient", why_tin_differs: "Name matches, tax ID differs",
-    remember_q: "Remember this for future payments to “{name}” too?", remember_yes: "Yes, always", remember_these: "Only these {n} payments",
-    payments_col: "Payments", last: "last",
-    choose_supplier: "Choose supplier", all_with_tin: "All payments with this tax ID", confirm: "Confirm",
-    not_supplier: "Not a supplier", showing_of: "Showing {a} of {b} recipients", bank: "Bank", last_sync: "Last sync",
+    paid_bank: "Paid (bank)", tax_id: "Tax ID",
+    recipient: "Recipient",
+    last: "last",
+    confirm: "Confirm",
+    bank: "Bank", last_sync: "Last sync",
     bank_settings: "Bank settings", history_from: "History from", bog_accounts: "BOG accounts (IBAN, one per line)",
-    save: "Save", tbc_auto: "TBC GEL accounts are read automatically", payments_loaded: "payments", matched: "matched",
+    save: "Save", tbc_auto: "TBC GEL accounts are read automatically", payments_loaded: "payments",
     ignored: "skipped", bank_not_connected: "Bank not connected",
     bank_secrets_hint: "Add these Secrets in Cloudflare: BOG_CLIENT_ID, BOG_CLIENT_SECRET and/or TBC_CLIENT_ID, TBC_CLIENT_SECRET.",
     need_start: "In Bank settings below, set the date waybills and transfers are counted from, and your BOG accounts.",
@@ -276,7 +288,57 @@ const T = {
     err_tbc_unknown_id: "TBC doesn't recognise this Client ID (also tried swapped). Create a new integration in TBC Business Internet Banking (API Integration, confirmed by SMS) and paste the new Client ID and Secret in Cloudflare.",
     err_tbc_bad_keys: "TBC rejects these keys. Check that the integration is active and confirmed by SMS, and that the linked user is active and has the “view history” permission.",
     err_tbc_down: "TBC's server isn't answering right now — the app will try again by itself.",
-    note_tbc_swapped: "The Client ID and Secret are swapped in Cloudflare — the app fixes this automatically, but it's better to swap them back.", linked: "Remembered decisions",
+    note_tbc_swapped: "The Client ID and Secret are swapped in Cloudflare — the app fixes this automatically, but it's better to swap them back.",
+    dt_debts: "Debts",
+    dt_nowb: "Without a waybill",
+    dt_problems: "Problems",
+    dt_over: "Overpaid",
+    col_waybills: "Waybills",
+    transfers: "Transfers",
+    paid_all: "Paid",
+    manual_paid: "Outside the bank",
+    rs_confirmed: "confirmed on rs.ge",
+    undo: "Undo",
+    debt_ok: "No transfer — the debt is confirmed",
+    how_code: "by code",
+    how_dec: "your decision",
+    showing_tx: "Showing {a} of {b} transfers",
+    st_over: "Overpaid",
+    st_problem: "Problem",
+    st_debt_ok: "Debt confirmed",
+    only_these: "only these transfers",
+    nw_open: "Transfers without a waybill",
+    nw_open_hint: "The recipient's code is on no waybill and its name looks like no supplier",
+    nw_wait: "Waiting for a waybill",
+    nw_wait_hint: "The waybill is being created — once rs.ge has one with this code, the transfers count automatically",
+    other_hint: "No waybill — doesn't change any supplier's debt",
+    code_ph: "Identification code",
+    pr_name: "Name matches, code doesn't",
+    pr_name_hint: "Counts only after you confirm a version",
+    versions: "Versions",
+    no_version: "No version — type the code",
+    none_of_these: "None of these",
+    pr_none: "No transfer at all",
+    pr_none_hint: "Suppliers with waybills but not a single transfer",
+    looks_like: "Looks like:",
+    see_above: "see above",
+    type_manually: "Type it in",
+    confirm_debt: "No transfer — I confirm the debt",
+    over_hint: "Suppliers you paid more than their waybills.",
+    excess: "Excess",
+    scope_q: "Which transfers to “{name}” does this apply to?",
+    scope_all: "All of this recipient's (future too)",
+    scope_once: "Only these {n} transfers",
+    code_q: "The supplier's identification code (as on the waybill)",
+    code_next: "Next",
+    code_unknown: "No waybill has code {code} yet. What is happening?",
+    opt_wait: "The waybill is being created",
+    opt_never: "There will be no waybill → other expense",
+    opt_find: "Find the waybills",
+    opt_none: "There is no waybill → other expense",
+    manual_code: "Recipient code, if you pay them under another code",
+    manual_pay: "Payment outside the bank (e.g. cash)",
+    manual_need: "Type a code or an amount", tx_n: "transfers",
   },
 };
 
@@ -297,11 +359,9 @@ const S = {
   varMonth: ymNow(),
   empMonth: ymNow(),
   empDay: "",                                      // Employees: the day whose shifts are being edited
-  staffOpen: "",                                   // Debts → Employees: the employee whose months are shown
   debtQuery: "",
-  debtTab: store.get("dash_debt_tab") || "rs",     // rs | syrve | tg | cats
-  debtCat: store.get("dash_debt_cat") || "food",   // the category shown in "rs მოსული"
-  debtCompare: false,                              // Telegram view: comparison with rs.ge open
+  debtTab: store.get("dash_debt_tab") || "debts",  // debts | nowb | problems | over
+  debtOpen: "",                                    // Debts: the open row ("s:<code>" supplier, "r:<recipient>" recipient)
   liveTimer: null,
 };
 
@@ -1351,93 +1411,50 @@ async function renderDishDetail(view, id, range, fresh) {
 }
 
 // ====================== 5. DEBTS ======================
-// Debt per supplier = goods received − our return waybills (rs.ge) − payments from BOG / TBC, in four views:
-// rs.ge waybills (its total is the one on the Main page) / Syrve incoming invoices / waybills approved in
-// Telegram (with a waybill-by-waybill comparison with rs.ge) / "rs მოსული": the rs.ge goods by category,
-// each supplier's payments split between its categories by share.
-// Payments the app can't match safely wait in "To review" until the CEO assigns them.
-const DEBT_TABS = ["rs", "syrve", "tg", "cats", "staff"];
-const DEBT_CATS = ["food", "supplies", "equipment", "other", "outsource"]; // the sections of "rs მოსული"
-const PRODUCT_CATS = ["food", "supplies", "equipment", "other"];           // a product's category
-const EXPENSE_CATS = ["supplies", "equipment", "other", "outsource"];      // a recipient that is not a supplier
-// a supplier row's [goods, waybills, owed] in each per-supplier view
-const DEBT_COLS = {
-  rs: s => [s.active, s.nActive, s.owed],
-  syrve: s => [s.inv, s.nInv, s.owedInv],
-  tg: s => [s.tg, s.nTg, s.owedTg],
-};
-// The Telegram view's comparison: approvals vs the active rs.ge waybills, per supplier and waybill by waybill
-function compareHtml(cmp, match) {
-  if (!cmp.since) return `<div class="notice">${esc(t("tg_none"))}</div>`;
-  const c = cmp.counts || {};
-  const sups = (cmp.suppliers || []).filter(p => match({ name: p.name, tin: p.key }));
-  const gap = v => Math.abs(v) < 0.01 ? "✓" : `<b class="bad-text">${money(v)}</b>`;
-  const block = (title, total, items, cells) => !items.length ? "" : `<div class="panel-body"><h4>${esc(title)} · ${total}</h4></div>
-    <div class="table-wrap"><table><tbody>${items.slice(0, 100).map(cells).join("")}</tbody></table></div>
-    ${total > Math.min(items.length, 100) ? `<div class="muted small" style="padding:6px 16px 12px">${esc(t("showing_of").replace("{a}", Math.min(items.length, 100)).replace("{b}", total))}</div>` : ""}`;
-  return `<div class="panel">
-    <div class="panel-head"><h3>⇄ ${esc(t("cmp_title").replace("{d}", cmp.since))}</h3>
-      <span class="muted small">${esc(t("cmp_only_tg"))}: ${c.onlyTg || 0} · ${esc(t("cmp_diff"))}: ${c.diff || 0} · ${esc(t("cmp_only_rs"))}: ${c.onlyRs || 0}</span></div>
-    <div class="table-wrap"><table>
-      <thead><tr><th>${esc(t("supplier"))}</th><th class="r">Telegram</th><th class="r">rs.ge</th><th class="r">${esc(t("cmp_gap"))}</th></tr></thead>
-      <tbody>${sups.map(p => `<tr><td>${esc(p.name)}</td>
-        <td class="r num">${money(p.tg)}<div class="muted small">${p.nTg} ${esc(t("wb_count"))}</div></td>
-        <td class="r num">${money(p.rs)}<div class="muted small">${p.nRs} ${esc(t("wb_count"))}</div></td>
-        <td class="r num">${gap(p.gap)}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
-    </table></div>
-    ${!c.onlyTg && !c.onlyRs && !c.diff ? `<div class="panel-body">✓ ${esc(t("cmp_all_match"))}</div>` : ""}
-    ${block(t("cmp_only_tg"), c.onlyTg, cmp.onlyTg || [], x => `<tr><td class="num">${esc(x.number)}</td><td>${esc(x.name)}</td><td class="muted">${esc(x.day)}</td><td class="r num">${money(x.amount)}</td><td><span class="pill warn">${esc(t("cmp_" + x.why))}</span></td></tr>`)}
-    ${block(t("cmp_diff"), c.diff, cmp.diff || [], x => `<tr><td class="num">${esc(x.number)}</td><td>${esc(x.name)}</td><td class="muted">${esc(x.day)}</td><td class="r num">Telegram ${money(x.tg)}</td><td class="r num">rs.ge ${money(x.rs)}</td></tr>`)}
-    ${block(t("cmp_only_rs"), c.onlyRs, cmp.onlyRs || [], x => `<tr><td class="num">${esc(x.number)}</td><td>${esc(x.name)}</td><td class="muted">${esc(x.day)}</td><td class="r num">${money(x.amount)}</td></tr>`)}
+// rs.ge waybills − our return waybills − BOG / TBC transfers, per supplier (debts.js). A transfer goes to a
+// supplier by identification code first, by name only after the CEO confirms. Four subtabs:
+// 1 debts per supplier · 2 transfers without a waybill („ვინ არის ეს?“) · 3 problems (recipients that match
+// a supplier by name only, suppliers with no transfer at all) · 4 overpayments. Answers go to /debts/decide.
+const DEBT_TABS = ["debts", "nowb", "problems", "over"];
+
+// a supplier's waybills, transfers and payments outside the bank (subtabs 1 and 4)
+function debtDetailHtml(s) {
+  const wbRows = s.waybills.map(([num, day, amount, st]) => `<tr><td class="num">${esc(num)}</td><td class="muted">${esc(day)}</td>
+    <td class="r num">${money(amount)}</td><td class="muted small">${st === 1 ? "✓ " + esc(t("rs_confirmed")) : ""}</td></tr>`).join("");
+  const txRows = s.transfers.map(([id, date, amount, who, purpose, how, scope, rk]) => `<tr><td class="muted">${esc(date)}</td><td class="r num">${money(amount)}</td>
+    <td>${esc(who)}<div class="muted small clip" title="${esc(purpose)}">${esc(purpose)}</div></td>
+    <td><span class="pill ${how === "code" ? "good" : "neutral"}">${esc(t("how_" + how))}</span>
+      ${how === "dec" ? `<button type="button" class="icon-btn dx-undo" data-rk="${esc(rk)}" data-scope="${esc(scope)}" data-id="${esc(id)}" title="${esc(t("undo"))}">↩</button>` : ""}</td></tr>`).join("");
+  const mRows = s.manualList.map(m => `<tr><td class="muted">${esc(m.date)}</td><td class="r num">${money(m.amount)}</td>
+    <td>${esc(t("manual_paid"))}${m.comment ? `<div class="muted small">${esc(m.comment)}</div>` : ""}</td>
+    <td><button type="button" class="icon-btn dx-mdel" data-id="${esc(m.id)}" title="${esc(t("delete"))}">✕</button></td></tr>`).join("");
+  return `<div class="debt-detail">
+    ${s.debtOk ? `<div class="notice">✓ ${esc(t("debt_ok"))} · ${esc(s.debtOk)} <button type="button" class="btn small dx-debt-off" data-tin="${esc(s.tin)}">${esc(t("undo"))}</button></div>` : ""}
+    <div><h4>${esc(t("col_waybills"))} · ${s.waybills.length}</h4>
+      <table class="mini"><tbody>${wbRows || `<tr><td class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody></table></div>
+    <div><h4>${esc(t("transfers"))} · ${s.transfers.length + s.manualList.length}</h4>
+      <table class="mini"><tbody>${txRows + mRows || `<tr><td class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody></table></div>
   </div>`;
 }
-// "Who is this?" for a recipient that is not a supplier: one of EXPENSE_CATS; "other" also asks for a comment.
-// "Employee" asks which one (emps: the active employees). onPick(cat, comment, employeeId) — comment only for "other".
-function expenseChooser(cell, onPick, onCancel, emps = []) {
-  cell.innerHTML = `<div class="remember"><div class="q">${esc(t("who_q"))}</div>
-    ${[...EXPENSE_CATS, "staff"].map(k => `<button type="button" class="btn small" data-x="${k}">${esc(t("cat_" + k))}</button>`).join("")}
-    <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
-  $(".rm-cancel", cell).addEventListener("click", onCancel);
-  $$("[data-x]", cell).forEach(b => b.addEventListener("click", () => {
-    if (b.dataset.x === "staff") {
-      cell.innerHTML = `<div class="remember"><div class="q">${esc(t("cat_staff"))}</div>
-        ${emps.length ? `<select class="x-emp">${emps.map(e => `<option value="${esc(e.id)}">${esc(e.name)}${e.role ? " · " + esc(e.role) : ""}</option>`).join("")}</select>
-          <button type="button" class="btn small primary x-ok">${esc(t("save"))}</button>` : `<div class="muted small">${esc(t("staff_none"))}</div>`}
-        <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
-      if (emps.length) $(".x-ok", cell).addEventListener("click", () => onPick("staff", undefined, $(".x-emp", cell).value));
-      $(".rm-cancel", cell).addEventListener("click", onCancel);
-      return;
-    }
-    if (b.dataset.x !== "other") return onPick(b.dataset.x);
-    cell.innerHTML = `<div class="remember"><div class="q">${esc(t("cat_other"))}</div>
-      <textarea class="x-note" rows="2" maxlength="300" placeholder="${esc(t("comment_ph"))}"></textarea>
-      <button type="button" class="btn small primary x-ok">${esc(t("save"))}</button>
-      <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
-    $(".x-note", cell).focus();
-    $(".x-ok", cell).addEventListener("click", () => onPick("other", $(".x-note", cell).value.trim()));
-    $(".rm-cancel", cell).addEventListener("click", onCancel);
-  }));
-}
+
 async function renderDebts(view, demo, fresh = false, quiet = false) {
   if (!S.syrve.debts && !quiet) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
   const r = await loadSyrve("debts", "", fresh);
-  const dt = DEBT_TABS.includes(S.debtTab) ? S.debtTab : "rs";
-  const dc = DEBT_CATS.includes(S.debtCat) ? S.debtCat : "food";
-  const col = DEBT_COLS[dt];
-  const totals = r.totals || {};
-  const C = r.cats || { totals: {}, suppliers: [], products: [], unsplit: 0 };
+  const dt = DEBT_TABS.includes(S.debtTab) ? S.debtTab : "debts";
+  const T = r.totals || {};
+  const NW = r.noWaybill || { open: [], wait: [], other: [], otherTotal: 0 };
+  const PR = r.problems || { name: [], none: [] };
+  const OV = r.over || [];
+  const sups = r.suppliers || [];
   const q = S.debtQuery.toLowerCase();
-  const match = s => !q || String(s.name).toLowerCase().includes(q) || String(s.tin || "").includes(q) || String(s.rsName || "").toLowerCase().includes(q);
-  const list = col ? r.suppliers.filter(s => (col(s)[0] || s.paid || s.returns || (dt === "rs" && s.rejected) || (dt === "syrve" && s.syrveBalance)) && match(s))
-    .sort((a, b) => col(b)[2] - col(a)[2]) : [];
+  const match = (...xs) => !q || xs.some(v => String(v ?? "").toLowerCase().includes(q));
   const wb = r.waybills || {};
-  const inv = r.invoices || {};
-  const bank = r.bank || { configured: {} };
+  const bank = r.bank || { configured: {}, settings: {} };
   const connected = bank.configured.bog || bank.configured.tbc;
-  const rev = r.review || { count: 0, amount: 0, items: [] };
   const lastSync = bank.lastSyncAt ? new Date(bank.lastSyncAt) : null;
+  const sellerName = new Map((r.sellers || []).map(s => [s.tin, s.name]));
 
-  // notices about the bank connection
+  // notices about the bank and rs.ge
   let notices = "";
   if (!connected) notices += `<div class="notice">🏦 <b>${esc(t("bank_not_connected"))}.</b> ${esc(t("bank_secrets_hint"))}</div>`;
   else if (!bank.settings.historyFrom) notices += `<div class="notice">🏦 ${esc(t("need_start"))}</div>`;
@@ -1449,39 +1466,126 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       : `<div class="notice bad">${esc(src.toUpperCase())}: ${esc(msg)}</div>`;
   }
   if ((bank.notes || {}).tbc === "tbc_swapped") notices += `<div class="notice">TBC: ${esc(t("note_tbc_swapped"))}</div>`;
-  // rs.ge waybills and Syrve invoices
   if (wb.configured === false) notices += `<div class="notice bad">📄 ${esc(t("rsge_not_connected"))}</div>`;
   else if (wb.configured && !wb.from && !(connected && !bank.settings.historyFrom)) notices += `<div class="notice">📄 ${esc(t("rsge_need_start"))}</div>`;
   if (wb.error) notices += `<div class="notice bad">rs.ge: ${esc(wb.error)}</div>`;
   else if (wb.pending) notices += `<div class="notice">⏳ ${esc(t("rsge_loading").replace("{a}", wb.months).replace("{b}", wb.total))}</div>`;
   if (wb.configured && wb.from && wb.returnsKnown === false) notices += `<div class="notice">${esc(t("rsge_no_returns"))}</div>`;
-  if (inv.error) notices += `<div class="notice bad">${esc(t("inv_error"))}: ${esc(inv.error)}</div>`;
-  else if (inv.pending) notices += `<div class="notice">⏳ ${esc(t("inv_loading").replace("{a}", inv.months).replace("{b}", inv.total))}</div>`;
-  if (r.syrveError) notices += `<div class="notice">${esc(t("syrve_col_error"))}: <span class="muted small">${esc(r.syrveError)}</span></div>`;
   notices += `<div id="bankProgress"></div>`;
 
-  const supplierSelect = (sel, attrs) => `<select ${attrs}><option value="">${esc(t("choose_supplier"))}</option>${(r.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === sel ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select>`;
+  const nProblems = PR.name.length + PR.none.length;
+  const tabLabel = { debts: `${t("dt_debts")} · ${money(r.total || 0)}`, nowb: `${t("dt_nowb")} · ${NW.open.length}`,
+    problems: `${t("dt_problems")} · ${nProblems}`, over: `${t("dt_over")} · ${OV.length}` };
+  const cards = card(t("total_owed"), money(r.total || 0), esc(t("dv_main_hint")), r.total > 0 ? "hero bad" : "hero") +
+    card(t("col_waybills"), money(T.waybillSum || 0), `${T.waybills || 0} ${esc(t("wb_count"))} · ${T.suppliers || 0} ${esc(t("suppliers").toLowerCase())}`) +
+    card(t("paid_all"), money((T.paid || 0) + (T.manual || 0)), T.returns ? `${esc(t("returns_col"))} ${money(T.returns)}` : "") +
+    card(t("bank"), connected ? "✓" : "—", lastSync ? `${esc(t("last_sync"))} ${pad(lastSync.getHours())}:${pad(lastSync.getMinutes())}` : esc(t("bank_not_connected")));
 
-  const reviewHtml = rev.count ? `<div class="panel">
-      <div class="panel-head"><h3>⚠ ${esc(t("to_review"))} · ${rev.count}</h3><span class="muted small">${esc(t("review_sub"))}</span></div>
-      <div class="table-wrap"><table class="edit review">
-        <thead><tr><th>${esc(t("recipient"))}</th><th class="r">${esc(t("payments_col"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("why"))}</th><th>${esc(t("supplier"))}</th><th></th></tr></thead>
-        <tbody>${rev.items.map(x => `<tr data-rk="${esc(x.rk)}" data-tin="${esc(x.tin)}" data-iban="${esc(x.iban || "")}" data-name="${esc(x.name || x.tin || x.iban || "")}" data-count="${x.count}">
-          <td><b>${esc(x.name || "—")}</b><div class="muted small">${x.tin ? esc(t("tax_id")) + " " + esc(x.tin) : esc(x.iban || "")}${x.rsName ? " · rs.ge: " + esc(x.rsName) : ""}</div>
-            <div class="muted small clip" title="${esc(x.purpose)}">${esc(x.bank)} · ${esc(t("last"))} ${esc(x.last)} · ${esc(x.purpose)}</div></td>
-          <td class="r num">${x.count}</td>
-          <td class="r num nowrap"><b>${money(x.amount)}</b></td>
-          <td><span class="pill ${["name_differs", "name_only", "tin_differs"].includes(x.reason) ? "warn" : "neutral"}">${esc(t("why_" + x.reason))}</span></td>
-          <td>${supplierSelect(x.suggestion, 'class="rv-sup"')}</td>
-          <td class="r nowrap rv-actions"><button class="btn small primary rv-ok">${esc(t("confirm"))}</button>
-            <button class="btn small rv-ignore">${esc(t("not_supplier"))}</button></td>
-        </tr>`).join("")}</tbody>
-      </table></div>
-      ${rev.count > rev.items.length ? `<div class="muted small" style="padding:10px 16px">${esc(t("showing_of").replace("{a}", rev.items.length).replace("{b}", rev.count))}</div>` : ""}
-    </div>` : "";
+  const who = x => `<b>${esc(x.name || "—")}</b><div class="muted small">${x.tin ? esc(t("tax_id")) + " " + esc(x.tin) : esc(x.iban || "")}</div>
+    <div class="muted small clip" title="${esc(x.purpose || "")}">${esc(x.bank || "")} · ${esc(t("last"))} ${esc(x.last || "")} · ${esc(x.purpose || "")}</div>`;
+  const txList = x => `<table class="mini"><tbody>${x.tx.map(([, date, amount, purpose]) => `<tr><td class="muted">${esc(date)}</td><td class="r num">${money(amount)}</td><td class="small">${esc(purpose)}</td></tr>`).join("")}</tbody></table>
+    ${x.count > x.tx.length ? `<div class="muted small">${esc(t("showing_tx").replace("{a}", x.tx.length).replace("{b}", x.count))}</div>` : ""}`;
+  const rkAttrs = x => `data-rk="${esc(x.rk)}" data-count="${x.count}" data-name="${esc(x.name || x.tin || x.iban || "")}"`;
+  const open = key => S.debtOpen === key;
+  const supRow = (s, cols, colspan) => `<tr class="pick" data-open="s:${esc(s.tin)}">${cols}</tr>${open("s:" + s.tin) ? `<tr class="sub"><td colspan="${colspan}">${debtDetailHtml(s)}</td></tr>` : ""}`;
+
+  let body = "";
+  if (dt === "debts") {
+    const list = sups.filter(s => s.n && match(s.name, s.tin));
+    const owedCell = s => s.owed > 0 ? `<b>${money(s.owed)}</b>` : s.owed < 0 ? `<span class="pill neutral">${esc(t("st_over"))}</span> ${money(-s.owed)}` : "—";
+    const status = s => [s.none || s.versions.length ? `<span class="pill warn">⚠ ${esc(t("st_problem"))}</span>` : "",
+      s.debtOk ? `<span class="pill neutral">✓ ${esc(t("st_debt_ok"))}</span>` : ""].join(" ");
+    body = `<div class="panel"><div class="table-wrap"><table>
+      <thead><tr><th>${esc(t("supplier"))}</th><th class="r">${esc(t("col_waybills"))}</th><th class="r">${esc(t("returns_col"))}</th><th class="r">${esc(t("paid_all"))}</th><th class="r">${esc(t("owed"))}</th><th></th></tr></thead>
+      <tbody>${list.map(s => supRow(s, `<td><b>${esc(s.name)}</b><div class="muted small">${esc(t("tax_id"))} ${esc(s.tin)}</div></td>
+        <td class="r num">${money(s.amount)}<div class="muted small">${s.n} ${esc(t("wb_count"))}${s.nConfirmed ? ` · ${s.nConfirmed} ${esc(t("rs_confirmed"))}` : ""}</div></td>
+        <td class="r num">${s.returns ? money(s.returns) : "—"}</td>
+        <td class="r num">${s.paid || s.manual ? money(s.paid + s.manual) : "—"}${s.manual ? `<div class="muted small">${esc(t("manual_paid"))} ${money(s.manual)}</div>` : ""}</td>
+        <td class="r num nowrap">${owedCell(s)}</td>
+        <td class="nowrap">${status(s)} <span class="muted">${open("s:" + s.tin) ? "▴" : "▾"}</span></td>`, 6)).join("")
+        || `<tr><td colspan="6" class="empty">${esc(t("no_debts"))}</td></tr>`}</tbody>
+      ${list.length ? `<tfoot><tr><td>${esc(t("total_owed"))}</td><td class="r num">${money(T.waybillSum || 0)}</td><td class="r num">${money(T.returns || 0)}</td><td class="r num">${money((T.paid || 0) + (T.manual || 0))}</td><td class="r num">${money(r.total || 0)}</td><td></td></tr></tfoot>` : ""}
+    </table></div></div>`;
+  } else if (dt === "nowb") {
+    const openRows = NW.open.filter(x => match(x.name, x.tin, x.iban, x.purpose));
+    const waitRows = NW.wait.filter(x => match(x.name, x.tin, x.iban, x.code));
+    const otherRows = NW.other.filter(x => match(x.name, x.tin, x.iban, x.comment, x.purpose));
+    const scopeTag = x => x.scope === "tx" ? ` <span class="pill neutral">${esc(t("only_these"))}</span>` : "";
+    body = `<div class="panel">
+        <div class="panel-head"><h3>${esc(t("nw_open"))} · ${openRows.length}</h3><span class="muted small">${esc(t("nw_open_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit review">
+          <thead><tr><th>${esc(t("recipient"))}</th><th class="r">${esc(t("transfers"))}</th><th class="r">${esc(t("amount"))}</th><th></th></tr></thead>
+          <tbody>${openRows.map(x => `<tr class="pick" data-open="r:${esc(x.rk)}" ${rkAttrs(x)}><td>${who(x)}</td><td class="r num">${x.count}</td>
+            <td class="r num nowrap"><b>${money(x.amount)}</b></td>
+            <td class="r nowrap rv-actions"><button type="button" class="btn small primary dw-who">${esc(t("who_q"))}</button></td></tr>
+            ${open("r:" + x.rk) ? `<tr class="sub"><td colspan="4">${txList(x)}</td></tr>` : ""}`).join("")
+            || `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div></div>
+      <div class="panel">
+        <div class="panel-head"><h3>⏳ ${esc(t("nw_wait"))} · ${waitRows.length}</h3><span class="muted small">${esc(t("nw_wait_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit">
+          <tbody>${waitRows.map(x => `<tr ${rkAttrs(x)} data-scope="${esc(x.scope)}" data-to="w:${esc(x.code)}"><td>${who(x)}</td>
+            <td>${esc(t("code_ph"))}: <b class="num">${esc(x.code)}</b>${scopeTag(x)}</td><td class="r num">${x.count}</td>
+            <td class="r num nowrap"><b>${money(x.amount)}</b></td>
+            <td class="r"><button type="button" class="icon-btn dw-undo" title="${esc(t("undo"))}">↩</button></td></tr>`).join("")
+            || `<tr><td class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div></div>
+      <div class="panel">
+        <div class="panel-head"><h3>${esc(t("cat_other"))} · ${otherRows.length} · ${money(NW.otherTotal || 0)}</h3><span class="muted small">${esc(t("other_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit">
+          <thead><tr><th>${esc(t("recipient"))}</th><th class="r">${esc(t("transfers"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("comment"))}</th><th></th></tr></thead>
+          <tbody>${otherRows.map(x => `<tr ${rkAttrs(x)} data-scope="${esc(x.scope)}" data-to="x" data-comment="${esc(x.comment || "")}"><td>${who(x)}</td>
+            <td class="r num">${x.count}</td><td class="r num nowrap"><b>${money(x.amount)}</b></td>
+            <td class="small">${esc(x.comment || "")}${scopeTag(x)} <button type="button" class="icon-btn dw-note" title="${esc(t("comment"))}">✎</button></td>
+            <td class="r"><button type="button" class="icon-btn dw-undo" title="${esc(t("undo"))}">↩</button></td></tr>`).join("")
+            || `<tr><td colspan="5" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div></div>`;
+  } else if (dt === "problems") {
+    const nameRows = PR.name.filter(x => match(x.name, x.tin, x.iban, ...x.versions.map(v => v.name + " " + v.tin)));
+    const noneRows = PR.none.filter(s => match(s.name, s.tin));
+    const vLabel = v => `${v.name} · ${t("tax_id")} ${v.tin} · ${money(v.amount)}`;
+    body = `<div class="panel">
+        <div class="panel-head"><h3>⚠ ${esc(t("pr_name"))} · ${nameRows.length}</h3><span class="muted small">${esc(t("pr_name_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit review">
+          <thead><tr><th>${esc(t("recipient"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("versions"))}</th><th></th></tr></thead>
+          <tbody>${nameRows.map(x => `<tr class="pick" data-open="r:${esc(x.rk)}" ${rkAttrs(x)} data-tins="${esc(x.versions.map(v => v.tin).join(","))}"><td>${who(x)}</td>
+            <td class="r num nowrap"><b>${money(x.amount)}</b><div class="muted small">${x.count} ${esc(t("tx_n"))}</div></td>
+            <td><select class="dp-ver">${x.versions.map(v => `<option value="${esc(v.tin)}">${esc(vLabel(v))}</option>`).join("")}</select></td>
+            <td class="r nowrap rv-actions"><button type="button" class="btn small primary dp-ok">${esc(t("confirm"))}</button>
+              <button type="button" class="btn small dp-manual">${esc(t("no_version"))}</button>
+              <button type="button" class="btn small ghost dp-reject">${esc(t("none_of_these"))}</button></td></tr>
+            ${open("r:" + x.rk) ? `<tr class="sub"><td colspan="4">${txList(x)}</td></tr>` : ""}`).join("")
+            || `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div></div>
+      <div class="panel">
+        <div class="panel-head"><h3>⚠ ${esc(t("pr_none"))} · ${noneRows.length}</h3><span class="muted small">${esc(t("pr_none_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit review">
+          <thead><tr><th>${esc(t("supplier"))}</th><th class="r">${esc(t("col_waybills"))}</th><th class="r">${esc(t("owed"))}</th><th></th></tr></thead>
+          <tbody>${noneRows.map(s => `<tr data-tin="${esc(s.tin)}" data-name="${esc(s.name)}"><td><b>${esc(s.name)}</b><div class="muted small">${esc(t("tax_id"))} ${esc(s.tin)}</div>
+              ${s.versions.length ? `<div class="muted small">${esc(t("looks_like"))} ${s.versions.map(v => `${esc(v.name)} (${esc(v.tin || "—")}, ${money(v.amount)})`).join(", ")} — ${esc(t("see_above"))}</div>` : ""}</td>
+            <td class="r num">${money(s.amount)}<div class="muted small">${s.n} ${esc(t("wb_count"))}</div></td>
+            <td class="r num nowrap"><b>${money(s.owed)}</b></td>
+            <td class="r nowrap rv-actions"><button type="button" class="btn small dn-manual">${esc(t("type_manually"))}</button>
+              <button type="button" class="btn small primary dn-debt">${esc(t("confirm_debt"))}</button></td></tr>`).join("")
+            || `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div></div>`;
+  } else {
+    const list = OV.filter(s => match(s.name, s.tin));
+    const full = new Map(sups.map(s => [s.tin, s]));
+    body = `<div class="muted small" style="margin:-6px 0 14px">${esc(t("over_hint"))}</div>
+      <div class="panel"><div class="table-wrap"><table>
+      <thead><tr><th>${esc(t("supplier"))}</th><th class="r">${esc(t("col_waybills"))}</th><th class="r">${esc(t("returns_col"))}</th><th class="r">${esc(t("paid_all"))}</th><th class="r">${esc(t("excess"))}</th><th></th></tr></thead>
+      <tbody>${list.map(o => supRow(full.get(o.tin) || { ...o, waybills: [], transfers: [], manualList: [] }, `<td><b>${esc(o.name)}</b><div class="muted small">${esc(t("tax_id"))} ${esc(o.tin)}</div></td>
+        <td class="r num">${o.n ? money(o.amount) : "—"}${o.n ? `<div class="muted small">${o.n} ${esc(t("wb_count"))}</div>` : ""}</td>
+        <td class="r num">${o.returns ? money(o.returns) : "—"}</td><td class="r num">${money(o.paid + o.manual)}</td>
+        <td class="r num nowrap"><b>${money(o.excess)}</b></td><td class="muted">${open("s:" + o.tin) ? "▴" : "▾"}</td>`, 6)).join("")
+        || `<tr><td colspan="6" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+      ${list.length ? `<tfoot><tr><td colspan="4">${esc(t("excess"))}</td><td class="r num">${money(list.reduce((a, o) => a + o.excess, 0))}</td><td></td></tr></tfoot>` : ""}
+    </table></div></div>`;
+  }
 
   const settingsHtml = `<details class="panel bank-settings" ${connected && !bank.settings.historyFrom ? "open" : ""}>
-      <summary class="panel-head"><h3>🏦 ${esc(t("bank_settings"))}</h3><span class="muted small">${connected ? `${bank.payments} ${esc(t("payments_loaded"))} · ${bank.matched} ${esc(t("matched"))} · ${bank.ignored} ${esc(t("ignored"))}` : esc(t("bank_not_connected"))}</span></summary>
+      <summary class="panel-head"><h3>🏦 ${esc(t("bank_settings"))}</h3><span class="muted small">${connected ? `${bank.payments || 0} ${esc(t("payments_loaded"))} · ${bank.skipped || 0} ${esc(t("ignored"))}` : esc(t("bank_not_connected"))}</span></summary>
       <form class="form-row" id="bankForm">
         <label class="w-s">${esc(t("history_from"))}<input type="date" name="historyFrom" value="${esc(bank.settings?.historyFrom || "")}"></label>
         <label class="w-l">${esc(t("bog_accounts"))}<textarea name="bogAccounts" rows="2" placeholder="GE00BG0000000000000000">${esc((bank.settings?.bogAccounts || []).join("\n"))}</textarea></label>
@@ -1490,263 +1594,160 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       <div class="panel-body small muted">
         <div>BOG: ${bank.configured.bog ? "✓" : "—"} · TBC: ${bank.configured.tbc ? "✓ " + esc(t("tbc_auto")) : "—"}</div>
         <div>${esc(t("history_note"))}</div>
-        ${(r.linkedTins || []).length ? `<div style="margin-top:10px"><b>${esc(t("linked"))}</b></div>
-          ${r.linkedTins.map(l => `<div class="linked">${esc(l.tin)} → ${l.to === "ignore" ? esc(t("not_supplier")) : l.to.startsWith("x:") ? `${esc(t("not_supplier"))} · ${esc(t("cat_" + l.to.slice(2)))}` : l.to.startsWith("e:") ? `${esc(t("cat_staff"))} · ${esc(l.name)}` : esc(l.name)} <button class="icon-btn unlink" data-kind="${esc(l.kind || "tin")}" data-tin="${esc(l.tin)}" title="${esc(t("delete"))}">✕</button></div>`).join("")}` : ""}
       </div>
     </details>`;
-
-  const owedCell = o => o >= 0 ? `<b>${money(o)}</b>` : `<span class="pill neutral">${esc(t("prepaid"))}</span> ${money(-o)}`;
-  const reviewCard = card(t("to_review"), String(rev.count), rev.count ? `${rev.payments || rev.count} ${esc(t("payments_col").toLowerCase())} · ${money(rev.amount)}` : "", rev.count ? "bad" : "");
-  const bankCard = card(t("bank"), connected ? "✓" : "—", lastSync ? `${esc(t("last_sync"))} ${pad(lastSync.getHours())}:${pad(lastSync.getMinutes())}` : esc(t("bank_not_connected")));
-  const supName = s => `${esc(s.name)}${s.rsName && s.rsName !== s.name ? `<div class="muted small">rs.ge: ${esc(s.rsName)}</div>` : ""}`;
-
-  let cards, body;
-  if (col) {
-    // rs.ge / Syrve / Telegram: one row per supplier
-    const total = totals[dt] || 0;
-    const owing = r.suppliers.filter(s => col(s)[2] > 0).length;
-    cards = card(t("total_owed"), money(total), dt === "rs" ? esc(t("dv_main_hint")) : "", total > 0 ? "hero bad" : "hero") +
-      card(t("suppliers"), String(owing)) + reviewCard + bankCard;
-    const extra = dt === "syrve";
-    const rows = list.map(s => {
-      const [a, k, o] = col(s);
-      const sub = k ? `${k} ${t("wb_count")}${dt === "rs" ? ` · ${s.nConfirmed || 0} ${t("confirmed_short")}` : ""}` : "";
-      const tip = dt === "rs" && s.nRejected ? `${t("rejected_tip")}: ${s.nRejected} · ${money(s.rejected)}` : "";
-      return `<tr><td>${supName(s)}</td><td class="muted num">${esc(s.tin || "")}</td>
-        <td class="r num" ${tip ? `title="${esc(tip)}"` : ""}>${a ? money(a) : "—"}${sub ? `<div class="muted small">${esc(sub)}</div>` : ""}</td>
-        <td class="r num">${s.returns ? money(s.returns) : "—"}</td>
-        <td class="r num">${s.paid ? money(s.paid) : "—"}</td>
-        <td class="r num">${owedCell(o)}</td>
-        ${extra ? `<td class="r num muted">${s.syrveBalance != null ? money(s.syrveBalance) : "—"}</td>` : ""}</tr>`;
-    }).join("");
-    const tgNote = dt === "tg" && r.tgSince ? `<div class="notice">${esc(t("tg_since").replace("{d}", r.tgSince).replace("{f}", bank.settings?.historyFrom || "—"))}</div>` : "";
-    body = (dt === "tg" ? tgNote + (S.debtCompare ? compareHtml(r.compare || {}, match) : "") : "") +
-      `<div class="panel">${dt === "tg" ? `<div class="panel-head"><h3>${esc(t("col_tg"))}</h3><button class="btn small" id="tgCompare">${esc(t(S.debtCompare ? "cmp_hide" : "cmp_btn"))}</button></div>` : ""}
-      <div class="table-wrap"><table>
-      <thead><tr><th>${esc(t("supplier"))}</th><th>${esc(t("tax_id"))}</th><th class="r">${esc(t("col_" + dt))}</th><th class="r">${esc(t("returns_col"))}</th><th class="r">${esc(t("paid_bank"))}</th><th class="r">${esc(t("owed"))}</th>${extra ? `<th class="r muted">${esc(t("syrve_balance"))}</th>` : ""}</tr></thead>
-      <tbody>${rows || `<tr><td colspan="${extra ? 7 : 6}" class="empty">${esc(t(dt === "tg" && !r.tgSince ? "tg_none" : "no_debts"))}</td></tr>`}</tbody>
-      ${list.length ? `<tfoot><tr><td colspan="5">${esc(t("total_owed"))}</td><td class="r num">${money(total)}</td>${extra ? "<td></td>" : ""}</tr></tfoot>` : ""}
-    </table></div></div>`;
-  } else if (dt === "staff") {
-    // employees: earned (their shifts × pay) + overtime − salary transfers, each from their start date
-    const ST = r.staff || { employees: [], total: 0 };
-    const emps = ST.employees.filter(e => match({ name: e.name, tin: (e.accounts || []).map(a => a.tin || a.iban).join(" "), rsName: e.role }));
-    cards = card(t("staff_owed"), money(ST.total || 0), "", ST.total > 0 ? "hero bad" : "hero") +
-      card(t("emp_list"), String(ST.employees.length)) + reviewCard + bankCard;
-    const monthsHtml = e => `<table class="mini"><thead><tr><th>${esc(t("month"))}</th><th class="r">${esc(t("shifts_n"))}</th><th class="r">${esc(t("hours"))}</th><th class="r">${esc(t("earned"))}</th><th class="r">${esc(t("overtime"))}</th><th class="r">${esc(t("paid_bank"))}</th></tr></thead>
-      <tbody>${e.months.map(m => `<tr><td>${esc(monthLabel(m.ym))}</td><td class="r num">${m.shifts}</td><td class="r num">${fmtHours(m.hours)}</td><td class="r num">${money(m.earned)}</td>
-        <td class="r num">${m.overtime ? money(m.overtime) : "—"}</td><td class="r num">${m.paid ? money(m.paid) : "—"}</td></tr>`).join("") || `<tr><td colspan="6" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody></table>`;
-    body = `<div class="muted small" style="margin:-6px 0 14px">${esc(t("staff_hint"))}</div>` +
-      (ST.employees.length ? "" : `<div class="notice">${esc(t("staff_none"))} <a href="#employees">→</a></div>`) +
-      `<div class="panel"><div class="table-wrap"><table>
-        <thead><tr><th>${esc(t("employee"))}</th><th>${esc(t("pay_type"))}</th><th>${esc(t("count_from"))}</th><th class="r">${esc(t("shifts_n"))} / ${esc(t("hours"))}</th><th class="r">${esc(t("earned"))}</th><th class="r">${esc(t("overtime"))}</th><th class="r">${esc(t("paid_bank"))}</th><th class="r">${esc(t("owed"))}</th></tr></thead>
-        <tbody>${emps.length ? emps.map(e => { const open = S.staffOpen === e.id; return `<tr class="pick" data-staff="${esc(e.id)}">
-          <td><b>${esc(e.name)}</b>${e.active ? "" : ` <span class="pill neutral">${esc(t("inactive"))}</span>`}<div class="muted small">${esc(e.role)}</div>
-            ${(e.accounts || []).length ? `<div class="muted small">🏦 ${e.accounts.map(a => esc(a.tin || a.iban)).join(", ")}</div>` : ""}</td>
-          <td class="small">${esc(t("pay_" + e.pay))} · ${money(e.rate)}</td>
-          <td class="muted">${e.start ? esc(e.start) : `<span class="pill warn">${esc(t("no_start"))}</span>`}</td>
-          <td class="r num">${e.shifts} / ${fmtHours(e.hours)}</td><td class="r num">${money(e.earned)}</td>
-          <td class="r num">${e.overtime ? money(e.overtime) : "—"}</td><td class="r num">${e.paid ? money(e.paid) : "—"}</td>
-          <td class="r num nowrap">${owedCell(e.owed)} <span class="muted">${open ? "▴" : "▾"}</span></td></tr>
-          ${open ? `<tr class="sub"><td colspan="8">${monthsHtml(e)}</td></tr>` : ""}`; }).join("")
-          : `<tr><td colspan="8" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
-        ${emps.length ? `<tfoot><tr><td colspan="7">${esc(t("staff_owed"))}</td><td class="r num">${money(ST.total || 0)}</td></tr></tfoot>` : ""}
-      </table></div></div>`;
-  } else {
-    // "rs მოსული": one section at a time — its suppliers (payments split by share), its products, and the payments
-    // to recipients that are not suppliers but were given this category (outsourcing has only those)
-    const ct = C.totals[dc] || { amount: 0, paid: 0, returns: 0, owed: 0, n: 0 };
-    const ET = C.expenseTotals || {};
-    const EX = ((C.expenses || {})[dc] || []).filter(x => match({ name: x.name, tin: x.tin || x.iban, rsName: x.comment }));
-    const U = (C.unsorted || []).filter(x => match({ name: x.name, tin: x.tin || x.iban, rsName: x.purpose }));
-    const xAttrs = x => `data-xrk="${esc(x.rk)}" data-scope="${esc(x.scope)}" data-tin="${esc(x.tin || "")}" data-iban="${esc(x.iban || "")}" data-comment="${esc(x.comment || "")}" data-cat="${dc}"`;
-    const who = x => `<b>${esc(x.name || "—")}</b><div class="muted small">${x.tin ? esc(t("tax_id")) + " " + esc(x.tin) : esc(x.iban || "")}</div>
-      <div class="muted small clip" title="${esc(x.purpose || "")}">${esc(t("last"))} ${esc(x.last || "")} · ${esc(x.purpose || "")}</div>`;
-    cards = dc === "outsource"
-      ? card(t("nw_card"), money(ET.outsource || 0), esc(t("cat_outsource")), "hero") + card(t("recipient"), String(EX.length)) + reviewCard
-      : card(t("cat_owed"), money(ct.owed), esc(t("cat_" + dc)), ct.owed > 0 ? "hero bad" : "hero") +
-        card(t("cat_goods"), money(ct.amount), `${ct.n} ${esc(t("suppliers").toLowerCase())}`) +
-        card(t("cat_paid"), money(ct.paid), ct.returns ? `${esc(t("returns_col"))} ${money(ct.returns)}` : "") +
-        card(t("nw_card"), money(ET[dc] || 0), `${EX.length} ${esc(t("recipients_n"))}`);
-    const unsortedHtml = U.length ? `<div class="panel">
-        <div class="panel-head"><h3>⚠ ${esc(t("unsorted_title"))} · ${U.length}</h3><span class="muted small">${esc(t("unsorted_hint"))}</span></div>
-        <div class="table-wrap"><table class="edit review"><tbody>${U.map(x => `<tr ${xAttrs(x)}>
-          <td>${who(x)}</td><td class="r num">${x.count}</td><td class="r num nowrap"><b>${money(x.amount)}</b></td>
-          <td class="r nowrap"><button type="button" class="btn small primary ux-pick">${esc(t("who_q"))}</button>
-            <button type="button" class="icon-btn ex-back" title="${esc(t("back_review"))}">↩</button></td></tr>`).join("")}</tbody></table></div>
-      </div>` : "";
-    const expenseHtml = `<div class="panel">
-        <div class="panel-head"><h3>${esc(t("nw_title"))} · ${EX.length} · ${money(ET[dc] || 0)}</h3><span class="muted small">${esc(t("nw_hint"))}</span></div>
-        <div class="table-wrap"><table class="edit">
-          <thead><tr><th>${esc(t("recipient"))}</th><th class="r">${esc(t("payments_col"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("comment"))}</th><th>${esc(t("category"))}</th></tr></thead>
-          <tbody>${EX.length ? EX.map(x => `<tr ${xAttrs(x)}>
-            <td>${who(x)}</td><td class="r num">${x.count}</td><td class="r num nowrap"><b>${money(x.amount)}</b></td>
-            <td class="small">${esc(x.comment || "")}${dc === "other" ? ` <button type="button" class="icon-btn ex-note" title="${esc(t("comment"))}">✎</button>` : ""}</td>
-            <td class="nowrap"><select class="ex-sel">${EXPENSE_CATS.map(k => `<option value="${k}" ${k === dc ? "selected" : ""}>${esc(t("cat_" + k))}</option>`).join("")}</select>
-              <button type="button" class="icon-btn ex-back" title="${esc(t("back_review"))}">↩</button></td></tr>`).join("")
-            : `<tr><td colspan="5" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
-        </table></div>
-      </div>`;
-    const sectionTotal = k => k === "outsource" ? ET.outsource || 0 : C.totals[k]?.owed || 0;
-    body = unsortedHtml + `<div class="seg debt-cats">${DEBT_CATS.map(k => `<button type="button" data-dc="${k}" class="${k === dc ? "on" : ""}">${esc(t("cat_" + k))} · ${money(sectionTotal(k))}</button>`).join("")}</div>`;
-    if (dc === "outsource") body += expenseHtml;
-    else {
-      const sups = C.suppliers.filter(s => s.c[dc] && match(s));
-      const prods = C.products.filter(p => p.cat === dc && (!q || p.name.toLowerCase().includes(q) || p.sellers.some(n => String(n).toLowerCase().includes(q))));
-      const shown = prods.slice(0, 300);
-      body += `<div class="muted small" style="margin:-6px 0 14px">${esc(t("cats_hint"))}${C.unsplit ? " " + esc(t("cat_unsplit").replace("{a}", money(C.unsplit))) : ""}</div>
-      <div class="panel"><div class="table-wrap"><table>
-        <thead><tr><th>${esc(t("supplier"))}</th><th>${esc(t("tax_id"))}</th><th class="r">${esc(t("cat_goods"))}</th><th class="r">${esc(t("cat_paid"))}</th><th class="r">${esc(t("cat_returns"))}</th><th class="r">${esc(t("cat_owed"))}</th></tr></thead>
-        <tbody>${sups.length ? sups.map(s => { const v = s.c[dc]; return `<tr><td>${esc(s.name)}</td><td class="muted num">${esc(s.tin || "")}</td>
-          <td class="r num">${money(v.amount)}<div class="muted small">${v.share}% ${esc(t("cat_share"))}</div></td>
-          <td class="r num">${v.paid ? money(v.paid) : "—"}</td><td class="r num">${v.returns ? money(v.returns) : "—"}</td>
-          <td class="r num">${v.owed ? `<b>${money(v.owed)}</b>` : s.owed < 0 ? `<span class="pill neutral">${esc(t("prepaid"))}</span>` : "—"}</td></tr>`; }).join("")
-          : `<tr><td colspan="6" class="empty">${esc(t("no_debts"))}</td></tr>`}</tbody>
-        ${sups.length ? `<tfoot><tr><td colspan="5">${esc(t("cat_owed"))}</td><td class="r num">${money(ct.owed)}</td></tr></tfoot>` : ""}
-      </table></div></div>
-      ${expenseHtml}
-      <div class="panel"><div class="panel-head"><h3>${esc(t("products"))} · ${prods.length}</h3><span class="muted small">${esc(t("products_hint"))}</span></div>
-        <div class="table-wrap"><table class="edit">
-          <thead><tr><th>${esc(t("products"))}</th><th>${esc(t("supplier"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("category"))}</th></tr></thead>
-          <tbody>${shown.length ? shown.map(p => `<tr><td>${esc(p.name)}${p.manual ? ` <span class="pill neutral">${esc(t("manual_cat"))}</span>` : ""}</td>
-            <td class="muted small">${esc(p.sellers.join(", "))}</td><td class="r num">${money(p.amount)}</td>
-            <td class="nowrap"><select class="cat-sel" data-key="${esc(p.key)}">${PRODUCT_CATS.map(k => `<option value="${k}" ${k === p.cat ? "selected" : ""}>${esc(t("cat_" + k))}</option>`).join("")}</select>
-              ${p.manual ? `<button class="icon-btn cat-auto" data-key="${esc(p.key)}" title="${esc(t("reset_auto"))}">↺</button>` : ""}</td></tr>`).join("")
-            : `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
-        </table></div>
-        ${prods.length > shown.length ? `<div class="muted small" style="padding:10px 16px">${esc(t("showing_of").replace("{a}", shown.length).replace("{b}", prods.length))}</div>` : ""}
-      </div>`;
-    }
-  }
 
   view.innerHTML = demo + head(t("tab_debts"), t("debts_sub"),
     `<input type="text" id="debtSearch" placeholder="${esc(t("search"))}…" value="${esc(S.debtQuery)}"><button class="btn" id="debtRefresh">${esc(t("refresh"))}</button><button class="btn" id="debtExport">${esc(t("export"))}</button>`) +
     notices +
-    `<div class="seg debt-views">${DEBT_TABS.map(v => `<button type="button" data-dt="${v}" class="${v === dt ? "on" : ""}">${esc(t("dt_" + v))}</button>`).join("")}</div>
+    `<div class="seg debt-views">${DEBT_TABS.map(v => `<button type="button" data-dt="${v}" class="${v === dt ? "on" : ""}">${esc(tabLabel[v])}</button>`).join("")}</div>
     <div class="cards">${cards}</div>
-    ${reviewHtml}
     ${body}
     ${settingsHtml}`;
 
   const rerender = () => renderDebts(view, demo, false, true).catch(e => toast(e.message));
-  $$("[data-dt]", view).forEach(b => b.addEventListener("click", () => { S.debtTab = b.dataset.dt; store.set("dash_debt_tab", S.debtTab); rerender(); }));
-  $$("[data-dc]", view).forEach(b => b.addEventListener("click", () => { S.debtCat = b.dataset.dc; store.set("dash_debt_cat", S.debtCat); rerender(); }));
-  const activeEmps = ((r.staff || {}).employees || []).filter(e => e.active);
-  $$("tr[data-staff]", view).forEach(tr => tr.addEventListener("click", () => { S.staffOpen = S.staffOpen === tr.dataset.staff ? "" : tr.dataset.staff; rerender(); }));
-  const cmpBtn = $("#tgCompare", view);
-  if (cmpBtn) cmpBtn.addEventListener("click", () => { S.debtCompare = !S.debtCompare; rerender(); });
-  // rs.ge months and Syrve months arrive a few per request: ask again until all are in (or 20 tries)
+  const decide = async body => {
+    try { await api("/debts/decide", { method: "POST", body }); toast(t("saved")); S.syrve.debts = null; await renderDebts(view, demo, false, true); }
+    catch (e) { toast(e.message); }
+  };
+  $$("[data-dt]", view).forEach(b => b.addEventListener("click", () => { S.debtTab = b.dataset.dt; store.set("dash_debt_tab", S.debtTab); S.debtOpen = ""; rerender(); }));
+  // a row opens its details; clicks on its buttons, selects and inputs don't
+  $$("tr[data-open]", view).forEach(tr => tr.addEventListener("click", e => {
+    if (e.target.closest("button, select, input, textarea, .remember")) return;
+    S.debtOpen = S.debtOpen === tr.dataset.open ? "" : tr.dataset.open; rerender();
+  }));
+  // rs.ge months arrive a few per request: ask again until all are in (or 20 tries)
   clearTimeout(S.debtRetry);
-  const pending = wb.pending || inv.pending;
-  if (pending && (S.debtTries = (S.debtTries || 0) + 1) <= 20) {
+  if (wb.pending && (S.debtTries = (S.debtTries || 0) + 1) <= 20) {
     S.debtRetry = setTimeout(() => { if (S.tab === "debts") { S.syrve.debts = null; renderDebts(view, demo, false, true).catch(() => {}); } }, 1500);
-  } else if (!pending) S.debtTries = 0;
+  } else if (!wb.pending) S.debtTries = 0;
 
   // search / refresh / export
   const sEl = $("#debtSearch", view);
   sEl.addEventListener("input", () => { S.debtQuery = sEl.value; renderDebts(view, demo).then(() => { const x = $("#debtSearch"); x.focus(); x.setSelectionRange(x.value.length, x.value.length); }); });
   $("#debtRefresh", view).addEventListener("click", () => renderDebts(view, demo, true).catch(e => toast(e.message)));
   $("#debtExport", view).addEventListener("click", () => {
-    let out;
-    if (col) {
-      out = [[t("dt_" + dt)], [t("supplier"), t("tax_id"), t("col_" + dt), t("returns_col"), t("paid_bank"), t("owed"), ...(dt === "syrve" ? [t("syrve_balance")] : [])]];
-      list.forEach(x => { const [a, , o] = col(x); out.push([x.name, x.tin || "", a || 0, x.returns || 0, x.paid || 0, o, ...(dt === "syrve" ? [x.syrveBalance ?? ""] : [])]); });
-      out.push([t("total_owed"), "", "", "", "", totals[dt] || 0]);
-    } else if (dt === "staff") {
-      out = [[t("dt_staff")], [t("employee"), t("role"), t("pay_type"), t("rate"), t("count_from"), t("shifts_n"), t("hours"), t("earned"), t("overtime"), t("paid_bank"), t("owed")]];
-      ((r.staff || {}).employees || []).forEach(e => out.push([e.name, e.role, t("pay_" + e.pay), e.rate, e.start, e.shifts, e.hours, e.earned, e.overtime, e.paid, e.owed]));
-      out.push([t("staff_owed"), "", "", "", "", "", "", "", "", "", (r.staff || {}).total || 0]);
+    const out = [[t("dt_" + dt)]];
+    if (dt === "debts") {
+      out.push([t("supplier"), t("tax_id"), t("wb_count"), t("col_waybills"), t("returns_col"), t("paid_bank"), t("manual_paid"), t("owed")]);
+      sups.filter(s => s.n).forEach(s => out.push([s.name, s.tin, s.n, s.amount, s.returns, s.paid, s.manual, s.owed]));
+      out.push([t("total_owed"), "", T.waybills || 0, T.waybillSum || 0, T.returns || 0, T.paid || 0, T.manual || 0, r.total || 0]);
+    } else if (dt === "nowb") {
+      out.push([t("recipient"), t("tax_id"), t("transfers"), t("amount"), t("status"), t("comment")]);
+      NW.open.forEach(x => out.push([x.name, x.tin || x.iban, x.count, x.amount, "", x.purpose]));
+      NW.wait.forEach(x => out.push([x.name, x.tin || x.iban, x.count, x.amount, t("nw_wait") + " " + x.code, ""]));
+      NW.other.forEach(x => out.push([x.name, x.tin || x.iban, x.count, x.amount, t("cat_other"), x.comment || ""]));
+    } else if (dt === "problems") {
+      out.push([t("pr_name")], [t("recipient"), t("tax_id"), t("transfers"), t("amount"), t("versions")]);
+      PR.name.forEach(x => out.push([x.name, x.tin || x.iban, x.count, x.amount, x.versions.map(v => `${v.name} (${v.tin})`).join(", ")]));
+      out.push([], [t("pr_none")], [t("supplier"), t("tax_id"), t("wb_count"), t("col_waybills"), t("owed")]);
+      PR.none.forEach(s => out.push([s.name, s.tin, s.n, s.amount, s.owed]));
     } else {
-      out = [[`${t("dt_cats")} · ${t("cat_" + dc)}`]];
-      if (dc !== "outsource") {
-        out.push([t("supplier"), t("tax_id"), t("cat_goods"), t("cat_paid"), t("cat_returns"), t("cat_owed")]);
-        C.suppliers.filter(s => s.c[dc] && match(s)).forEach(s => { const v = s.c[dc]; out.push([s.name, s.tin || "", v.amount, v.paid, v.returns, v.owed]); });
-        out.push([], [t("products"), t("supplier"), t("amount"), t("category")]);
-        C.products.filter(p => p.cat === dc).forEach(p => out.push([p.name, p.sellers.join(", "), p.amount, t("cat_" + p.cat)]));
-        out.push([]);
-      }
-      out.push([t("nw_title")], [t("recipient"), t("tax_id"), t("payments_col"), t("amount"), t("comment")]);
-      ((C.expenses || {})[dc] || []).forEach(x => out.push([x.name, x.tin || x.iban || "", x.count, x.amount, x.comment || ""]));
+      out.push([t("supplier"), t("tax_id"), t("col_waybills"), t("returns_col"), t("paid_all"), t("excess")]);
+      OV.forEach(o => out.push([o.name, o.tin, o.amount, o.returns, o.paid + o.manual, o.excess]));
     }
-    exportXlsx(`debts-${dt}${dt === "cats" ? "-" + dc : ""}-${todayISO()}.xlsx`, t("tab_debts"), out);
+    exportXlsx(`debts-${dt}-${todayISO()}.xlsx`, t("tab_debts"), out);
   });
 
-  // "rs მოსული": move a product to another category (↺ = automatic again)
-  const setCat = async (key, cat) => {
-    try { await api("/debts/category", { method: "POST", body: { key, cat } }); toast(t("saved")); S.syrve.debts = null; await renderDebts(view, demo, false, true); }
-    catch (e) { toast(e.message); }
+  // details: undo a decision, delete a payment outside the bank, undo "the debt is right"
+  $$(".dx-undo", view).forEach(b => b.addEventListener("click", () =>
+    decide(b.dataset.scope === "tx" ? { kind: "undo", ids: [b.dataset.id] } : { kind: "undo", rk: b.dataset.rk, scope: "rcp" })));
+  $$(".dx-mdel", view).forEach(b => b.addEventListener("click", () => { if (confirmDel()) decide({ kind: "manualDel", id: b.dataset.id }); }));
+  $$(".dx-debt-off", view).forEach(b => b.addEventListener("click", () => decide({ kind: "debt", tin: b.dataset.tin, on: false })));
+
+  // "only these N transfers" or this recipient always (future transfers too)
+  const askScope = (cell, tr, to, comment, back) => {
+    cell.innerHTML = `<div class="remember"><div class="q">${esc(t("scope_q").replace("{name}", tr.dataset.name))}</div>
+      <button type="button" class="btn small primary sc-all">${esc(t("scope_all"))}</button>
+      <button type="button" class="btn small sc-once">${esc(t("scope_once").replace("{n}", tr.dataset.count))}</button>
+      <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+    $(".sc-all", cell).addEventListener("click", () => decide({ kind: "assign", rk: tr.dataset.rk, to, comment }));
+    $(".sc-once", cell).addEventListener("click", () => decide({ kind: "assign", rk: tr.dataset.rk, to, comment, once: true }));
+    $(".rm-cancel", cell).addEventListener("click", back);
   };
-  $$(".cat-sel", view).forEach(sel => sel.addEventListener("change", () => setCat(sel.dataset.key, sel.value)));
-  $$(".cat-auto", view).forEach(b => b.addEventListener("click", () => setCat(b.dataset.key, "")));
-
-  // "rs მოსული": recipients that are not suppliers — give / change a category, edit the comment, or send back to review.
-  // The decision keeps its scope (this tax ID, this account, or only these payments), so every tab follows it.
-  const xBody = (tr, supplierId, comment) => ({ ...(tr.dataset.scope === "tin" ? { scope: "tin", tin: tr.dataset.tin } : tr.dataset.scope === "iban" ? { scope: "iban", iban: tr.dataset.iban } : { scope: "once", rk: tr.dataset.xrk }), supplierId, comment });
-  const xSave = async body => {
-    try { await api("/bank/review", { method: "POST", body }); toast(t("saved")); S.syrve.debts = null; await renderDebts(view, demo, false, true); }
-    catch (e) { toast(e.message); }
+  const commentStep = (cell, title, next, back, value = "") => {
+    cell.innerHTML = `<div class="remember"><div class="q">${esc(title)}</div>
+      <textarea class="x-note" rows="2" maxlength="300" placeholder="${esc(t("comment_ph"))}">${esc(value)}</textarea>
+      <button type="button" class="btn small primary x-ok">${esc(t("save"))}</button>
+      <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+    $(".x-note", cell).focus();
+    $(".x-ok", cell).addEventListener("click", () => next($(".x-note", cell).value.trim()));
+    $(".rm-cancel", cell).addEventListener("click", back);
   };
-  $$("tr[data-xrk]", view).forEach(tr => {
-    const pick = $(".ux-pick", tr);
-    if (pick) pick.addEventListener("click", () => {
-      const cell = pick.parentElement, original = cell.innerHTML;
-      expenseChooser(cell, (cat, comment, emp) => xSave(xBody(tr, cat === "staff" ? "e:" + emp : "x:" + cat, comment)), () => { cell.innerHTML = original; renderDebts(view, demo, false, true); }, activeEmps);
+  // a typed identification code: a supplier with waybills → it counts; no waybill yet → being created, or never (other expense)
+  const codeStep = (cell, tr, back) => {
+    cell.innerHTML = `<div class="remember"><div class="q">${esc(t("code_q"))}</div>
+      <input type="text" class="x-code" inputmode="numeric" maxlength="20" placeholder="${esc(t("code_ph"))}">
+      <button type="button" class="btn small primary x-ok">${esc(t("code_next"))}</button>
+      <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+    const inp = $(".x-code", cell);
+    inp.focus();
+    $(".rm-cancel", cell).addEventListener("click", back);
+    $(".x-ok", cell).addEventListener("click", () => {
+      const code = inp.value.replace(/\s+/g, "");
+      if (!/^[0-9A-Za-z]{2,20}$/.test(code)) { toast(t("code_ph")); return; }
+      if (sellerName.has(code)) return askScope(cell, tr, "s:" + code, "", back);
+      cell.innerHTML = `<div class="remember"><div class="q">${esc(t("code_unknown").replace("{code}", code))}</div>
+        <button type="button" class="btn small primary cu-wait">${esc(t("opt_wait"))}</button>
+        <button type="button" class="btn small cu-never">${esc(t("opt_never"))}</button>
+        <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+      $(".cu-wait", cell).addEventListener("click", () => askScope(cell, tr, "w:" + code, "", back));
+      $(".cu-never", cell).addEventListener("click", () => commentStep(cell, t("cat_other"), c => askScope(cell, tr, "x", c, back), back));
+      $(".rm-cancel", cell).addEventListener("click", back);
     });
-    const sel = $(".ex-sel", tr);
-    if (sel) sel.addEventListener("change", () => xSave(xBody(tr, "x:" + sel.value)));
-    const back = $(".ex-back", tr);
-    if (back) back.addEventListener("click", () => xSave(xBody(tr, null)));
-    const edit = $(".ex-note", tr);
-    if (edit) edit.addEventListener("click", () => {
-      const cell = edit.parentElement;
-      cell.innerHTML = `<div class="remember"><textarea class="x-note" rows="2" maxlength="300" placeholder="${esc(t("comment_ph"))}">${esc(tr.dataset.comment || "")}</textarea>
-        <button type="button" class="btn small primary x-ok">${esc(t("save"))}</button></div>`;
-      $(".x-note", cell).focus();
-      $(".x-ok", cell).addEventListener("click", () => xSave(xBody(tr, "x:" + tr.dataset.cat, $(".x-note", cell).value.trim())));
-    });
-  });
+  };
 
-  const reload = async () => { S.syrve.debts = null; await renderDebts(view, demo, false, true); };
-
-  // review actions
-  // after Confirm / Not a supplier the row asks: remember for this recipient's future payments too, or only these?
-  $$("tr[data-rk]", view).forEach(tr => {
-    const cell = $(".rv-actions", tr);
-    const original = cell.innerHTML;
-    const save = async body => {
-      try { await api("/bank/review", { method: "POST", body }); toast(t("saved")); await reload(); }
-      catch (e) { toast(e.message); }
-    };
-    const ask = (supplierId, comment) => {
-      const { tin, iban, name, rk, count } = tr.dataset;
-      const always = tin ? { scope: "tin", tin, supplierId, comment } : iban ? { scope: "iban", iban, supplierId, comment } : null;
-      const once = { scope: "once", rk, supplierId, comment };
-      if (!always) return save(once);
-      cell.innerHTML = `<div class="remember"><div class="q">${esc(t("remember_q").replace("{name}", name))}</div>
-        <button class="btn small primary rm-yes">${esc(t("remember_yes"))}</button>
-        <button class="btn small rm-once">${esc(t("remember_these").replace("{n}", count))}</button>
-        <button class="btn small ghost rm-cancel">✕</button></div>`;
-      $(".rm-yes", cell).addEventListener("click", () => save(always));
-      $(".rm-once", cell).addEventListener("click", () => save(once));
-      $(".rm-cancel", cell).addEventListener("click", () => { cell.innerHTML = original; wire(); });
-    };
-    const wire = () => {
-      $(".rv-ok", cell).addEventListener("click", () => {
-        const v = $(".rv-sup", tr).value;
-        if (!v) { toast(t("choose_supplier")); return; }
-        ask(v);
-      });
-      $(".rv-ignore", cell).addEventListener("click", () => {
-        if (dt !== "cats" && dt !== "staff") return ask("ignore");
-        expenseChooser(cell, (cat, comment, emp) => ask(cat === "staff" ? "e:" + emp : "x:" + cat, comment), () => { cell.innerHTML = original; wire(); }, activeEmps);
-      });
-    };
-    wire();
-  });
-  $$(".unlink", view).forEach(b => b.addEventListener("click", async () => {
-    const body = b.dataset.kind === "iban" ? { scope: "iban", iban: b.dataset.tin, supplierId: null } : { scope: "tin", tin: b.dataset.tin, supplierId: null };
-    try { await api("/bank/review", { method: "POST", body }); await reload(); } catch (e) { toast(e.message); }
+  // subtab 2: „ვინ არის ეს?“ → find waybills (type the code) / there is no waybill (other expense + comment)
+  $$(".dw-who", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr"), cell = b.parentElement;
+    const back = rerender;
+    cell.innerHTML = `<div class="remember"><div class="q">${esc(t("who_q"))}</div>
+      <button type="button" class="btn small primary wq-find">${esc(t("opt_find"))}</button>
+      <button type="button" class="btn small wq-none">${esc(t("opt_none"))}</button>
+      <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+    $(".wq-find", cell).addEventListener("click", () => codeStep(cell, tr, back));
+    $(".wq-none", cell).addEventListener("click", () => commentStep(cell, t("cat_other"), c => askScope(cell, tr, "x", c, back), back));
+    $(".rm-cancel", cell).addEventListener("click", back);
   }));
+  $$(".dw-undo", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr");
+    decide({ kind: "undo", rk: tr.dataset.rk, scope: tr.dataset.scope, to: tr.dataset.to });
+  }));
+  $$(".dw-note", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr"), cell = b.parentElement;
+    commentStep(cell, t("comment"), c => decide({ kind: "comment", rk: tr.dataset.rk, scope: tr.dataset.scope, comment: c }), rerender, tr.dataset.comment);
+  }));
+
+  // subtab 3, name matches: pick a version / no version → type the code / none of these (→ subtab 2)
+  $$(".dp-ok", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr");
+    askScope(b.parentElement, tr, "s:" + $(".dp-ver", tr).value, "", rerender);
+  }));
+  $$(".dp-manual", view).forEach(b => b.addEventListener("click", () => codeStep(b.parentElement, b.closest("tr"), rerender)));
+  $$(".dp-reject", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr");
+    decide({ kind: "reject", rk: tr.dataset.rk, tins: tr.dataset.tins.split(",").filter(Boolean) });
+  }));
+  // subtab 3, no transfer at all: type it (a recipient code and/or a payment outside the bank) / confirm the debt
+  $$(".dn-manual", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr"), cell = b.parentElement;
+    cell.innerHTML = `<div class="remember"><div class="q">${esc(t("type_manually"))} · ${esc(tr.dataset.name)}</div>
+      <label class="tiny">${esc(t("manual_code"))}</label><input type="text" class="m-code" inputmode="numeric" maxlength="20" placeholder="${esc(t("code_ph"))}">
+      <label class="tiny">${esc(t("manual_pay"))}</label>
+      <input type="number" class="m-amount" min="0" step="0.01" placeholder="${esc(t("amount"))}">
+      <input type="date" class="m-date" value="${todayISO()}">
+      <textarea class="m-note" rows="2" maxlength="300" placeholder="${esc(t("comment_ph"))}"></textarea>
+      <button type="button" class="btn small primary x-ok">${esc(t("save"))}</button>
+      <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+    $(".m-code", cell).focus();
+    $(".rm-cancel", cell).addEventListener("click", rerender);
+    $(".x-ok", cell).addEventListener("click", () => {
+      const code = $(".m-code", cell).value.replace(/\s+/g, ""), amount = $(".m-amount", cell).value;
+      if (!code && !(Number(amount) > 0)) { toast(t("manual_need")); return; }
+      decide({ kind: "manual", tin: tr.dataset.tin, code, amount, date: $(".m-date", cell).value, comment: $(".m-note", cell).value.trim() });
+    });
+  }));
+  $$(".dn-debt", view).forEach(b => b.addEventListener("click", () => decide({ kind: "debt", tin: b.closest("tr").dataset.tin, on: true })));
 
   // bank settings
   $("#bankForm", view).addEventListener("submit", async ev => {
@@ -1754,7 +1755,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
     const f = new FormData(ev.target);
     try {
       await api("/bank/settings", { method: "PUT", body: { historyFrom: f.get("historyFrom"), bogAccounts: String(f.get("bogAccounts") || "") } });
-      toast(t("saved")); await reload();
+      toast(t("saved")); S.syrve.debts = null; await renderDebts(view, demo, false, true);
     } catch (e) { toast(e.message); }
   });
 
@@ -1852,7 +1853,7 @@ async function renderRatings(view, demo) {
 // ====================== 7. EMPLOYEES ======================
 // Everything here is typed in by hand (saved as data "staff"): the employees (role, pay, personal ID / bank
 // account for matching salary transfers, the date their salary counts from) and the shifts in the calendar
-// (any number per day, from–to, overtime ₾, note). Debts → Employees turns them into what each one is owed.
+// (any number per day, from–to, overtime ₾, note). Debts leaves transfers to these employees out.
 const PAY_TYPES = ["hour", "shift", "month"];
 const empHours = s => { // a shift that ends before it starts goes past midnight
   const mins = x => { const m = String(x || "").match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
@@ -2175,72 +2176,45 @@ function demoApi(path, opts) {
     return { months };
   }
   if (path.startsWith("/syrve/debts")) {
-    // [name, tin, confirmed, unconfirmed, rejected, returns, paid, Syrve invoices, Syrve balance, Telegram approved]
-    const rows = [["Nikora", "204567891", 0, 12420.5, 0, 0, 9000, 12420.5, 12420.5, 2100], ["Sante GMT", "205123456", 400, 5780, 150, 60, 4000, 6000, 6180, 0],
-      ["Ori Nabiji", "400112233", 0, 3460, 0, 0, 2000, 3460, 3460, 640], ["Metro Cash & Carry", "211334455", 0, 890.4, 0, 0, 0, 0, null, 0],
-      ["Local farm (veg)", "01001012345", 0, 300, 0, 0, 500, 300, 300, 0]];
-    const r2 = x => Math.round(x * 100) / 100;
-    const suppliers = rows.map(([name, tin, c, u, rj, ret, paid, inv, bal, tg]) => {
-      const active = r2(c + u), left = v => r2(v - ret - paid), nU = Math.ceil(u / 400);
-      return { id: tin, name, tin, rsName: "", confirmed: c, unconfirmed: u, rejected: rj, nConfirmed: c ? 1 : 0, nUnconfirmed: nU, nRejected: rj ? 1 : 0,
-        returns: ret, nReturns: ret ? 1 : 0, paid, syrveBalance: bal, inv, nInv: inv ? Math.ceil(inv / 400) : 0, tg, nTg: tg ? Math.ceil(tg / 500) : 0,
-        active, nActive: (c ? 1 : 0) + nU, owed: left(active), owedInv: left(inv), owedTg: left(tg) };
-    });
-    const sum = f => r2(suppliers.reduce((a, s) => a + Math.max(0, f(s)), 0));
-    // rs მოსული: [product, tin, amount, category], payments split by each supplier's shares
-    const goods = [["ფქვილი მადლი I ხ საცხობი 50კგ", "204567891", 8200, "food"], ["მოცარელა 1კგ", "204567891", 3200.5, "food"], ["ქაღალდის ხელსახოცი", "204567891", 1020, "supplies"],
-      ["ზეითუნის ზეთი 5ლ", "205123456", 4600, "food"], ["პიცის ყუთი 33სმ", "205123456", 1580, "supplies"], ["Coca-Cola 0.5ლ", "400112233", 3460, "food"],
-      ["მიკროტალღური ღუმელი", "211334455", 890.4, "equipment"], ["ბოსტნეული ასორტი", "01001012345", 300, "food"]];
-    const cats = { totals: {}, suppliers: [], products: goods.map(([name, tin, amount, cat]) => ({ key: name.toLowerCase(), name, cat, manual: name.startsWith("ბოსტნეული"), amount,
-      sellers: [suppliers.find(s => s.tin === tin).name] })), unsplit: 0 };
-    for (const k of DEBT_CATS) cats.totals[k] = { amount: 0, paid: 0, returns: 0, owed: 0, n: 0 };
-    for (const s of suppliers) {
-      const mine = goods.filter(g => g[1] === s.tin), total = r2(mine.reduce((a, g) => a + g[2], 0));
-      const owed = r2(total - s.returns - s.paid), e = { id: s.id, name: s.name, tin: s.tin, total, paid: s.paid, returns: s.returns, owed, c: {} };
-      for (const k of DEBT_CATS) {
-        const amount = r2(mine.filter(g => g[3] === k).reduce((a, g) => a + g[2], 0));
-        if (!amount) continue;
-        const share = amount / total, v = e.c[k] = { amount, share: Math.round(share * 1000) / 10, paid: r2(s.paid * share), returns: r2(s.returns * share), owed: r2(Math.max(0, owed) * share) };
-        const tt = cats.totals[k]; tt.amount = r2(tt.amount + v.amount); tt.paid = r2(tt.paid + v.paid); tt.returns = r2(tt.returns + v.returns); tt.owed = r2(tt.owed + v.owed); tt.n++;
-      }
-      cats.suppliers.push(e);
-    }
-    const x = (rk, name, tin, iban, count, amount, purpose, comment = "", scope = tin ? "tin" : "iban") => ({ rk, scope, name, tin, iban, count, amount, last: todayISO(), purpose, comment });
-    cats.expenses = { supplies: [x("t:01008011111", "ი/მ ნინო კაპანაძე", "01008011111", "", 3, 240, "ხელსახოცები")],
-      equipment: [x("i:GE29TB0000000000000777", "Giorgi Beridze", "", "GE29TB0000000000000777", 1, 1850, "მაცივარი (მეორადი)")],
-      other: [x("t:406111222", "შპს სახლი", "406111222", "", 2, 3000, "ქირა ოქტომბერი", "ქირა")],
-      outsource: [x("t:405333444", "შპს კლინ სერვისი", "405333444", "", 4, 1200, "დალაგება")] };
-    cats.expenseTotals = Object.fromEntries(Object.entries(cats.expenses).map(([k, v]) => [k, r2(v.reduce((a, y) => a + y.amount, 0))]));
-    cats.unsorted = [x("t:01017050319", "ინდივიდუალური მეწარმე ელენე რატიშვილი", "01017050319", "", 15, 16700, "მარკეტინგი")];
-    const since = ymNow() + "-01";
-    return { asOf: todayISO(), total: sum(s => s.owed), suppliers, cats, tgSince: since,
-      totals: { rs: sum(s => s.owed), syrve: sum(s => s.owedInv), tg: sum(s => s.owedTg), cats: r2(DEBT_CATS.reduce((a, k) => a + cats.totals[k].owed, 0)) },
-      staff: { total: 2061.5, employees: [
-        { id: "e1", name: "ნინო ბერიძე", role: "მზარეული", pay: "month", rate: 1800, start: ymShift(ymNow(), -1) + "-01", active: true, hours: 56, shifts: 7, days: 7,
-          earned: 3600, overtime: 0, paid: 1800, owed: 1800, accounts: [{ rk: "t:01001012345", name: "ნინო ბერიძე", tin: "01001012345", iban: "", scope: "auto" }],
-          months: [{ ym: ymShift(ymNow(), -1), hours: 0, shifts: 0, days: 0, earned: 1800, overtime: 0, paid: 1800 }, { ym: ymNow(), hours: 56, shifts: 7, days: 7, earned: 1800, overtime: 0, paid: 0 }] },
-        { id: "e3", name: "ანა ლომიძე", role: "პიცაიოლო", pay: "shift", rate: 90, start: ymNow() + "-02", active: true, hours: 36, shifts: 3, days: 3,
-          earned: 270, overtime: 0, paid: 0, owed: 270, accounts: [], months: [{ ym: ymNow(), hours: 36, shifts: 3, days: 3, earned: 270, overtime: 0, paid: 0 }] },
-        { id: "e2", name: "გიორგი კაპანაძე", role: "მიმტანი", pay: "hour", rate: 9, start: ymNow() + "-01", active: true, hours: 50.5, shifts: 6, days: 6,
-          earned: 454.5, overtime: 25, paid: 488, owed: -8.5, accounts: [{ rk: "i:GE11TB0000000000000222", name: "Giorgi Kapanadze", tin: "", iban: "GE11TB0000000000000222", scope: "tin" }],
-          months: [{ ym: ymNow(), hours: 50.5, shifts: 6, days: 6, earned: 454.5, overtime: 25, paid: 488 }] },
-      ] },
-      compare: { since, counts: { onlyTg: 1, onlyRs: 3, diff: 1 },
-        suppliers: [{ key: "205123456", name: "Sante GMT", tg: 0, rs: 980, nTg: 0, nRs: 2, gap: 980 }, { key: "204567891", name: "Nikora", tg: 2100, rs: 2350, nTg: 5, nRs: 5, gap: 250 },
-          { key: "400112233", name: "Ori Nabiji", tg: 640, rs: 640, nTg: 2, nRs: 1, gap: 0 }],
-        onlyTg: [{ number: "1017058856", name: "Ori Nabiji", amount: 320, day: since, why: "missing" }],
-        diff: [{ number: "1011388053", name: "Nikora", tg: 410, rs: 660, day: since }],
-        onlyRs: [{ number: "1011390112", name: "Sante GMT", amount: 560, day: todayISO() }, { number: "1011390001", name: "Sante GMT", amount: 420, day: todayISO() },
-          { number: "1011389555", name: "Ori Nabiji", amount: 320, day: since }] },
+    const r2 = x => Math.round(x * 100) / 100, d = n => shiftDay(todayISO(), -n);
+    const tx = (rk, who, list, how = "code") => list.map(([days, amount, purpose], i) => [`bog:${rk}:${i}`, d(days), amount, who, purpose, how, how === "dec" ? "rcp" : "", rk]);
+    const wbs = (tin, list) => list.map(([days, amount], i) => [`0${tin.slice(0, 4)}${String(812 + i * 37)}`, d(days), amount, i % 4 === 0 ? 1 : 0]);
+    // [code, name, waybills [daysAgo, amount], returns, transfers, payments outside the bank, debt confirmed]
+    const spec = [
+      ["204567891", "შპს ნიკორა", [[2, 2420.5], [9, 3100], [16, 3400], [23, 3500]], 0, tx("t:204567891", "შპს ნიკორა", [[5, 4000, "ზედნადები 0457812"], [19, 5000, "ოქტომბრის ზედნადებები"]]), [], ""],
+      ["205123456", "შპს სანტე ჯი-ემ-თი პროდაქტს", [[3, 1780], [10, 2200], [17, 2200]], 60, tx("t:205123456", "Sante GMT Products", [[6, 2500, "invoice"], [20, 1500, "invoice"]]), [], ""],
+      ["400112233", "შპს ორი ნაბიჯი", [[4, 1200], [12, 1260], [25, 1000]], 0, [], [], ""],
+      ["211334455", "შპს მეტრო", [[8, 890.4]], 0, [], [], todayISO()],
+      ["01001012345", "ი/მ ნინო ფერმერი", [[11, 300]], 0, tx("t:01001012345", "ნინო ფერმერი", [[11, 300, "ბოსტნეული"], [3, 150, "ბოსტნეული"]]), [{ id: "m1", amount: 50, date: d(2), comment: "ნაღდი" }], ""],
+    ];
+    const name = { rk: "t:204999888", name: "შპს ორი ნაბიჯი ტრეიდი", tin: "204999888", iban: "", bank: "BOG", count: 3, amount: 1450, last: d(1), purpose: "ზედნადები #1017058856",
+      tx: [["bog:x1", d(1), 650, "ზედნადები #1017058856"], ["bog:x2", d(9), 500, "ზედნადები"], ["bog:x3", d(21), 300, "ზედნადები"]] };
+    const suppliers = spec.map(([tin, nm, w, returns, transfers, manualList, debtOk]) => {
+      const amount = r2(w.reduce((a, x) => a + x[1], 0)), paid = r2(transfers.reduce((a, x) => a + x[2], 0)), manual = r2(manualList.reduce((a, m) => a + m.amount, 0));
+      const owed = r2(amount - returns - paid - manual);
+      const versions = tin === "400112233" ? [{ rk: name.rk, name: name.name, tin: name.tin, amount: name.amount, count: name.count }] : [];
+      return { tin, name: nm, n: w.length, nConfirmed: Math.ceil(w.length / 4), amount, returns, nReturns: returns ? 1 : 0, paid, manual,
+        waybills: wbs(tin, w), transfers, manualList, owed, debtOk, none: !paid && !manual && owed > 0 && !debtOk, versions };
+    }).sort((a, b) => b.owed - a.owed);
+    const sup = tin => suppliers.find(s => s.tin === tin);
+    name.versions = [{ tin: "400112233", name: sup("400112233").name, amount: sup("400112233").amount, n: sup("400112233").n }];
+    const sum = f => r2(suppliers.reduce((a, s) => a + f(s), 0));
+    const group = (rk, nm, tin, iban, rows, extra = {}) => ({ rk, name: nm, tin, iban, bank: iban.includes("TB") ? "TBC" : "BOG", count: rows.length,
+      amount: r2(rows.reduce((a, x) => a + x[1], 0)), last: d(rows[0][0]), purpose: rows[0][2], tx: rows.map(([days, amount, p], i) => [`${rk}:${i}`, d(days), amount, p]), ...extra });
+    const other = [group("t:406111222", "შპს სახლი", "406111222", "", [[2, 1500, "ქირა ნოემბერი"], [32, 1500, "ქირა ოქტომბერი"]], { scope: "rcp", comment: "ქირა" })];
+    return { total: sum(s => Math.max(0, s.owed)),
+      totals: { waybills: sum(s => s.n), waybillSum: sum(s => s.amount), returns: sum(s => s.returns), paid: sum(s => s.paid), manual: sum(s => s.manual),
+        suppliers: suppliers.length, owing: suppliers.filter(s => s.owed > 0).length },
+      suppliers,
+      noWaybill: { open: [group("i:GE33TB0000000000000003", "Giorgi Beridze", "", "GE33TB0000000000000003", [[6, 150, "transfer"], [14, 100, "transfer"]]),
+          group("t:01017050319", "ი/მ ელენე რატიშვილი", "01017050319", "", [[1, 700, "მარკეტინგი"]])],
+        wait: [group("t:405999111", "შპს ახალი პური", "405999111", "", [[2, 320, "პური"]], { scope: "rcp", code: "405999111" })],
+        other, otherTotal: r2(other.reduce((a, g) => a + g.amount, 0)) },
+      problems: { name: [name], none: suppliers.filter(s => s.none).map(s => ({ tin: s.tin, name: s.name, n: s.n, amount: s.amount, returns: s.returns, owed: s.owed, versions: s.versions })) },
+      over: suppliers.filter(s => s.owed < 0).map(s => ({ tin: s.tin, name: s.name, n: s.n, amount: s.amount, returns: s.returns, paid: s.paid, manual: s.manual, excess: r2(-s.owed) })),
+      sellers: suppliers.map(s => ({ tin: s.tin, name: s.name })),
       waybills: { configured: true, from: "2026-03-01", months: 9, total: 9, pending: false, error: "", returnsKnown: true },
-      invoices: { configured: true, from: "2026-03-01", months: 9, total: 9, pending: false, error: "" },
-      review: { count: 2, payments: 7, amount: 1700, items: [
-        { rk: "t:204999888", name: "შპს ნიკორა ტრეიდი", tin: "204999888", iban: "", count: 5, amount: 1450, last: todayISO(), purpose: "ზედნადები #0457812", bank: "BOG", reason: "name_only", suggestion: "204567891", rsName: "" },
-        { rk: "t:01001055555", name: "Giorgi Beridze", tin: "01001055555", iban: "GE33TB0000000000000003", count: 2, amount: 250, last: ymNow() + "-12", purpose: "transfer", bank: "TBC", reason: "unknown", suggestion: null, rsName: "" },
-      ] },
-      options: suppliers.map(s => ({ id: s.id, name: s.name })),
-      linkedTins: [{ tin: "206000111", to: "ignore", name: "" }, { tin: "406111222", to: "x:other", name: "" }],
-      bank: { configured: { bog: true, tbc: true }, settings: { historyFrom: "2026-03-01", bogAccounts: ["GE00BG0000000000000001"] }, lastSyncAt: new Date().toISOString(), errors: {}, cursors: {}, payments: 412, matched: 371, ignored: 39 } };
+      bank: { configured: { bog: true, tbc: true }, settings: { historyFrom: "2026-03-01", bogAccounts: ["GE00BG0000000000000001"] }, lastSyncAt: new Date().toISOString(), errors: {}, cursors: {}, payments: 412, skipped: 39 } };
   }
   if (path.startsWith("/bank/")) return { ok: true, done: true };
   if (path.startsWith("/debts/")) return { ok: true };

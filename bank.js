@@ -17,7 +17,7 @@
 //   dash:bank:rcp         { <recipientKey>: [name, tin, iban, bankCode, own(0|1)] }   each recipient stored once
 //   dash:bank:v2:<year>   [[id, "YYYY-MM-DD", amountInTetri, recipientKey, purpose], ...]
 //   dash:bank:agg         { <recipientKey>: [count, totalTetri, lastDate, lastPurpose, banks(1=BOG,2=TBC)] }
-//                         running totals, so the Debts page never has to read every payment
+//                         running totals per recipient
 
 const SETTINGS_KEY = "dash:bank:settings";
 const STATE_KEY = "dash:bank:state2";
@@ -92,17 +92,13 @@ export async function loadRecipientPayments(env, historyFrom, rk) {
   return out;
 }
 
-// all stored payments of several recipients (a Set of recipient keys), each year read once — employees' salaries
-export async function loadPaymentsOf(env, historyFrom, rks) {
-  if (!rks.size) return [];
+// every stored payment from the start year on, each year read once — the Debts tab
+export async function loadPayments(env, historyFrom) {
   const y0 = Number((historyFrom || "2015").slice(0, 4));
   const y1 = new Date().getUTCFullYear();
-  const out = [];
-  for (let y = y0; y <= y1; y++) {
-    const rows = await env.STORE.get(TX_PREFIX + y, "json");
-    if (rows) for (const r of rows) if (rks.has(r[3])) out.push(r);
-  }
-  return out;
+  const years = [];
+  for (let y = y0; y <= y1; y++) years.push(env.STORE.get(TX_PREFIX + y, "json"));
+  return (await Promise.all(years)).flatMap(rows => rows || []);
 }
 
 async function savePayments(env, list) {
