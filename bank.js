@@ -394,6 +394,12 @@ export async function syncStep(env) {
   // recognised get their shop, card and purchase day (savePayments replaces those rows; nothing is deleted)
   const reread = cfg.bog && !(await env.STORE.get(CARDS_REREAD_KEY));
   if (reread) for (const src of sources) if (src.iban) delete state.cursors[src.key];
+  // BOG throttles ("429") after a few months per run: read the account that is furthest behind first
+  // (during the re-read that is the card account), so one account isn't starved by the other
+  const at = s => state.cursors[s.key] || settings.historyFrom;
+  // (TBC stays first: it is one quick request when caught up)
+  const rank = s => (s.key === "tbc" ? "0" : "1") + at(s);
+  sources.sort((a, b) => rank(a).localeCompare(rank(b)));
 
   const budget = { used: 0 };
   const tokens = {};

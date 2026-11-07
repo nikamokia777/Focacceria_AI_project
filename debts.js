@@ -21,7 +21,11 @@
 // the supplier (a decision on the shop = all its payments, future too, or on one payment). Suggestions are
 // the suppliers' waybills with the same amount at any date (a waybill can come late), nearest date first,
 // that no confirmed card payment uses yet. A confirmed card payment without such a waybill shows
-// „ზედნადები ჯერ არ არის“ until one arrives.
+// „ზედნადები ჯერ არ არის“ until one arrives. Clear cases count by themselves („ავტომატურად“, ✕ per payment):
+// the shop's name is exactly one supplier's name and that supplier has an unused waybill with the same amount.
+//
+// A transfer to someone else whose purpose names a supplier („საქვეანგარიშო შპს ძმები“) waits in subtab 3 as a
+// suggestion, one row per transfer. Any single transfer can be assigned (with a comment) from subtab 2.
 //
 // KV dash:debts2:decisions {
 //   rcp:    { recipientKey: { to, at, comment? } }        all transfers to a recipient
@@ -139,9 +143,23 @@ export async function buildDebts(env) {
   const isFee = (id, date, cents, rk, purpose) => !isCard(rk) && (isFeePurpose(purpose)
     || (String(id).startsWith("bog:") && cents <= FEE_CENTS && biggest[rk + "|" + date] > FEE_CENTS));
 
+  // a supplier named in a transfer's purpose ("საქვეანგარიშო შპს ძმები"): whole words of the seller's name,
+  // without შპს / ი/მ; short names (under 4 letters) are too common to look for
+  const purposeKeys = sellerKeys.filter(s => s.key.n.length >= 4);
+  const purposeMemo = {};
+  const purposeHits = purpose => purposeMemo[purpose] ??= (() => {
+    const P = nameKey(purpose);
+    if (!P.n) return [];
+    const hits = purposeKeys.filter(s => (" " + P.n + " ").includes(" " + s.key.n + " ") || (" " + P.l + " ").includes(" " + s.key.l + " "));
+    // "ძმები 22" in the purpose also contains "ძმები": keep only the longest names
+    return hits.filter(h => !hits.some(o => o !== h && o.key.n.length > h.key.n.length && (" " + o.key.n + " ").includes(" " + h.key.n + " "))).map(h => h.tin);
+  })();
+
   const groups = { open: {}, wait: {}, other: {}, name: {} };
   const cardOpen = [], cardOther = {}, cardPaid = []; // card payments: undecided, other expenses, counted for a supplier
+  const purposeRaw = []; // undecided transfers whose purpose names a supplier
   let counted = 0, skipped = 0;
+  const addCard = (tin, cents) => { const x = sup[tin]; x.cardN = (x.cardN || 0) + 1; x.cardSum = r2((x.cardSum || 0) + cents / 100); };
   for (const [id, date, cents, rk, purpose = "", card] of payments) {
     if (settings.historyFrom && date < settings.historyFrom) continue;
     if (skip(rk) || isFee(id, date, cents, rk, purpose)) { skipped++; continue; }
@@ -150,7 +168,9 @@ export async function buildDebts(env) {
     const [name = "", tin = "", iban = ""] = recipients[rk] || [];
     const txd = dec.tx[id], rd = dec.rcp[rk], d = txd || rd;
     const scope = txd ? "tx" : rd ? "rcp" : "";
+    const off = txd?.to === "o"; // "not this one": no automatic match / suggestion for this payment
     let t = d ? target(d.to) : null, how = t ? "dec" : "";
+    const comment = d?.comment || "";
     if (isCard(rk)) {
       const [last4 = "", buy = "", shopKa = "", mcc = ""] = card || [];
       const c = { id, rk, date, buy: buy || date, amount: r2(amount), shop: name || rk.slice(2), shopKa, last4, mcc, purpose };
@@ -158,16 +178,16 @@ export async function buildDebts(env) {
         const x = row(t.tin);
         if (!x.name) x.name = t.tin;
         x.paid = r2(x.paid + amount);
-        const tr = [id, date, r2(amount), c.shop + (last4 ? " ••" + last4 : ""), purpose, "card", scope, rk, last4, ""];
+        const tr = [id, date, r2(amount), c.shop + (last4 ? " ••" + last4 : ""), purpose, "card", scope, rk, last4, "", comment];
         x.transfers.push(tr);
         cardPaid.push({ tin: t.tin, cents, buy: c.buy, tr, c });
       } else if (t?.other) {
         const gk = rk + "|" + scope;
-        const g = cardOther[gk] = cardOther[gk] || { rk, name: c.shop, shopKa, last4, scope, comment: d.comment || "", count: 0, amount: 0, last: "", tx: [] };
+        const g = cardOther[gk] = cardOther[gk] || { rk, name: c.shop, shopKa, last4, scope, comment, count: 0, amount: 0, last: "", tx: [] };
         g.count++; g.amount = r2(g.amount + amount);
         if (c.buy >= g.last) g.last = c.buy;
         g.tx.push([id, c.buy, r2(amount), purpose]);
-      } else cardOpen.push({ ...c, cents });
+      } else cardOpen.push({ ...c, cents, off });
       continue;
     }
     if (!t && tin && sellers.has(tin)) { t = { tin }; how = "code"; }
@@ -176,7 +196,11 @@ export async function buildDebts(env) {
       const x = row(t.tin);
       if (!x.name) x.name = name || t.tin;
       x.paid = r2(x.paid + amount);
-      x.transfers.push([id, date, r2(amount), name || tin || iban, purpose, how, scope, rk]);
+      x.transfers.push([id, date, r2(amount), name || tin || iban, purpose, how, scope, rk, "", "", comment]);
+      continue;
+    }
+    if (!d && purposeHits(purpose).length) {
+      purposeRaw.push({ id, rk, name, tin, iban, date, amount: r2(amount), cents, purpose, hits: purposeHits(purpose) });
       continue;
     }
     let into, gk = rk, extra = {};
@@ -210,15 +234,35 @@ export async function buildDebts(env) {
   const used = new Set();
   const nearest = (list, day) => list.filter(w => !used.has(w.tin + "|" + w.num)).sort((a, b) => dayGap(a.day, day) - dayGap(b.day, day) || b.day.localeCompare(a.day));
   for (const p of cardPaid.sort((a, b) => a.buy.localeCompare(b.buy))) {
+    addCard(p.tin, p.cents);
     const w = nearest((wbByCents[p.cents] || []).filter(w => w.tin === p.tin), p.buy)[0];
     if (w) { used.add(w.tin + "|" + w.num); p.tr[9] = w.num; }
     else sup[p.tin].cardWait = (sup[p.tin].cardWait || 0) + 1;
   }
+  // clear cases count by themselves: the shop's name is exactly one supplier's name (Georgian or Latin
+  // spelling, without შპს) AND that supplier has an unused waybill with the same amount
+  const exactShop = c => {
+    const keys = [c.shopKa, c.shop].filter(Boolean).map(nameKey);
+    const hits = sellerKeys.filter(s => keys.some(k => sameKey(k, s.key)) && !(dec.sup[s.tin]?.no || []).includes(c.rk));
+    return hits.length === 1 ? hits[0].tin : "";
+  };
+  for (const c of cardOpen.sort((a, b) => a.buy.localeCompare(b.buy))) {
+    const tin = !c.off && exactShop(c);
+    const w = tin && nearest((wbByCents[c.cents] || []).filter(w => w.tin === tin), c.buy)[0];
+    if (!w) continue;
+    used.add(w.tin + "|" + w.num);
+    const x = sup[tin];
+    x.paid = r2(x.paid + c.amount);
+    x.transfers.push([c.id, c.date, c.amount, c.shop + (c.last4 ? " ••" + c.last4 : ""), c.purpose, "cardauto", "", c.rk, c.last4, w.num, ""]);
+    addCard(tin, c.cents);
+    c.auto = tin;
+  }
   const sellerKeyOf = Object.fromEntries(sellerKeys.map(s => [s.tin, s.key]));
   const shopCount = {};
-  for (const c of cardOpen) shopCount[c.rk] = (shopCount[c.rk] || 0) + 1;
+  for (const c of cardOpen) if (!c.auto) shopCount[c.rk] = (shopCount[c.rk] || 0) + 1;
   const cardsFor = {}; // supplier code → undecided card payments that suggest it
-  const openCards = cardOpen.sort((a, b) => b.buy.localeCompare(a.buy) || b.amount - a.amount).map(({ cents, ...c }) => {
+  const purposeFor = {}; // supplier code → undecided transfers whose purpose names it
+  const openCards = cardOpen.filter(c => !c.auto).sort((a, b) => b.buy.localeCompare(a.buy) || b.amount - a.amount).map(({ cents, auto, ...c }) => {
     const suggest = nearest(wbByCents[cents] || [], c.buy).slice(0, MAX_SUGGEST)
       .map(w => ({ tin: w.tin, name: sup[w.tin].name || w.tin, num: w.num, day: w.day, amount: w.amount, gap: dayGap(w.day, c.buy) }));
     for (const s of suggest) cardsFor[s.tin] = (cardsFor[s.tin] || 0) + 1;
@@ -226,6 +270,15 @@ export async function buildDebts(env) {
     const names = [...sellers].filter(tin => !suggest.some(s => s.tin === tin) && keys.some(k => k && similarKey(k, sellerKeyOf[tin])))
       .slice(0, 3).map(tin => ({ tin, name: sup[tin].name || tin }));
     return { ...c, count: shopCount[c.rk], suggest, names };
+  });
+  // transfers whose purpose names a supplier: one row each, versions with a same-amount waybill first
+  const purposeList = purposeRaw.sort((a, b) => b.date.localeCompare(a.date)).map(({ cents, hits, ...p }) => {
+    const versions = hits.map(tin => {
+      const w = (wbByCents[cents] || []).filter(w => w.tin === tin).sort((a, b) => dayGap(a.day, p.date) - dayGap(b.day, p.date))[0];
+      return { tin, name: sup[tin].name || tin, wb: w ? { num: w.num, day: w.day, gap: dayGap(w.day, p.date) } : null };
+    }).sort((a, b) => !!b.wb - !!a.wb);
+    for (const v of versions) purposeFor[v.tin] = (purposeFor[v.tin] || 0) + 1;
+    return { ...p, versions };
   });
   const cardOtherList = Object.values(cardOther).map(g => ({ ...g, tx: g.tx.sort((a, b) => b[1].localeCompare(a[1])).slice(0, MAX_TX) })).sort((a, b) => b.amount - a.amount);
 
@@ -243,7 +296,8 @@ export async function buildDebts(env) {
     const none = x.n > 0 && !x.paid && !x.manual && owed > 0 && !debtOk;
     x.waybills.sort((a, b) => b[1].localeCompare(a[1]));
     x.transfers.sort((a, b) => b[1].localeCompare(a[1]));
-    return { ...x, owed, debtOk, none, versions: versionFor[x.tin] || [], cardWait: x.cardWait || 0, cards: cardsFor[x.tin] || 0 };
+    return { ...x, owed, debtOk, none, versions: versionFor[x.tin] || [], cardWait: x.cardWait || 0, cards: cardsFor[x.tin] || 0,
+      cardN: x.cardN || 0, cardSum: x.cardSum || 0, purpose: purposeFor[x.tin] || 0 };
   }).sort((a, b) => b.owed - a.owed);
 
   const sum = (arr, f) => r2(arr.reduce((a, x) => a + f(x), 0));
@@ -260,12 +314,14 @@ export async function buildDebts(env) {
     noWaybill: { open: byAmount(groups.open), wait: byAmount(groups.wait), other, otherTotal: sum(other, g => g.amount) },
     problems: {
       name: nameGroups,
-      none: list.filter(x => x.none).map(x => ({ tin: x.tin, name: x.name, n: x.n, amount: x.amount, returns: x.returns, owed: x.owed, versions: x.versions, cards: x.cards })),
+      none: list.filter(x => x.none).map(x => ({ tin: x.tin, name: x.name, n: x.n, amount: x.amount, returns: x.returns, owed: x.owed, versions: x.versions, cards: x.cards, purpose: x.purpose })),
+      purpose: purposeList,
     },
     cards: {
       open: openCards, other: cardOtherList, otherTotal: sum(cardOtherList, g => g.amount),
       openTotal: sum(openCards, c => c.amount),
       paid: cardPaid.length, paidTotal: sum(cardPaid, p => p.c.amount), waiting: cardPaid.filter(p => !p.tr[9]).length,
+      auto: cardOpen.filter(c => c.auto).length, autoTotal: sum(cardOpen.filter(c => c.auto), c => c.amount),
     },
     over: list.filter(x => x.owed < 0).map(x => ({ tin: x.tin, name: x.name, n: x.n, amount: x.amount, returns: x.returns, paid: x.paid, manual: x.manual, excess: r2(-x.owed) })),
     sellers: [...sellers].map(tin => ({ tin, name: nameOf(tin) })).sort((a, b) => a.name.localeCompare(b.name)),
@@ -281,6 +337,7 @@ export async function buildDebts(env) {
 //   reject     { rk, tins: [code] }                                         "not this supplier" for name versions
 //   debt       { tin, on }                                                  "no transfer at all, the debt is right" (on: false = undo)
 //   manual     { tin, code?, amount?, date?, comment? }                     a recipient code that pays this supplier, and/or a payment outside the bank
+//   noauto     { id, rk }                                                   this payment: no automatic card match / purpose suggestion
 //   manualDel  { id }
 export async function saveDecision(env, body) {
   const dec = await loadDecisions(env);
@@ -295,9 +352,9 @@ export async function saveDecision(env, body) {
       if (to !== "x" && !(m && CODE.test(m[2]))) return { error: "bad target" };
       if (!rk) return { error: "rk required" };
       if (body.id) {
-        // one payment (a card payment: „მხოლოდ ეს გადახდა“)
+        // one payment („მხოლოდ ეს გადახდა“, or one transfer picked from a recipient's list); a comment is kept for any target
         const id = String(body.id).slice(0, 100);
-        dec.tx[id] = { to, at, rk, ...(to === "x" && comment ? { comment } : {}) };
+        dec.tx[id] = { to, at, rk, ...(comment ? { comment } : {}) };
       } else if (body.once) {
         const settings = await loadBankSettings(env);
         let n = 0;
@@ -349,6 +406,13 @@ export async function saveDecision(env, body) {
         const date = /^\d{4}-\d{2}-\d{2}$/.test(body.date || "") ? body.date : at;
         dec.manual.push({ id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), tin, amount, date, comment });
       }
+      break;
+    }
+    case "noauto": {
+      // "not this one": an automatic card match or a purpose suggestion is wrong for this one payment
+      const id = String(body.id || "").slice(0, 100);
+      if (!id || !rk) return { error: "id and rk required" };
+      dec.tx[id] = { to: "o", at, rk };
       break;
     }
     case "manualDel": {

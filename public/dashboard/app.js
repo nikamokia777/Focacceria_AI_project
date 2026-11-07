@@ -193,6 +193,15 @@ const T = {
     cd_wb: "ზედნადები", cd_wait_wb: "ზედნადები ჯერ არ არის",
     cd_scope_all: "ამ მაღაზიის ყველა (მომავალიც)", cd_scope_once: "მხოლოდ ეს გადახდა",
     cd_scope_q: "რომელ გადახდებს ეხება „{name}“-ში?",
+    how_cardauto: "ბარათით, ავტომატურად",
+    cd_incl_hint: "გადახდილში შედის ბარათით გადახდები",
+    cd_auto_off: "ავტომატური დამთხვევა გამორთულია",
+    one_pick: "ეს გადარიცხვა", one_tx: "მხოლოდ ეს გადარიცხვა",
+    one_q: "ვის ეკუთვნის ეს ერთი გადარიცხვა?",
+    comment_opt: "კომენტარი (არასავალდებულო)", purpose: "დანიშნულება",
+    pr_purpose: "დანიშნულებაში მომწოდებელია",
+    pr_purpose_hint: "გადარიცხვა სხვაზეა, მაგრამ დანიშნულებაში მომწოდებლის სახელი წერია (მაგ. „საქვეანგარიშო შპს ძმები“) — ითვლება დადასტურების შემდეგ",
+    pr_purpose_none: "{n} გადარიცხვის დანიშნულებაში ეს მომწოდებელია — იხ. ზემოთ",
     cd_other: "სხვა ხარჯი (ბარათით)",
     cd_none_hint: "{n} ბარათით გადახდა შეიძლება ამ მომწოდებლის იყოს — იხ. „ბარათით“",
   },
@@ -369,6 +378,15 @@ const T = {
     cd_wb: "Waybill", cd_wait_wb: "No waybill yet",
     cd_scope_all: "All from this shop (future too)", cd_scope_once: "Only this payment",
     cd_scope_q: "Which payments at “{name}” does this apply to?",
+    how_cardauto: "by card, automatically",
+    cd_incl_hint: "Paid includes card payments",
+    cd_auto_off: "Automatic match turned off",
+    one_pick: "This transfer", one_tx: "only this transfer",
+    one_q: "Who is this one transfer for?",
+    comment_opt: "Comment (optional)", purpose: "Purpose",
+    pr_purpose: "Purpose names a supplier",
+    pr_purpose_hint: "The transfer went to someone else, but its purpose names a supplier (e.g. “advance for შპს ძმები”) — counts after you confirm",
+    pr_purpose_none: "{n} transfer(s) name this supplier in the purpose — see above",
     cd_other: "Other expenses (card)",
     cd_none_hint: "{n} card payment(s) may belong to this supplier — see “Card payments”",
   },
@@ -1454,11 +1472,14 @@ const DEBT_TABS = ["debts", "nowb", "cards", "problems", "over"];
 function debtDetailHtml(s) {
   const wbRows = s.waybills.map(([num, day, amount, st]) => `<tr><td class="num">${esc(num)}</td><td class="muted">${esc(day)}</td>
     <td class="r num">${money(amount)}</td><td class="muted small">${st === 1 ? "✓ " + esc(t("rs_confirmed")) : ""}</td></tr>`).join("");
-  const txRows = s.transfers.map(([id, date, amount, who, purpose, how, scope, rk, , wbNum]) => `<tr><td class="muted">${esc(date)}</td><td class="r num">${money(amount)}</td>
-    <td>${how === "card" ? "💳 " : ""}${esc(who)}<div class="muted small clip" title="${esc(purpose)}">${esc(purpose)}</div>
-      ${how === "card" ? `<div class="small ${wbNum ? "muted" : "warn-text"}">${wbNum ? esc(t("cd_wb")) + " " + esc(wbNum) : "⏳ " + esc(t("cd_wait_wb"))}</div>` : ""}</td>
-    <td><span class="pill ${how === "code" ? "good" : "neutral"}">${esc(t("how_" + how))}</span>${how === "card" && scope === "tx" ? ` <span class="muted small">${esc(t("cd_scope_once"))}</span>` : ""}
+  const isCardHow = how => how === "card" || how === "cardauto";
+  const txRows = s.transfers.map(([id, date, amount, who, purpose, how, scope, rk, , wbNum, note]) => `<tr><td class="muted">${esc(date)}</td><td class="r num">${money(amount)}</td>
+    <td>${isCardHow(how) ? "💳 " : ""}${esc(who)}<div class="muted small clip" title="${esc(purpose)}">${esc(purpose)}</div>
+      ${isCardHow(how) ? `<div class="small ${wbNum ? "muted" : "warn-text"}">${wbNum ? esc(t("cd_wb")) + " " + esc(wbNum) : "⏳ " + esc(t("cd_wait_wb"))}</div>` : ""}
+      ${note ? `<div class="small">💬 ${esc(note)}</div>` : ""}</td>
+    <td><span class="pill ${how === "code" ? "good" : "neutral"}">${esc(t("how_" + how))}</span>${(how === "card" || how === "dec") && scope === "tx" ? ` <span class="muted small">${esc(t(how === "card" ? "cd_scope_once" : "one_tx"))}</span>` : ""}
       ${how === "dec" || how === "card" ? `<button type="button" class="icon-btn dx-undo" data-rk="${esc(rk)}" data-scope="${esc(scope)}" data-id="${esc(id)}" title="${esc(t("undo"))}">↩</button>` : ""}
+      ${how === "cardauto" ? `<button type="button" class="icon-btn dx-noauto" data-rk="${esc(rk)}" data-id="${esc(id)}" title="${esc(t("not_this"))}">✕</button>` : ""}
       ${how === "name" ? `<button type="button" class="icon-btn dx-notthis" data-rk="${esc(rk)}" data-tin="${esc(s.tin)}" title="${esc(t("not_this"))}">✕</button>` : ""}</td></tr>`).join("");
   const mRows = s.manualList.map(m => `<tr><td class="muted">${esc(m.date)}</td><td class="r num">${money(m.amount)}</td>
     <td>${esc(t("manual_paid"))}${m.comment ? `<div class="muted small">${esc(m.comment)}</div>` : ""}</td>
@@ -1478,7 +1499,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
   const dt = DEBT_TABS.includes(S.debtTab) ? S.debtTab : "debts";
   const T = r.totals || {};
   const NW = r.noWaybill || { open: [], wait: [], other: [], otherTotal: 0 };
-  const PR = r.problems || { name: [], none: [] };
+  const PR = { name: [], none: [], purpose: [], ...(r.problems || {}) };
   const OV = r.over || [];
   const CD = r.cards || { open: [], other: [], otherTotal: 0, openTotal: 0, paid: 0, paidTotal: 0, waiting: 0 };
   const sups = r.suppliers || [];
@@ -1509,7 +1530,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
   if (wb.configured && wb.from && wb.returnsKnown === false) notices += `<div class="notice">${esc(t("rsge_no_returns"))}</div>`;
   notices += `<div id="bankProgress"></div>`;
 
-  const nProblems = PR.name.length + PR.none.length;
+  const nProblems = PR.name.length + PR.none.length + PR.purpose.length;
   const tabLabel = { debts: `${t("dt_debts")} · ${money(r.total || 0)}`, nowb: `${t("dt_nowb")} · ${NW.open.length}`,
     cards: `💳 ${t("dt_cards")} · ${CD.open.length}`, problems: `${t("dt_problems")} · ${nProblems}`, over: `${t("dt_over")} · ${OV.length}` };
   const cards = card(t("total_owed"), money(r.total || 0), esc(t("dv_main_hint")), r.total > 0 ? "hero bad" : "hero") +
@@ -1519,7 +1540,9 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
 
   const who = x => `<b>${esc(x.name || "—")}</b><div class="muted small">${x.tin ? esc(t("tax_id")) + " " + esc(x.tin) : esc(x.iban || "")}</div>
     <div class="muted small clip" title="${esc(x.purpose || "")}">${esc(x.bank || "")} · ${esc(t("last"))} ${esc(x.last || "")} · ${esc(x.purpose || "")}</div>`;
-  const txList = x => `<table class="mini"><tbody>${x.tx.map(([, date, amount, purpose]) => `<tr><td class="muted">${esc(date)}</td><td class="r num">${money(amount)}</td><td class="small">${esc(purpose)}</td></tr>`).join("")}</tbody></table>
+  // a recipient's transfers; in subtabs 2 and 3 each one can be assigned on its own („ეს გადარიცხვა →“)
+  const txList = (x, pickOne = false) => `<table class="mini"><tbody>${x.tx.map(([id, date, amount, purpose]) => `<tr data-id="${esc(id)}" data-rk="${esc(x.rk)}" data-name="${esc(x.name || x.tin || x.iban || "")}" data-count="1"><td class="muted">${esc(date)}</td><td class="r num">${money(amount)}</td><td class="small">${esc(purpose)}</td>
+      ${pickOne ? `<td class="r nowrap"><button type="button" class="btn small dt-one">${esc(t("one_pick"))} →</button></td>` : ""}</tr>`).join("")}</tbody></table>
     ${x.count > x.tx.length ? `<div class="muted small">${esc(t("showing_tx").replace("{a}", x.tx.length).replace("{b}", x.count))}</div>` : ""}`;
   const rkAttrs = x => `data-rk="${esc(x.rk)}" data-count="${x.count}" data-name="${esc(x.name || x.tin || x.iban || "")}"`;
   const open = key => S.debtOpen === key;
@@ -1537,7 +1560,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       <tbody>${list.map(s => supRow(s, `<td><b>${esc(s.name)}</b><div class="muted small">${esc(t("tax_id"))} ${esc(s.tin)}</div></td>
         <td class="r num">${money(s.amount)}<div class="muted small">${s.n} ${esc(t("wb_count"))}${s.nConfirmed ? ` · ${s.nConfirmed} ${esc(t("rs_confirmed"))}` : ""}</div></td>
         <td class="r num">${s.returns ? money(s.returns) : "—"}</td>
-        <td class="r num">${s.paid || s.manual ? money(s.paid + s.manual) : "—"}${s.manual ? `<div class="muted small">${esc(t("manual_paid"))} ${money(s.manual)}</div>` : ""}</td>
+        <td class="r num">${s.paid || s.manual ? money(s.paid + s.manual) : "—"}${s.manual ? `<div class="muted small">${esc(t("manual_paid"))} ${money(s.manual)}</div>` : ""}${s.cardN ? `<div class="muted small" title="${esc(t("cd_incl_hint"))}">💳 ${esc(t("how_card"))} ${money(s.cardSum)}</div>` : ""}</td>
         <td class="r num nowrap">${owedCell(s)}</td>
         <td class="nowrap">${status(s)} <span class="muted">${open("s:" + s.tin) ? "▴" : "▾"}</span></td>`, 6)).join("")
         || `<tr><td colspan="6" class="empty">${esc(t("no_debts"))}</td></tr>`}</tbody>
@@ -1555,7 +1578,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
           <tbody>${openRows.map(x => `<tr class="pick" data-open="r:${esc(x.rk)}" ${rkAttrs(x)}><td>${who(x)}</td><td class="r num">${x.count}</td>
             <td class="r num nowrap"><b>${money(x.amount)}</b></td>
             <td class="r nowrap rv-actions"><button type="button" class="btn small primary dw-who">${esc(t("who_q"))}</button></td></tr>
-            ${open("r:" + x.rk) ? `<tr class="sub"><td colspan="4">${txList(x)}</td></tr>` : ""}`).join("")
+            ${open("r:" + x.rk) ? `<tr class="sub"><td colspan="4">${txList(x, true)}</td></tr>` : ""}`).join("")
             || `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
         </table></div></div>
       <div class="panel">
@@ -1592,7 +1615,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
         ? `<div class="muted small">📄 ${esc(t("cd_wb"))} ${esc(c.suggest[0].num)} · ${esc(c.suggest[0].day)} · ${esc(gapLabel(c.suggest[0].gap))}${c.suggest.length > 1 ? ` · +${c.suggest.length - 1}` : ""}</div>`
         : `<div class="small warn-text">⚠ ${esc(t("cd_no_wb"))}</div>`}`;
     const scopeTag = x => x.scope === "tx" ? ` <span class="pill neutral">${esc(t("cd_scope_once"))}</span>` : "";
-    body = `<div class="muted small" style="margin:-6px 0 14px">✓ ${esc(t("cd_confirmed"))}: ${CD.paid || 0} · ${money(CD.paidTotal || 0)}${CD.waiting ? ` · <span class="warn-text">⏳ ${esc(t("cd_wait_wb"))}: ${CD.waiting}</span>` : ""} — ${esc(t("cd_confirmed_hint"))}</div>
+    body = `<div class="muted small" style="margin:-6px 0 14px">${CD.auto ? `💳 ${esc(t("how_cardauto"))}: ${CD.auto} · ${money(CD.autoTotal || 0)} · ` : ""}✓ ${esc(t("cd_confirmed"))}: ${CD.paid || 0} · ${money(CD.paidTotal || 0)}${CD.waiting ? ` · <span class="warn-text">⏳ ${esc(t("cd_wait_wb"))}: ${CD.waiting}</span>` : ""} — ${esc(t("cd_confirmed_hint"))}</div>
       <div class="panel">
         <div class="panel-head"><h3>💳 ${esc(t("cd_open"))} · ${openRows.length} · ${money(CD.openTotal || 0)}</h3><span class="muted small">${esc(t("cd_open_hint"))}</span></div>
         <div class="table-wrap"><table class="edit review">
@@ -1602,7 +1625,8 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
             <td class="r num nowrap"><b>${money(c.amount)}</b></td>
             <td>${pick(c)}</td>
             <td class="r nowrap rv-actions"><button type="button" class="btn small primary dc-ok">✓ ${esc(t("confirm"))}</button>
-              <button type="button" class="btn small dc-other">${esc(t("cat_other"))}</button></td></tr>`).join("")
+              <button type="button" class="btn small dc-other">${esc(t("cat_other"))}</button>
+              ${c.off ? `<div class="muted small">${esc(t("cd_auto_off"))} <button type="button" class="icon-btn dc-reauto" title="${esc(t("undo"))}">↩</button></div>` : ""}</td></tr>`).join("")
             || `<tr><td colspan="5" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
         </table></div></div>
       <div class="panel">
@@ -1619,6 +1643,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
   } else if (dt === "problems") {
     const nameRows = PR.name.filter(x => match(x.name, x.tin, x.iban, ...x.versions.map(v => v.name + " " + v.tin)));
     const noneRows = PR.none.filter(s => match(s.name, s.tin));
+    const purposeRows = PR.purpose.filter(p => match(p.name, p.tin, p.iban, p.purpose, ...p.versions.map(v => v.name + " " + v.tin)));
     const vLabel = v => `${v.name} · ${t("tax_id")} ${v.tin} · ${money(v.amount)}`;
     body = `<div class="panel">
         <div class="panel-head"><h3>⚠ ${esc(t("pr_name"))} · ${nameRows.length}</h3><span class="muted small">${esc(t("pr_name_hint"))}</span></div>
@@ -1630,7 +1655,23 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
             <td class="r nowrap rv-actions"><button type="button" class="btn small primary dp-ok">${esc(t("confirm"))}</button>
               <button type="button" class="btn small dp-manual">${esc(t("no_version"))}</button>
               <button type="button" class="btn small ghost dp-reject">${esc(t("none_of_these"))}</button></td></tr>
-            ${open("r:" + x.rk) ? `<tr class="sub"><td colspan="4">${txList(x)}</td></tr>` : ""}`).join("")
+            ${open("r:" + x.rk) ? `<tr class="sub"><td colspan="4">${txList(x, true)}</td></tr>` : ""}`).join("")
+            || `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div></div>
+      <div class="panel">
+        <div class="panel-head"><h3>⚠ ${esc(t("pr_purpose"))} · ${purposeRows.length}</h3><span class="muted small">${esc(t("pr_purpose_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit review">
+          <thead><tr><th>${esc(t("recipient"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("supplier"))}</th><th></th></tr></thead>
+          <tbody>${purposeRows.map(p => `<tr data-id="${esc(p.id)}" data-rk="${esc(p.rk)}">
+            <td><b>${esc(p.name || p.tin || p.iban)}</b><div class="muted small">${esc(p.date)}${p.tin ? ` · ${esc(t("tax_id"))} ${esc(p.tin)}` : ""}</div>
+              <div class="small">„${esc(p.purpose)}“</div></td>
+            <td class="r num nowrap"><b>${money(p.amount)}</b></td>
+            <td><select class="pp-ver" style="max-width:320px">${p.versions.map(v => `<option value="${esc(v.tin)}">${esc(v.name)} · ${esc(v.tin)}${v.wb ? ` · ${esc(t("cd_wb"))} ${esc(v.wb.num)}` : ""}</option>`).join("")}</select>
+              ${p.versions[0]?.wb ? `<div class="muted small">📄 ${esc(t("cd_wb"))} ${esc(p.versions[0].wb.num)} · ${esc(p.versions[0].wb.day)} · ${esc(p.versions[0].wb.gap ? t("cd_days").replace("{n}", p.versions[0].wb.gap) : t("cd_same_day"))}</div>`
+                : `<div class="small warn-text">⚠ ${esc(t("cd_no_wb"))}</div>`}
+              <input type="text" class="pp-note" maxlength="300" placeholder="${esc(t("comment_opt"))}" style="display:block;margin-top:6px;width:100%;max-width:320px"></td>
+            <td class="r nowrap rv-actions"><button type="button" class="btn small primary pp-ok">✓ ${esc(t("confirm"))}</button>
+              <button type="button" class="btn small ghost pp-no">${esc(t("not_this"))}</button></td></tr>`).join("")
             || `<tr><td colspan="4" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
         </table></div></div>
       <div class="panel">
@@ -1639,7 +1680,8 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
           <thead><tr><th>${esc(t("supplier"))}</th><th class="r">${esc(t("col_waybills"))}</th><th class="r">${esc(t("owed"))}</th><th></th></tr></thead>
           <tbody>${noneRows.map(s => `<tr data-tin="${esc(s.tin)}" data-name="${esc(s.name)}"><td><b>${esc(s.name)}</b><div class="muted small">${esc(t("tax_id"))} ${esc(s.tin)}</div>
               ${s.versions.length ? `<div class="muted small">${esc(t("looks_like"))} ${s.versions.map(v => `${esc(v.name)} (${esc(v.tin || "—")}, ${money(v.amount)})`).join(", ")} — ${esc(t("see_above"))}</div>` : ""}
-              ${s.cards ? `<div class="small warn-text">💳 ${esc(t("cd_none_hint").replace("{n}", s.cards))}</div>` : ""}</td>
+              ${s.cards ? `<div class="small warn-text">💳 ${esc(t("cd_none_hint").replace("{n}", s.cards))}</div>` : ""}
+              ${s.purpose ? `<div class="small warn-text">📝 ${esc(t("pr_purpose_none").replace("{n}", s.purpose))}</div>` : ""}</td>
             <td class="r num">${money(s.amount)}<div class="muted small">${s.n} ${esc(t("wb_count"))}</div></td>
             <td class="r num nowrap"><b>${money(s.owed)}</b></td>
             <td class="r nowrap rv-actions"><button type="button" class="btn small dn-manual">${esc(t("type_manually"))}</button>
@@ -1719,10 +1761,12 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       CD.open.forEach(c => out.push([c.buy, c.shop + (c.shopKa ? " / " + c.shopKa : ""), c.last4, c.amount, t("cd_open"),
         c.suggest.map(s => `${s.name} (${s.tin}) ${s.num} ${s.day}`).join("; "), ""]));
       CD.other.forEach(x => x.tx.forEach(([, day, amount]) => out.push([day, x.name + (x.shopKa ? " / " + x.shopKa : ""), x.last4, amount, t("cat_other"), "", x.comment || ""])));
-      sups.forEach(s => s.transfers.filter(tr => tr[5] === "card").forEach(tr => out.push([tr[1], tr[3], tr[8], tr[2], t("cd_confirmed"), `${s.name} (${s.tin})`, tr[9] ? t("cd_wb") + " " + tr[9] : t("cd_wait_wb")])));
+      sups.forEach(s => s.transfers.filter(tr => tr[5] === "card" || tr[5] === "cardauto").forEach(tr => out.push([tr[1], tr[3], tr[8], tr[2], t(tr[5] === "card" ? "cd_confirmed" : "how_cardauto"), `${s.name} (${s.tin})`, tr[9] ? t("cd_wb") + " " + tr[9] : t("cd_wait_wb")])));
     } else if (dt === "problems") {
       out.push([t("pr_name")], [t("recipient"), t("tax_id"), t("transfers"), t("amount"), t("versions")]);
       PR.name.forEach(x => out.push([x.name, x.tin || x.iban, x.count, x.amount, x.versions.map(v => `${v.name} (${v.tin})`).join(", ")]));
+      out.push([], [t("pr_purpose")], [t("recipient"), t("tax_id"), t("cd_bought"), t("amount"), t("purpose"), t("versions")]);
+      PR.purpose.forEach(p => out.push([p.name, p.tin || p.iban, p.date, p.amount, p.purpose, p.versions.map(v => `${v.name} (${v.tin})`).join(", ")]));
       out.push([], [t("pr_none")], [t("supplier"), t("tax_id"), t("wb_count"), t("col_waybills"), t("owed")]);
       PR.none.forEach(s => out.push([s.name, s.tin, s.n, s.amount, s.owed]));
     } else {
@@ -1821,6 +1865,35 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
   $$(".dc-other", view).forEach(b => b.addEventListener("click", () => {
     const tr = b.closest("tr"), cell = b.parentElement;
     commentStep(cell, t("cat_other"), c => cardScope(cell, tr, "x", c), rerender);
+  }));
+  $$(".dc-reauto", view).forEach(b => b.addEventListener("click", () => decide({ kind: "undo", ids: [b.closest("tr").dataset.id] })));
+  // an automatic card match that is wrong for this payment → back to „ბარათით“
+  $$(".dx-noauto", view).forEach(b => b.addEventListener("click", () => decide({ kind: "noauto", id: b.dataset.id, rk: b.dataset.rk })));
+
+  // one transfer from a recipient's list → a supplier or other expense, with an optional comment
+  $$(".dt-one", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr"), cell = b.parentElement;
+    cell.innerHTML = `<div class="remember"><div class="q">${esc(t("one_q"))}</div>
+      <select class="o-to" style="max-width:300px"><option value="">${esc(t("cd_pick"))}</option><option value="x">${esc(t("cat_other"))}</option>
+        <optgroup label="${esc(t("cd_all_sellers"))}">${(r.sellers || []).map(s => `<option value="s:${esc(s.tin)}">${esc(s.name)} · ${esc(s.tin)}</option>`).join("")}</optgroup></select>
+      <input type="text" class="o-note" maxlength="300" placeholder="${esc(t("comment_opt"))}">
+      <button type="button" class="btn small primary x-ok">${esc(t("save"))}</button>
+      <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+    $(".rm-cancel", cell).addEventListener("click", rerender);
+    $(".x-ok", cell).addEventListener("click", () => {
+      const to = $(".o-to", cell).value;
+      if (!to) { toast(t("cd_pick_need")); return; }
+      decide({ kind: "assign", rk: tr.dataset.rk, id: tr.dataset.id, to, comment: $(".o-note", cell).value.trim() });
+    });
+  }));
+  // subtab 3, the purpose names a supplier: confirm (one transfer, optional comment) / not this
+  $$(".pp-ok", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr");
+    decide({ kind: "assign", rk: tr.dataset.rk, id: tr.dataset.id, to: "s:" + $(".pp-ver", tr).value, comment: $(".pp-note", tr).value.trim() });
+  }));
+  $$(".pp-no", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr");
+    decide({ kind: "noauto", id: tr.dataset.id, rk: tr.dataset.rk });
   }));
 
   // subtab 3, name matches: pick a version / no version → type the code / none of these (→ subtab 2)
@@ -2289,7 +2362,8 @@ function demoApi(path, opts) {
       ["204567891", "შპს ნიკორა", [[2, 2420.5], [9, 3100], [16, 3400], [23, 3500]], 0, [...tx("t:204567891", "შპს ნიკორა", [[5, 4000, "ზედნადები 0457812"], [19, 5000, "ოქტომბრის ზედნადებები"]]), ...tx("i:GE29TB0000000000000123", "შპს „ნიკორა“", [[12, 500, "ზედნადები"]], "name"),
         ["bog:c1", d(4), 120, "Nikora ••3094", "გადახდა - თანხა: GEL120.00; ობიექტი: Nikora, Tbilisi; MCC:5411", "card", "rcp", "c:NIKORA", "3094", ""],
         ["bog:c0", d(9), 3100, "Nikora ••3094", "გადახდა - თანხა: GEL3100.00; ობიექტი: Nikora, Tbilisi; MCC:5411", "card", "tx", "c:NIKORA", "3094", "02045849"]], [], ""],
-      ["205123456", "შპს სანტე ჯი-ემ-თი პროდაქტს", [[3, 1780], [10, 2200], [17, 2200]], 60, tx("t:205123456", "Sante GMT Products", [[6, 2500, "invoice"], [20, 1500, "invoice"]]), [], ""],
+      ["205123456", "შპს სანტე ჯი-ემ-თი პროდაქტს", [[3, 1780], [10, 2200], [17, 2200]], 60, [...tx("t:205123456", "Sante GMT Products", [[6, 2500, "invoice"], [20, 1500, "invoice"]]),
+        ["bog:c8", d(10), 2200, "Sante GMT Products ••3094", "გადახდა - თანხა: GEL2200.00; ობიექტი: Sante GMT Products, Tbilisi", "cardauto", "", "c:SANTE GMT PRODUCTS", "3094", "02051849", ""]], [], ""],
       ["400112233", "შპს ორი ნაბიჯი", [[4, 1200], [12, 1260], [25, 1000]], 0, [], [], ""],
       ["211334455", "შპს მეტრო", [[8, 890.4]], 0, [], [], todayISO()],
       ["01001012345", "ი/მ ნინო ფერმერი", [[11, 300]], 0, tx("t:01001012345", "ნინო ფერმერი", [[11, 300, "ბოსტნეული"], [3, 150, "ბოსტნეული"]]), [{ id: "m1", amount: 50, date: d(2), comment: "ნაღდი" }], ""],
@@ -2313,7 +2387,9 @@ function demoApi(path, opts) {
       const versions = tin === "400112233" ? [{ rk: name.rk, name: name.name, tin: name.tin, amount: name.amount, count: name.count }] : [];
       return { tin, name: nm, n: w.length, nConfirmed: Math.ceil(w.length / 4), amount, returns, nReturns: returns ? 1 : 0, paid, manual,
         waybills: wbs(tin, w), transfers, manualList, owed, debtOk, none: !paid && !manual && owed > 0 && !debtOk, versions,
-        cardWait: transfers.filter(x => x[5] === "card" && !x[9]).length, cards: openCards.filter(c => c.suggest.some(s => s.tin === tin)).length };
+        cardWait: transfers.filter(x => x[5] === "card" && !x[9]).length, cards: openCards.filter(c => c.suggest.some(s => s.tin === tin)).length,
+        cardN: transfers.filter(x => /^card/.test(x[5])).length, cardSum: r2(transfers.filter(x => /^card/.test(x[5])).reduce((a, x) => a + x[2], 0)),
+        purpose: tin === "400112233" ? 1 : 0 };
     }).sort((a, b) => b.owed - a.owed);
     const sup = tin => suppliers.find(s => s.tin === tin);
     name.versions = [{ tin: "400112233", name: sup("400112233").name, amount: sup("400112233").amount, n: sup("400112233").n }];
@@ -2329,8 +2405,10 @@ function demoApi(path, opts) {
           group("t:01017050319", "ი/მ ელენე რატიშვილი", "01017050319", "", [[1, 700, "მარკეტინგი"]])],
         wait: [group("t:405999111", "შპს ახალი პური", "405999111", "", [[2, 320, "პური"]], { scope: "rcp", code: "405999111" })],
         other, otherTotal: r2(other.reduce((a, g) => a + g.amount, 0)) },
-      problems: { name: [name], none: suppliers.filter(s => s.none).map(s => ({ tin: s.tin, name: s.name, n: s.n, amount: s.amount, returns: s.returns, owed: s.owed, versions: s.versions, cards: s.cards })) },
-      cards: { open: openCards, other: cardOther, otherTotal: 175, openTotal: r2(openCards.reduce((a, c) => a + c.amount, 0)), paid: 2, paidTotal: 3220, waiting: 1 },
+      problems: { name: [name], none: suppliers.filter(s => s.none).map(s => ({ tin: s.tin, name: s.name, n: s.n, amount: s.amount, returns: s.returns, owed: s.owed, versions: s.versions, cards: s.cards, purpose: s.purpose })),
+        purpose: [{ id: "bog:p1", rk: "t:01031005952", name: "დავით მახათაძე", tin: "01031005952", iban: "", date: d(4), amount: 1200, purpose: "საქვეანგარიშო შპს ორი ნაბიჯი",
+          versions: [{ tin: "400112233", name: "შპს ორი ნაბიჯი", wb: { num: "04001812", day: d(4), gap: 0 } }] }] },
+      cards: { open: openCards, other: cardOther, otherTotal: 175, openTotal: r2(openCards.reduce((a, c) => a + c.amount, 0)), paid: 2, paidTotal: 3220, waiting: 1, auto: 1, autoTotal: 2200 },
       over: suppliers.filter(s => s.owed < 0).map(s => ({ tin: s.tin, name: s.name, n: s.n, amount: s.amount, returns: s.returns, paid: s.paid, manual: s.manual, excess: r2(-s.owed) })),
       sellers: suppliers.map(s => ({ tin: s.tin, name: s.name })),
       waybills: { configured: true, from: "2026-03-01", months: 9, total: 9, pending: false, error: "", returnsKnown: true },
