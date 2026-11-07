@@ -179,6 +179,22 @@ const T = {
     manual_code: "მიმღების კოდი, თუ ბანკში სხვა კოდით უხდით",
     manual_pay: "გადახდა ბანკის გარეშე (მაგ. ნაღდი)",
     manual_need: "ჩაწერეთ კოდი ან თანხა", tx_n: "გადარიცხვა",
+    dt_cards: "ბარათით", how_card: "ბარათით",
+    cd_open: "დასადასტურებელი ბარათით გადახდები",
+    cd_open_hint: "ითვლება მხოლოდ დადასტურების შემდეგ. შემოთავაზებულია იგივე თანხის ზედნადები (ნებისმიერი თარიღით, უახლოესი პირველი)",
+    cd_confirmed: "დადასტურებული",
+    cd_confirmed_hint: "დადასტურებული გადახდები ჩანს „ვალები“-ში, მომწოდებლის დეტალებში",
+    cd_shop: "მაღაზია", cd_card: "ბარათი", cd_bought: "ყიდვის დღე", cd_payments: "გადახდები",
+    cd_shop_n: "ამ მაღაზიაში {n} დაუდასტურებელი გადახდა",
+    cd_pick: "— აირჩიეთ მომწოდებელი —", cd_pick_need: "აირჩიეთ მომწოდებელი",
+    cd_by_amount: "იგივე თანხის ზედნადები", cd_by_name: "სახელით ჰგავს", cd_all_sellers: "ყველა მომწოდებელი",
+    cd_no_wb: "იგივე თანხის ზედნადები ჯერ არ არის",
+    cd_days: "{n} დღის სხვაობა", cd_same_day: "იმავე დღეს",
+    cd_wb: "ზედნადები", cd_wait_wb: "ზედნადები ჯერ არ არის",
+    cd_scope_all: "ამ მაღაზიის ყველა (მომავალიც)", cd_scope_once: "მხოლოდ ეს გადახდა",
+    cd_scope_q: "რომელ გადახდებს ეხება „{name}“-ში?",
+    cd_other: "სხვა ხარჯი (ბარათით)",
+    cd_none_hint: "{n} ბარათით გადახდა შეიძლება ამ მომწოდებლის იყოს — იხ. „ბარათით“",
   },
   en: {
     dashboard: "Dashboard", home: "← Home", password: "Password", login: "Log in", logout: "Log out",
@@ -339,6 +355,22 @@ const T = {
     manual_code: "Recipient code, if you pay them under another code",
     manual_pay: "Payment outside the bank (e.g. cash)",
     manual_need: "Type a code or an amount", tx_n: "transfers",
+    dt_cards: "Card payments", how_card: "by card",
+    cd_open: "Card payments to confirm",
+    cd_open_hint: "Count only after you confirm. Suggested: a waybill with the same amount (any date, nearest first)",
+    cd_confirmed: "Confirmed",
+    cd_confirmed_hint: "confirmed payments are in “Debts”, in the supplier's details",
+    cd_shop: "Shop", cd_card: "Card", cd_bought: "Purchase day", cd_payments: "Payments",
+    cd_shop_n: "{n} unconfirmed payments at this shop",
+    cd_pick: "— choose a supplier —", cd_pick_need: "Choose a supplier",
+    cd_by_amount: "Waybill with the same amount", cd_by_name: "Name looks like", cd_all_sellers: "All suppliers",
+    cd_no_wb: "No waybill with this amount yet",
+    cd_days: "{n} days apart", cd_same_day: "same day",
+    cd_wb: "Waybill", cd_wait_wb: "No waybill yet",
+    cd_scope_all: "All from this shop (future too)", cd_scope_once: "Only this payment",
+    cd_scope_q: "Which payments at “{name}” does this apply to?",
+    cd_other: "Other expenses (card)",
+    cd_none_hint: "{n} card payment(s) may belong to this supplier — see “Card payments”",
   },
 };
 
@@ -1414,17 +1446,19 @@ async function renderDishDetail(view, id, range, fresh) {
 // rs.ge waybills − our return waybills − BOG / TBC transfers, per supplier (debts.js). A transfer goes to a
 // supplier by identification code first, by name only after the CEO confirms. Four subtabs:
 // 1 debts per supplier · 2 transfers without a waybill („ვინ არის ეს?“) · 3 problems (recipients that match
-// a supplier by name only, suppliers with no transfer at all) · 4 overpayments. Answers go to /debts/decide.
-const DEBT_TABS = ["debts", "nowb", "problems", "over"];
+// a supplier by name only, suppliers with no transfer at all) · 4 overpayments · 5 card payments (BOG card
+// purchases: count for a supplier only after the CEO confirms). Answers go to /debts/decide.
+const DEBT_TABS = ["debts", "nowb", "cards", "problems", "over"];
 
 // a supplier's waybills, transfers and payments outside the bank (subtabs 1 and 4)
 function debtDetailHtml(s) {
   const wbRows = s.waybills.map(([num, day, amount, st]) => `<tr><td class="num">${esc(num)}</td><td class="muted">${esc(day)}</td>
     <td class="r num">${money(amount)}</td><td class="muted small">${st === 1 ? "✓ " + esc(t("rs_confirmed")) : ""}</td></tr>`).join("");
-  const txRows = s.transfers.map(([id, date, amount, who, purpose, how, scope, rk]) => `<tr><td class="muted">${esc(date)}</td><td class="r num">${money(amount)}</td>
-    <td>${esc(who)}<div class="muted small clip" title="${esc(purpose)}">${esc(purpose)}</div></td>
-    <td><span class="pill ${how === "code" ? "good" : "neutral"}">${esc(t("how_" + how))}</span>
-      ${how === "dec" ? `<button type="button" class="icon-btn dx-undo" data-rk="${esc(rk)}" data-scope="${esc(scope)}" data-id="${esc(id)}" title="${esc(t("undo"))}">↩</button>` : ""}
+  const txRows = s.transfers.map(([id, date, amount, who, purpose, how, scope, rk, , wbNum]) => `<tr><td class="muted">${esc(date)}</td><td class="r num">${money(amount)}</td>
+    <td>${how === "card" ? "💳 " : ""}${esc(who)}<div class="muted small clip" title="${esc(purpose)}">${esc(purpose)}</div>
+      ${how === "card" ? `<div class="small ${wbNum ? "muted" : "warn-text"}">${wbNum ? esc(t("cd_wb")) + " " + esc(wbNum) : "⏳ " + esc(t("cd_wait_wb"))}</div>` : ""}</td>
+    <td><span class="pill ${how === "code" ? "good" : "neutral"}">${esc(t("how_" + how))}</span>${how === "card" && scope === "tx" ? ` <span class="muted small">${esc(t("cd_scope_once"))}</span>` : ""}
+      ${how === "dec" || how === "card" ? `<button type="button" class="icon-btn dx-undo" data-rk="${esc(rk)}" data-scope="${esc(scope)}" data-id="${esc(id)}" title="${esc(t("undo"))}">↩</button>` : ""}
       ${how === "name" ? `<button type="button" class="icon-btn dx-notthis" data-rk="${esc(rk)}" data-tin="${esc(s.tin)}" title="${esc(t("not_this"))}">✕</button>` : ""}</td></tr>`).join("");
   const mRows = s.manualList.map(m => `<tr><td class="muted">${esc(m.date)}</td><td class="r num">${money(m.amount)}</td>
     <td>${esc(t("manual_paid"))}${m.comment ? `<div class="muted small">${esc(m.comment)}</div>` : ""}</td>
@@ -1446,6 +1480,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
   const NW = r.noWaybill || { open: [], wait: [], other: [], otherTotal: 0 };
   const PR = r.problems || { name: [], none: [] };
   const OV = r.over || [];
+  const CD = r.cards || { open: [], other: [], otherTotal: 0, openTotal: 0, paid: 0, paidTotal: 0, waiting: 0 };
   const sups = r.suppliers || [];
   const q = S.debtQuery.toLowerCase();
   const match = (...xs) => !q || xs.some(v => String(v ?? "").toLowerCase().includes(q));
@@ -1476,7 +1511,7 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
 
   const nProblems = PR.name.length + PR.none.length;
   const tabLabel = { debts: `${t("dt_debts")} · ${money(r.total || 0)}`, nowb: `${t("dt_nowb")} · ${NW.open.length}`,
-    problems: `${t("dt_problems")} · ${nProblems}`, over: `${t("dt_over")} · ${OV.length}` };
+    cards: `💳 ${t("dt_cards")} · ${CD.open.length}`, problems: `${t("dt_problems")} · ${nProblems}`, over: `${t("dt_over")} · ${OV.length}` };
   const cards = card(t("total_owed"), money(r.total || 0), esc(t("dv_main_hint")), r.total > 0 ? "hero bad" : "hero") +
     card(t("col_waybills"), money(T.waybillSum || 0), `${T.waybills || 0} ${esc(t("wb_count"))} · ${T.suppliers || 0} ${esc(t("suppliers").toLowerCase())}`) +
     card(t("paid_all"), money((T.paid || 0) + (T.manual || 0)), T.returns ? `${esc(t("returns_col"))} ${money(T.returns)}` : "") +
@@ -1495,7 +1530,8 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
     const list = sups.filter(s => s.n && match(s.name, s.tin));
     const owedCell = s => s.owed > 0 ? `<b>${money(s.owed)}</b>` : s.owed < 0 ? `<span class="pill neutral">${esc(t("st_over"))}</span> ${money(-s.owed)}` : "—";
     const status = s => [s.none || s.versions.length ? `<span class="pill warn">⚠ ${esc(t("st_problem"))}</span>` : "",
-      s.debtOk ? `<span class="pill neutral">✓ ${esc(t("st_debt_ok"))}</span>` : ""].join(" ");
+      s.debtOk ? `<span class="pill neutral">✓ ${esc(t("st_debt_ok"))}</span>` : "",
+      s.cardWait ? `<span class="pill neutral" title="${esc(t("cd_wait_wb"))}">💳 ⏳ ${s.cardWait}</span>` : ""].join(" ");
     body = `<div class="panel"><div class="table-wrap"><table>
       <thead><tr><th>${esc(t("supplier"))}</th><th class="r">${esc(t("col_waybills"))}</th><th class="r">${esc(t("returns_col"))}</th><th class="r">${esc(t("paid_all"))}</th><th class="r">${esc(t("owed"))}</th><th></th></tr></thead>
       <tbody>${list.map(s => supRow(s, `<td><b>${esc(s.name)}</b><div class="muted small">${esc(t("tax_id"))} ${esc(s.tin)}</div></td>
@@ -1541,6 +1577,45 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
             <td class="r"><button type="button" class="icon-btn dw-undo" title="${esc(t("undo"))}">↩</button></td></tr>`).join("")
             || `<tr><td colspan="5" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
         </table></div></div>`;
+  } else if (dt === "cards") {
+    const openRows = CD.open.filter(c => match(c.shop, c.shopKa, c.last4, c.purpose, ...c.suggest.map(s => s.name + " " + s.tin + " " + s.num), ...c.names.map(s => s.name)));
+    const otherRows = CD.other.filter(x => match(x.name, x.shopKa, x.comment));
+    const gapLabel = g => g ? t("cd_days").replace("{n}", g) : t("cd_same_day");
+    const shopCell = c => `<b>${esc(c.shop)}</b>${c.shopKa ? ` <span class="muted">${esc(c.shopKa)}</span>` : ""}
+      <div class="muted small">${c.last4 ? `${esc(t("cd_card"))} ••${esc(c.last4)}` : ""}${c.mcc ? ` · MCC ${esc(c.mcc)}` : ""}${c.count > 1 ? ` · ${esc(t("cd_shop_n").replace("{n}", c.count))}` : ""}</div>`;
+    const pick = c => `<select class="dc-sup" style="max-width:340px">
+        ${c.suggest.length ? "" : `<option value="">${esc(t("cd_pick"))}</option>`}
+        ${c.suggest.length ? `<optgroup label="${esc(t("cd_by_amount"))}">${c.suggest.map(s => `<option value="${esc(s.tin)}">${esc(s.name)} · ${esc(t("cd_wb"))} ${esc(s.num)} · ${esc(s.day)} (${esc(gapLabel(s.gap))})</option>`).join("")}</optgroup>` : ""}
+        ${c.names.length ? `<optgroup label="${esc(t("cd_by_name"))}">${c.names.map(s => `<option value="${esc(s.tin)}">${esc(s.name)}</option>`).join("")}</optgroup>` : ""}
+        <optgroup label="${esc(t("cd_all_sellers"))}">${(r.sellers || []).map(s => `<option value="${esc(s.tin)}">${esc(s.name)} · ${esc(s.tin)}</option>`).join("")}</optgroup>
+      </select>${c.suggest.length
+        ? `<div class="muted small">📄 ${esc(t("cd_wb"))} ${esc(c.suggest[0].num)} · ${esc(c.suggest[0].day)} · ${esc(gapLabel(c.suggest[0].gap))}${c.suggest.length > 1 ? ` · +${c.suggest.length - 1}` : ""}</div>`
+        : `<div class="small warn-text">⚠ ${esc(t("cd_no_wb"))}</div>`}`;
+    const scopeTag = x => x.scope === "tx" ? ` <span class="pill neutral">${esc(t("cd_scope_once"))}</span>` : "";
+    body = `<div class="muted small" style="margin:-6px 0 14px">✓ ${esc(t("cd_confirmed"))}: ${CD.paid || 0} · ${money(CD.paidTotal || 0)}${CD.waiting ? ` · <span class="warn-text">⏳ ${esc(t("cd_wait_wb"))}: ${CD.waiting}</span>` : ""} — ${esc(t("cd_confirmed_hint"))}</div>
+      <div class="panel">
+        <div class="panel-head"><h3>💳 ${esc(t("cd_open"))} · ${openRows.length} · ${money(CD.openTotal || 0)}</h3><span class="muted small">${esc(t("cd_open_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit review">
+          <thead><tr><th>${esc(t("cd_bought"))}</th><th>${esc(t("cd_shop"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("supplier"))}</th><th></th></tr></thead>
+          <tbody>${openRows.map(c => `<tr data-id="${esc(c.id)}" data-rk="${esc(c.rk)}" data-name="${esc(c.shop)}" data-count="${c.count}">
+            <td class="muted nowrap">${esc(c.buy)}</td><td>${shopCell(c)}</td>
+            <td class="r num nowrap"><b>${money(c.amount)}</b></td>
+            <td>${pick(c)}</td>
+            <td class="r nowrap rv-actions"><button type="button" class="btn small primary dc-ok">✓ ${esc(t("confirm"))}</button>
+              <button type="button" class="btn small dc-other">${esc(t("cat_other"))}</button></td></tr>`).join("")
+            || `<tr><td colspan="5" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div></div>
+      <div class="panel">
+        <div class="panel-head"><h3>${esc(t("cd_other"))} · ${otherRows.length} · ${money(CD.otherTotal || 0)}</h3><span class="muted small">${esc(t("other_hint"))}</span></div>
+        <div class="table-wrap"><table class="edit">
+          <thead><tr><th>${esc(t("cd_shop"))}</th><th class="r">${esc(t("cd_payments"))}</th><th class="r">${esc(t("amount"))}</th><th>${esc(t("comment"))}</th><th></th></tr></thead>
+          <tbody>${otherRows.map(x => `<tr data-rk="${esc(x.rk)}" data-scope="${esc(x.scope)}" data-to="x" data-comment="${esc(x.comment || "")}">
+            <td>${shopCell({ shop: x.name, shopKa: x.shopKa, last4: x.last4 })}<div class="muted small">${esc(t("last"))} ${esc(x.last)}</div></td>
+            <td class="r num">${x.count}</td><td class="r num nowrap"><b>${money(x.amount)}</b></td>
+            <td class="small">${esc(x.comment || "")}${scopeTag(x)} <button type="button" class="icon-btn dw-note" title="${esc(t("comment"))}">✎</button></td>
+            <td class="r"><button type="button" class="icon-btn dw-undo" title="${esc(t("undo"))}">↩</button></td></tr>`).join("")
+            || `<tr><td colspan="5" class="empty">${esc(t("no_entries"))}</td></tr>`}</tbody>
+        </table></div></div>`;
   } else if (dt === "problems") {
     const nameRows = PR.name.filter(x => match(x.name, x.tin, x.iban, ...x.versions.map(v => v.name + " " + v.tin)));
     const noneRows = PR.none.filter(s => match(s.name, s.tin));
@@ -1563,7 +1638,8 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
         <div class="table-wrap"><table class="edit review">
           <thead><tr><th>${esc(t("supplier"))}</th><th class="r">${esc(t("col_waybills"))}</th><th class="r">${esc(t("owed"))}</th><th></th></tr></thead>
           <tbody>${noneRows.map(s => `<tr data-tin="${esc(s.tin)}" data-name="${esc(s.name)}"><td><b>${esc(s.name)}</b><div class="muted small">${esc(t("tax_id"))} ${esc(s.tin)}</div>
-              ${s.versions.length ? `<div class="muted small">${esc(t("looks_like"))} ${s.versions.map(v => `${esc(v.name)} (${esc(v.tin || "—")}, ${money(v.amount)})`).join(", ")} — ${esc(t("see_above"))}</div>` : ""}</td>
+              ${s.versions.length ? `<div class="muted small">${esc(t("looks_like"))} ${s.versions.map(v => `${esc(v.name)} (${esc(v.tin || "—")}, ${money(v.amount)})`).join(", ")} — ${esc(t("see_above"))}</div>` : ""}
+              ${s.cards ? `<div class="small warn-text">💳 ${esc(t("cd_none_hint").replace("{n}", s.cards))}</div>` : ""}</td>
             <td class="r num">${money(s.amount)}<div class="muted small">${s.n} ${esc(t("wb_count"))}</div></td>
             <td class="r num nowrap"><b>${money(s.owed)}</b></td>
             <td class="r nowrap rv-actions"><button type="button" class="btn small dn-manual">${esc(t("type_manually"))}</button>
@@ -1638,6 +1714,12 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
       NW.open.forEach(x => out.push([x.name, x.tin || x.iban, x.count, x.amount, "", x.purpose]));
       NW.wait.forEach(x => out.push([x.name, x.tin || x.iban, x.count, x.amount, t("nw_wait") + " " + x.code, ""]));
       NW.other.forEach(x => out.push([x.name, x.tin || x.iban, x.count, x.amount, t("cat_other"), x.comment || ""]));
+    } else if (dt === "cards") {
+      out.push([t("cd_bought"), t("cd_shop"), t("cd_card"), t("amount"), t("status"), t("supplier"), t("comment")]);
+      CD.open.forEach(c => out.push([c.buy, c.shop + (c.shopKa ? " / " + c.shopKa : ""), c.last4, c.amount, t("cd_open"),
+        c.suggest.map(s => `${s.name} (${s.tin}) ${s.num} ${s.day}`).join("; "), ""]));
+      CD.other.forEach(x => x.tx.forEach(([, day, amount]) => out.push([day, x.name + (x.shopKa ? " / " + x.shopKa : ""), x.last4, amount, t("cat_other"), "", x.comment || ""])));
+      sups.forEach(s => s.transfers.filter(tr => tr[5] === "card").forEach(tr => out.push([tr[1], tr[3], tr[8], tr[2], t("cd_confirmed"), `${s.name} (${s.tin})`, tr[9] ? t("cd_wb") + " " + tr[9] : t("cd_wait_wb")])));
     } else if (dt === "problems") {
       out.push([t("pr_name")], [t("recipient"), t("tax_id"), t("transfers"), t("amount"), t("versions")]);
       PR.name.forEach(x => out.push([x.name, x.tin || x.iban, x.count, x.amount, x.versions.map(v => `${v.name} (${v.tin})`).join(", ")]));
@@ -1719,6 +1801,26 @@ async function renderDebts(view, demo, fresh = false, quiet = false) {
   $$(".dw-note", view).forEach(b => b.addEventListener("click", () => {
     const tr = b.closest("tr"), cell = b.parentElement;
     commentStep(cell, t("comment"), c => decide({ kind: "comment", rk: tr.dataset.rk, scope: tr.dataset.scope, comment: c }), rerender, tr.dataset.comment);
+  }));
+
+  // subtab „ბარათით“: confirm the chosen supplier, or other expense (+ comment); then this shop always or only this payment
+  const cardScope = (cell, tr, to, comment) => {
+    cell.innerHTML = `<div class="remember"><div class="q">${esc(t("cd_scope_q").replace("{name}", tr.dataset.name))}</div>
+      <button type="button" class="btn small primary sc-all">${esc(t("cd_scope_all"))}${Number(tr.dataset.count) > 1 ? ` · ${esc(tr.dataset.count)}` : ""}</button>
+      <button type="button" class="btn small sc-once">${esc(t("cd_scope_once"))}</button>
+      <button type="button" class="btn small ghost rm-cancel">✕</button></div>`;
+    $(".sc-all", cell).addEventListener("click", () => decide({ kind: "assign", rk: tr.dataset.rk, to, comment }));
+    $(".sc-once", cell).addEventListener("click", () => decide({ kind: "assign", rk: tr.dataset.rk, to, comment, id: tr.dataset.id }));
+    $(".rm-cancel", cell).addEventListener("click", rerender);
+  };
+  $$(".dc-ok", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr"), tin = $(".dc-sup", tr).value;
+    if (!tin) { toast(t("cd_pick_need")); return; }
+    cardScope(b.parentElement, tr, "s:" + tin, "");
+  }));
+  $$(".dc-other", view).forEach(b => b.addEventListener("click", () => {
+    const tr = b.closest("tr"), cell = b.parentElement;
+    commentStep(cell, t("cat_other"), c => cardScope(cell, tr, "x", c), rerender);
   }));
 
   // subtab 3, name matches: pick a version / no version → type the code / none of these (→ subtab 2)
@@ -2184,7 +2286,9 @@ function demoApi(path, opts) {
     const wbs = (tin, list) => list.map(([days, amount], i) => [`0${tin.slice(0, 4)}${String(812 + i * 37)}`, d(days), amount, i % 4 === 0 ? 1 : 0]);
     // [code, name, waybills [daysAgo, amount], returns, transfers, payments outside the bank, debt confirmed]
     const spec = [
-      ["204567891", "შპს ნიკორა", [[2, 2420.5], [9, 3100], [16, 3400], [23, 3500]], 0, [...tx("t:204567891", "შპს ნიკორა", [[5, 4000, "ზედნადები 0457812"], [19, 5000, "ოქტომბრის ზედნადებები"]]), ...tx("i:GE29TB0000000000000123", "შპს „ნიკორა“", [[12, 500, "ზედნადები"]], "name")], [], ""],
+      ["204567891", "შპს ნიკორა", [[2, 2420.5], [9, 3100], [16, 3400], [23, 3500]], 0, [...tx("t:204567891", "შპს ნიკორა", [[5, 4000, "ზედნადები 0457812"], [19, 5000, "ოქტომბრის ზედნადებები"]]), ...tx("i:GE29TB0000000000000123", "შპს „ნიკორა“", [[12, 500, "ზედნადები"]], "name"),
+        ["bog:c1", d(4), 120, "Nikora ••3094", "გადახდა - თანხა: GEL120.00; ობიექტი: Nikora, Tbilisi; MCC:5411", "card", "rcp", "c:NIKORA", "3094", ""],
+        ["bog:c0", d(9), 3100, "Nikora ••3094", "გადახდა - თანხა: GEL3100.00; ობიექტი: Nikora, Tbilisi; MCC:5411", "card", "tx", "c:NIKORA", "3094", "02045849"]], [], ""],
       ["205123456", "შპს სანტე ჯი-ემ-თი პროდაქტს", [[3, 1780], [10, 2200], [17, 2200]], 60, tx("t:205123456", "Sante GMT Products", [[6, 2500, "invoice"], [20, 1500, "invoice"]]), [], ""],
       ["400112233", "შპს ორი ნაბიჯი", [[4, 1200], [12, 1260], [25, 1000]], 0, [], [], ""],
       ["211334455", "შპს მეტრო", [[8, 890.4]], 0, [], [], todayISO()],
@@ -2192,12 +2296,24 @@ function demoApi(path, opts) {
     ];
     const name = { rk: "t:204999888", name: "შპს ორი ნაბიჯი ტრეიდი", tin: "204999888", iban: "", bank: "BOG", count: 3, amount: 1450, last: d(1), purpose: "ზედნადები #1017058856",
       tx: [["bog:x1", d(1), 650, "ზედნადები #1017058856"], ["bog:x2", d(9), 500, "ზედნადები"], ["bog:x3", d(21), 300, "ზედნადები"]] };
+    // card payments waiting for the CEO („ბარათით“)
+    const card = (id, days, amount, shop, shopKa, suggest, names = []) => ({ id, rk: "c:" + shop.toUpperCase(), date: d(days), buy: d(days), amount, shop, shopKa, last4: "3094", mcc: "5411",
+      purpose: `გადახდა - თანხა: GEL${amount}; ობიექტი: ${shop}, Tbilisi`, count: 1, suggest, names });
+    const openCards = [
+      card("bog:c2", 8, 890.4, "Metro", "მეტრო", [{ tin: "211334455", name: "შპს მეტრო", num: "02113812", day: d(8), amount: 890.4, gap: 0 }]),
+      card("bog:c3", 23, 1000, "Ori Nabiji", "ორი ნაბიჯი", [{ tin: "400112233", name: "შპს ორი ნაბიჯი", num: "04001886", day: d(25), amount: 1000, gap: 2 }]),
+      card("bog:c4", 3, 156.14, "WFP.IT1", "", []),
+      card("bog:c5", 1, 42.5, "Sante", "სანტე", [], [{ tin: "205123456", name: "შპს სანტე ჯი-ემ-თი პროდაქტს" }]),
+    ];
+    const cardOther = [{ rk: "c:DOMENEBI", name: "Domenebi", shopKa: "", last4: "3094", scope: "rcp", comment: "საიტის დომენი", count: 2, amount: 175, last: d(10),
+      tx: [["bog:c6", d(10), 105, "Domenebi"], ["bog:c7", d(40), 70, "Domenebi"]] }];
     const suppliers = spec.map(([tin, nm, w, returns, transfers, manualList, debtOk]) => {
       const amount = r2(w.reduce((a, x) => a + x[1], 0)), paid = r2(transfers.reduce((a, x) => a + x[2], 0)), manual = r2(manualList.reduce((a, m) => a + m.amount, 0));
       const owed = r2(amount - returns - paid - manual);
       const versions = tin === "400112233" ? [{ rk: name.rk, name: name.name, tin: name.tin, amount: name.amount, count: name.count }] : [];
       return { tin, name: nm, n: w.length, nConfirmed: Math.ceil(w.length / 4), amount, returns, nReturns: returns ? 1 : 0, paid, manual,
-        waybills: wbs(tin, w), transfers, manualList, owed, debtOk, none: !paid && !manual && owed > 0 && !debtOk, versions };
+        waybills: wbs(tin, w), transfers, manualList, owed, debtOk, none: !paid && !manual && owed > 0 && !debtOk, versions,
+        cardWait: transfers.filter(x => x[5] === "card" && !x[9]).length, cards: openCards.filter(c => c.suggest.some(s => s.tin === tin)).length };
     }).sort((a, b) => b.owed - a.owed);
     const sup = tin => suppliers.find(s => s.tin === tin);
     name.versions = [{ tin: "400112233", name: sup("400112233").name, amount: sup("400112233").amount, n: sup("400112233").n }];
@@ -2213,7 +2329,8 @@ function demoApi(path, opts) {
           group("t:01017050319", "ი/მ ელენე რატიშვილი", "01017050319", "", [[1, 700, "მარკეტინგი"]])],
         wait: [group("t:405999111", "შპს ახალი პური", "405999111", "", [[2, 320, "პური"]], { scope: "rcp", code: "405999111" })],
         other, otherTotal: r2(other.reduce((a, g) => a + g.amount, 0)) },
-      problems: { name: [name], none: suppliers.filter(s => s.none).map(s => ({ tin: s.tin, name: s.name, n: s.n, amount: s.amount, returns: s.returns, owed: s.owed, versions: s.versions })) },
+      problems: { name: [name], none: suppliers.filter(s => s.none).map(s => ({ tin: s.tin, name: s.name, n: s.n, amount: s.amount, returns: s.returns, owed: s.owed, versions: s.versions, cards: s.cards })) },
+      cards: { open: openCards, other: cardOther, otherTotal: 175, openTotal: r2(openCards.reduce((a, c) => a + c.amount, 0)), paid: 2, paidTotal: 3220, waiting: 1 },
       over: suppliers.filter(s => s.owed < 0).map(s => ({ tin: s.tin, name: s.name, n: s.n, amount: s.amount, returns: s.returns, paid: s.paid, manual: s.manual, excess: r2(-s.owed) })),
       sellers: suppliers.map(s => ({ tin: s.tin, name: s.name })),
       waybills: { configured: true, from: "2026-03-01", months: 9, total: 9, pending: false, error: "", returnsKnown: true },

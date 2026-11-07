@@ -20,7 +20,7 @@ import { runProbe } from "./rsprobe.js";
 // staff = { employees: [{ id, name, role, pay: "hour" | "shift" | "month", rate, pid, iban, from, active }],
 //           shifts: [{ id, emp, day: "YYYY-MM-DD", from: "HH:MM", to: "HH:MM", ot: overtime ₾, note }] } — typed in the Employees tab
 const DATA_KEYS = ["fixed", "variable", "ratings", "tasks", "staff"];
-const DEBTS_RESULT_KEY = "dash:cache:debts-result4"; // the last Debts answer, kept until the data version changes
+const DEBTS_RESULT_KEY = "dash:cache:debts-result5"; // the last Debts answer, kept until the data version changes
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" };
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: JSON_HEADERS });
 

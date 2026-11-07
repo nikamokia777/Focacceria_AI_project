@@ -15,7 +15,9 @@
 //   dash:bank:settings    { bogAccounts: [iban], historyFrom: "YYYY-MM-DD" }
 //   dash:bank:state2      { cursors: { "bog:<iban>": "YYYY-MM-DD", "tbc": "YYYY-MM-DD" }, lastSyncAt, errors }
 //   dash:bank:rcp         { <recipientKey>: [name, tin, iban, bankCode, own(0|1)] }   each recipient stored once
-//   dash:bank:v2:<year>   [[id, "YYYY-MM-DD", amountInTetri, recipientKey, purpose], ...]
+//   dash:bank:v2:<year>   [[id, "YYYY-MM-DD", amountInTetri, recipientKey, purpose, card?], ...]
+//                         card (BOG card purchases only): [last 4 digits, purchase day, shop name in Georgian, MCC];
+//                         their recipientKey is "c:<SHOP NAME>" (a card purchase has no code and no account)
 //   dash:bank:agg         { <recipientKey>: [count, totalTetri, lastDate, lastPurpose, banks(1=BOG,2=TBC)] }
 //                         running totals per recipient
 
@@ -25,6 +27,8 @@ const RCP_KEY = "dash:bank:rcp";
 const TX_PREFIX = "dash:bank:v2:";
 const AGG_KEY = "dash:bank:agg";
 const VER_KEY = "dash:bank:ver"; // changes whenever anything the debts depend on changes
+// set once BOG history has been re-read so that stored card purchases get their shop, card and date
+const CARDS_REREAD_KEY = "dash:bank:cards1";
 
 export async function bumpVersion(env) { await env.STORE.put(VER_KEY, String(Date.now())); }
 export async function loadVersion(env) { return (await env.STORE.get(VER_KEY)) || "0"; }
@@ -72,7 +76,9 @@ export async function loadBankState(env) {
 }
 
 export const recipientKey = tx =>
+  tx.card ? "c:" + shopKey(tx.name) :
   tx.tin ? "t:" + tx.tin : tx.iban ? "i:" + tx.iban.toUpperCase() : "n:" + (tx.name || "").toLowerCase();
+export const shopKey = name => String(name || "").toUpperCase().replace(/\s+/g, " ").trim().slice(0, 60);
 
 // what the Debts page needs: each recipient once, with running totals
 export async function loadBankData(env) {
@@ -109,7 +115,9 @@ async function savePayments(env, list) {
     const key = recipientKey(tx);
     const rec = [tx.name, tx.tin, tx.iban, tx.bankCode, tx.own ? 1 : 0];
     if (!rcp[key] || (!rcp[key][0] && tx.name)) { rcp[key] = rec; rcpChanged = true; }
-    (byYear[tx.date.slice(0, 4)] = byYear[tx.date.slice(0, 4)] || []).push([tx.id, tx.date, Math.round(tx.amount * 100), key, (tx.purpose || "").slice(0, 80)]);
+    const row = [tx.id, tx.date, Math.round(tx.amount * 100), key, (tx.purpose || "").slice(0, 80)];
+    if (tx.card) row.push(tx.card);
+    (byYear[tx.date.slice(0, 4)] = byYear[tx.date.slice(0, 4)] || []).push(row);
   }
   if (rcpChanged) await env.STORE.put(RCP_KEY, JSON.stringify(rcp));
   const agg = (await env.STORE.get(AGG_KEY, "json")) || {};
@@ -117,11 +125,16 @@ async function savePayments(env, list) {
   for (const [year, rows] of Object.entries(byYear)) {
     const key = TX_PREFIX + year;
     const cur = (await env.STORE.get(key, "json")) || [];
-    const seen = new Set(cur.map(r => r[0]));
+    const seen = new Map(cur.map((r, i) => [r[0], i]));
     let added = false;
     for (const r of rows) {
-      if (seen.has(r[0])) continue;
-      cur.push(r); seen.add(r[0]); added = true;
+      if (seen.has(r[0])) {
+        // a card purchase stored before cards were recognised: replace it (new key, shop, card, day)
+        const i = seen.get(r[0]);
+        if (r[5] && JSON.stringify(cur[i]) !== JSON.stringify(r)) { cur[i] = r; added = true; aggChanged = true; }
+        continue;
+      }
+      cur.push(r); seen.set(r[0], cur.length - 1); added = true;
       // update the running totals for this recipient
       const a = agg[r[3]] || (agg[r[3]] = [0, 0, "", "", 0]);
       a[0] += 1; a[1] += r[2];
@@ -231,6 +244,31 @@ async function tbcLogin(env, budget) {
 
 // ── Bank of Georgia ──────────────────────────────────────────────────────────
 
+// A card purchase has no recipient code or account; everything is in the texts, in one of these forms
+// (seen in the bonline statement export, Nov 2026):
+//   "გადახდა - თანხა: GEL499.00; ობიექტი: Alta, Tbilisi, 5 TSINTSADZE STR; MCC:5732; თარიღი: 04/11/2026 19:21; ბარათის No: ****3094; …"
+//   "გადახდა - თანხა: GEL 499 საკომისიო: 0; MCC: 5732; ობიექტი: ალტა; თარიღი: 04/11/2026 19:21:13; ბარათის ნომერი: 55832*******3094"
+//   "გადახდა - თანხა: GEL 584; MCC: 7622; მერჩანტის დასახელება: ELVARE LTD; ავტორიზაციის თარიღი: 08/11/2025 17:43:33; ბარათის ნომერი: 55832*******3094; …"
+// Returns { shop, card: [last4, "YYYY-MM-DD", shopInGeorgian, mcc] } or null.
+const GEO = /[Ⴀ-ჿ]/;
+export function parseCard(texts) {
+  const list = texts.map(str).filter(Boolean);
+  const all = list.join(" ; ");
+  // "****3094" or "55832*******3094": the last 4 digits of the masked number
+  const last4 = (/ბარათის\s*(?:No|ნომერი)\s*:?\s*[\d*xX]*(\d{4})(?![\d*xX])/.exec(all) || [])[1];
+  if (!last4) return null;
+  const shops = list.map(s => (/(?:ობიექტი|მერჩანტის დასახელება)\s*:\s*([^;]+)/.exec(s) || [])[1])
+    .filter(Boolean).map(s => s.trim());
+  if (!shops.length) return null;
+  // the first form adds the city and street after a comma; the shop is what comes before it
+  const shop = shops[0].split(",")[0].trim();
+  if (!shop) return null;
+  const ka = shops.find(s => GEO.test(s)) || "";
+  const d = /თარიღი\s*:\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(all);
+  const mcc = (/MCC\s*:\s*(\d{3,4})/.exec(all) || [])[1] || "";
+  return { shop, card: [last4, d ? `${d[3]}-${d[2]}-${d[1]}` : "", ka === shop ? "" : ka.split(",")[0].trim(), mcc] };
+}
+
 function bogRecord(r, iban) {
   const debit = num(g(r, "entryAmountDebit"));
   if (debit <= 0) return null;                    // only money going out
@@ -239,6 +277,15 @@ function bogRecord(r, iban) {
   const id = str(g(r, "entryId")) || str(g(r, "documentKey"));
   if (!id) return null;
   const tin = str(g(ben, "inn"));
+  const purpose = str(g(r, "documentNomination")) || str(g(r, "entryComment"));
+  if (!tin) {
+    const c = parseCard([g(r, "entryComment"), g(r, "documentNomination"), g(r, "documentInformation")]);
+    if (c) return {
+      id: "bog:" + id, bank: "BOG", account: iban, date: str(g(r, "entryDate")).slice(0, 10),
+      amount: Math.round(debit * 100) / 100, name: c.shop, tin: "", iban: "", bankCode: "",
+      purpose, own: false, card: c.card,
+    };
+  }
   return {
     id: "bog:" + id,
     bank: "BOG",
@@ -249,7 +296,7 @@ function bogRecord(r, iban) {
     tin,
     iban: str(g(ben, "accountNumber")),
     bankCode: str(g(ben, "bankCode")),
-    purpose: str(g(r, "documentNomination")) || str(g(r, "entryComment")),
+    purpose,
     own: !!tin && tin === str(g(snd, "inn")),     // transfer between our own accounts
   };
 }
@@ -343,6 +390,11 @@ export async function syncStep(env) {
   if (cfg.tbc) sources.push({ key: "tbc" });
   if (cfg.bog) for (const iban of settings.bogAccounts) sources.push({ key: "bog:" + iban, iban });
 
+  // once: read every BOG account again from the start date, so card purchases stored before cards were
+  // recognised get their shop, card and purchase day (savePayments replaces those rows; nothing is deleted)
+  const reread = cfg.bog && !(await env.STORE.get(CARDS_REREAD_KEY));
+  if (reread) for (const src of sources) if (src.iban) delete state.cursors[src.key];
+
   const budget = { used: 0 };
   const tokens = {};
   const collected = [];
@@ -384,6 +436,7 @@ export async function syncStep(env) {
   const done = sources.every(s => (state.cursors[s.key] || "") >= addDays(end, -OVERLAP_DAYS)) || Object.keys(state.errors).length > 0;
   state.lastSyncAt = new Date().toISOString();
   await env.STORE.put(STATE_KEY, JSON.stringify(state));
+  if (reread) await env.STORE.put(CARDS_REREAD_KEY, new Date().toISOString());
   // a fixed key or a new error must reach the Debts page even when no new payments arrived
   if (JSON.stringify([state.errors, state.notes]) !== before) await bumpVersion(env);
   return { done, configured: cfg, state, saved: collected.length, behind: sources.filter(s => (state.cursors[s.key] || "") < addDays(end, -OVERLAP_DAYS)).map(s => ({ source: s.key, at: state.cursors[s.key] })) };

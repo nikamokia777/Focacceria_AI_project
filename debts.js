@@ -14,7 +14,14 @@
 //   3. by a similar name: only after the CEO picks that version (subtab 3);
 //   4. by another CEO decision (a code typed in subtab 2 or 3).
 // Subtabs: 1 debt per supplier · 2 transfers without a waybill · 3 problems (recipients that match a
-// supplier by name only; suppliers with no transfer at all) · 4 overpayments (paid more than the waybills).
+// supplier by name only; suppliers with no transfer at all) · 4 overpayments (paid more than the waybills)
+// · 5 card payments („ბარათით“).
+//
+// Card purchases (BOG, recipientKey "c:<SHOP>", bank.js) have no code: they count only after the CEO picks
+// the supplier (a decision on the shop = all its payments, future too, or on one payment). Suggestions are
+// the suppliers' waybills with the same amount at any date (a waybill can come late), nearest date first,
+// that no confirmed card payment uses yet. A confirmed card payment without such a waybill shows
+// „ზედნადები ჯერ არ არის“ until one arrives.
 //
 // KV dash:debts2:decisions {
 //   rcp:    { recipientKey: { to, at, comment? } }        all transfers to a recipient
@@ -45,6 +52,9 @@ const CODE = /^[0-9A-Za-z]{2,20}$/;
 const FEE_CENTS = 500; // BOG's fee entries for transfers to another bank are a few tetri to a few lari
 const isFeePurpose = p => /^გადარიცხვის საკომისიო/.test(String(p || "").trim());
 const cleanCode = v => String(v ?? "").replace(/\s+/g, "");
+const isCard = rk => String(rk).startsWith("c:");
+const dayGap = (a, b) => Math.abs(Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 864e5 || 0;
+const MAX_SUGGEST = 5;
 
 export async function loadDecisions(env) {
   const d = (await env.STORE.get(KEY, "json")) || {};
@@ -87,6 +97,7 @@ export async function buildDebts(env) {
   const ownIbans = new Set((settings.bogAccounts || []).map(x => x.toUpperCase()));
   const skipMemo = {};
   const skip = rk => {
+    if (isCard(rk)) return false;
     if (rk in skipMemo) return skipMemo[rk];
     const [name = "", tin = "", iban = "", bankCode = "", own = 0] = recipients[rk] || [];
     const I = iban.toUpperCase();
@@ -125,12 +136,13 @@ export async function buildDebts(env) {
   // to the same recipient on the same day
   const biggest = {};
   for (const [, date, cents, rk] of payments) { const k = rk + "|" + date; if (cents > (biggest[k] || 0)) biggest[k] = cents; }
-  const isFee = (id, date, cents, rk, purpose) => isFeePurpose(purpose)
-    || (String(id).startsWith("bog:") && cents <= FEE_CENTS && biggest[rk + "|" + date] > FEE_CENTS);
+  const isFee = (id, date, cents, rk, purpose) => !isCard(rk) && (isFeePurpose(purpose)
+    || (String(id).startsWith("bog:") && cents <= FEE_CENTS && biggest[rk + "|" + date] > FEE_CENTS));
 
   const groups = { open: {}, wait: {}, other: {}, name: {} };
+  const cardOpen = [], cardOther = {}, cardPaid = []; // card payments: undecided, other expenses, counted for a supplier
   let counted = 0, skipped = 0;
-  for (const [id, date, cents, rk, purpose = ""] of payments) {
+  for (const [id, date, cents, rk, purpose = "", card] of payments) {
     if (settings.historyFrom && date < settings.historyFrom) continue;
     if (skip(rk) || isFee(id, date, cents, rk, purpose)) { skipped++; continue; }
     counted++;
@@ -139,6 +151,25 @@ export async function buildDebts(env) {
     const txd = dec.tx[id], rd = dec.rcp[rk], d = txd || rd;
     const scope = txd ? "tx" : rd ? "rcp" : "";
     let t = d ? target(d.to) : null, how = t ? "dec" : "";
+    if (isCard(rk)) {
+      const [last4 = "", buy = "", shopKa = "", mcc = ""] = card || [];
+      const c = { id, rk, date, buy: buy || date, amount: r2(amount), shop: name || rk.slice(2), shopKa, last4, mcc, purpose };
+      if (t?.tin) {
+        const x = row(t.tin);
+        if (!x.name) x.name = t.tin;
+        x.paid = r2(x.paid + amount);
+        const tr = [id, date, r2(amount), c.shop + (last4 ? " ••" + last4 : ""), purpose, "card", scope, rk, last4, ""];
+        x.transfers.push(tr);
+        cardPaid.push({ tin: t.tin, cents, buy: c.buy, tr, c });
+      } else if (t?.other) {
+        const gk = rk + "|" + scope;
+        const g = cardOther[gk] = cardOther[gk] || { rk, name: c.shop, shopKa, last4, scope, comment: d.comment || "", count: 0, amount: 0, last: "", tx: [] };
+        g.count++; g.amount = r2(g.amount + amount);
+        if (c.buy >= g.last) g.last = c.buy;
+        g.tx.push([id, c.buy, r2(amount), purpose]);
+      } else cardOpen.push({ ...c, cents });
+      continue;
+    }
     if (!t && tin && sellers.has(tin)) { t = { tin }; how = "code"; }
     if (!t && !tin && exactOf(rk)) { t = { tin: exactOf(rk) }; how = "name"; }
     if (t?.tin) {
@@ -170,6 +201,34 @@ export async function buildDebts(env) {
     x.manualList.push({ id: m.id, amount: r2(Number(m.amount) || 0), date: m.date || "", comment: m.comment || "" });
   }
 
+  // card payments ↔ waybills of the same amount (any date, nearest first; each waybill used once)
+  const wbByCents = {};
+  for (const tin of sellers) for (const [num, day, amount] of sup[tin].waybills) {
+    const k = Math.round(amount * 100);
+    (wbByCents[k] = wbByCents[k] || []).push({ tin, num, day, amount });
+  }
+  const used = new Set();
+  const nearest = (list, day) => list.filter(w => !used.has(w.tin + "|" + w.num)).sort((a, b) => dayGap(a.day, day) - dayGap(b.day, day) || b.day.localeCompare(a.day));
+  for (const p of cardPaid.sort((a, b) => a.buy.localeCompare(b.buy))) {
+    const w = nearest((wbByCents[p.cents] || []).filter(w => w.tin === p.tin), p.buy)[0];
+    if (w) { used.add(w.tin + "|" + w.num); p.tr[9] = w.num; }
+    else sup[p.tin].cardWait = (sup[p.tin].cardWait || 0) + 1;
+  }
+  const sellerKeyOf = Object.fromEntries(sellerKeys.map(s => [s.tin, s.key]));
+  const shopCount = {};
+  for (const c of cardOpen) shopCount[c.rk] = (shopCount[c.rk] || 0) + 1;
+  const cardsFor = {}; // supplier code → undecided card payments that suggest it
+  const openCards = cardOpen.sort((a, b) => b.buy.localeCompare(a.buy) || b.amount - a.amount).map(({ cents, ...c }) => {
+    const suggest = nearest(wbByCents[cents] || [], c.buy).slice(0, MAX_SUGGEST)
+      .map(w => ({ tin: w.tin, name: sup[w.tin].name || w.tin, num: w.num, day: w.day, amount: w.amount, gap: dayGap(w.day, c.buy) }));
+    for (const s of suggest) cardsFor[s.tin] = (cardsFor[s.tin] || 0) + 1;
+    const keys = [c.shopKa, c.shop].filter(Boolean).map(nameKey);
+    const names = [...sellers].filter(tin => !suggest.some(s => s.tin === tin) && keys.some(k => k && similarKey(k, sellerKeyOf[tin])))
+      .slice(0, 3).map(tin => ({ tin, name: sup[tin].name || tin }));
+    return { ...c, count: shopCount[c.rk], suggest, names };
+  });
+  const cardOtherList = Object.values(cardOther).map(g => ({ ...g, tx: g.tx.sort((a, b) => b[1].localeCompare(a[1])).slice(0, MAX_TX) })).sort((a, b) => b.amount - a.amount);
+
   const nameOf = tin => sup[tin]?.name || tin;
   const finish = g => ({ ...g, tx: g.tx.sort((a, b) => b[1].localeCompare(a[1])).slice(0, MAX_TX) });
   const byAmount = o => Object.values(o).map(finish).sort((a, b) => b.amount - a.amount);
@@ -184,7 +243,7 @@ export async function buildDebts(env) {
     const none = x.n > 0 && !x.paid && !x.manual && owed > 0 && !debtOk;
     x.waybills.sort((a, b) => b[1].localeCompare(a[1]));
     x.transfers.sort((a, b) => b[1].localeCompare(a[1]));
-    return { ...x, owed, debtOk, none, versions: versionFor[x.tin] || [] };
+    return { ...x, owed, debtOk, none, versions: versionFor[x.tin] || [], cardWait: x.cardWait || 0, cards: cardsFor[x.tin] || 0 };
   }).sort((a, b) => b.owed - a.owed);
 
   const sum = (arr, f) => r2(arr.reduce((a, x) => a + f(x), 0));
@@ -201,7 +260,12 @@ export async function buildDebts(env) {
     noWaybill: { open: byAmount(groups.open), wait: byAmount(groups.wait), other, otherTotal: sum(other, g => g.amount) },
     problems: {
       name: nameGroups,
-      none: list.filter(x => x.none).map(x => ({ tin: x.tin, name: x.name, n: x.n, amount: x.amount, returns: x.returns, owed: x.owed, versions: x.versions })),
+      none: list.filter(x => x.none).map(x => ({ tin: x.tin, name: x.name, n: x.n, amount: x.amount, returns: x.returns, owed: x.owed, versions: x.versions, cards: x.cards })),
+    },
+    cards: {
+      open: openCards, other: cardOtherList, otherTotal: sum(cardOtherList, g => g.amount),
+      openTotal: sum(openCards, c => c.amount),
+      paid: cardPaid.length, paidTotal: sum(cardPaid, p => p.c.amount), waiting: cardPaid.filter(p => !p.tr[9]).length,
     },
     over: list.filter(x => x.owed < 0).map(x => ({ tin: x.tin, name: x.name, n: x.n, amount: x.amount, returns: x.returns, paid: x.paid, manual: x.manual, excess: r2(-x.owed) })),
     sellers: [...sellers].map(tin => ({ tin, name: nameOf(tin) })).sort((a, b) => a.name.localeCompare(b.name)),
@@ -210,7 +274,8 @@ export async function buildDebts(env) {
 }
 
 // The CEO's answers. body.kind:
-//   assign     { rk, to: "s:<code>" | "w:<code>" | "x", comment?, once? }  a recipient's transfers (once: only the ones there are now)
+//   assign     { rk, to: "s:<code>" | "w:<code>" | "x", comment?, once?, id? }  a recipient's transfers (once: only the
+//              ones there are now; id: only that one payment)
 //   undo       { rk, scope: "rcp" | "tx", to? } or { ids: [transferId] }    back to undecided
 //   comment    { rk, scope, comment }                                       an other expense's comment
 //   reject     { rk, tins: [code] }                                         "not this supplier" for name versions
@@ -229,7 +294,11 @@ export async function saveDecision(env, body) {
       const m = /^([sw]):(.+)$/.exec(to);
       if (to !== "x" && !(m && CODE.test(m[2]))) return { error: "bad target" };
       if (!rk) return { error: "rk required" };
-      if (body.once) {
+      if (body.id) {
+        // one payment (a card payment: „მხოლოდ ეს გადახდა“)
+        const id = String(body.id).slice(0, 100);
+        dec.tx[id] = { to, at, rk, ...(to === "x" && comment ? { comment } : {}) };
+      } else if (body.once) {
         const settings = await loadBankSettings(env);
         let n = 0;
         for (const r of await loadRecipientPayments(env, settings.historyFrom, rk)) {
