@@ -62,6 +62,8 @@ const T = {
     updated: "განახლდა", live_sub: "მონაცემები Syrve-დან, ახლდება ყოველ 2 წუთში.",
     range_sub: "მონაცემები Syrve-დან არჩეული პერიოდისთვის.", income_range: "შემოსავალი", by_day: "დღეების მიხედვით",
     by_hour_avg: "საათების მიხედვით · საშუალო დღეში", days_with_sales: "{n} დღე გაყიდვებით",
+    avg_by_day: "საშუალო ჩეკი · დღეების მიხედვით", avg_by_hour: "საშუალო ჩეკი · საათების მიხედვით",
+    avg_all_days: "ყველა დღე ერთად", avg_no_marketing: "მარკეტინგის გარეშე", orders_n: "{n} შეკვეთა",
     peak1: "1-ლი პიკი", peak2: "მე-2 პიკი", lowest: "ყველაზე დაბალი",
     pick_today: "დღეს", pick_yesterday: "გუშინ", pick_week: "ეს კვირა", pick_month: "ეს თვე", pick_last_month: "წინა თვე", pick_6m: "6 თვე", pick_12m: "12 თვე",
     pick_end: "აირჩიეთ ბოლო დღე", wdays: ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვ"],
@@ -247,6 +249,8 @@ const T = {
     updated: "Updated", live_sub: "Data from Syrve, refreshes every 2 minutes.",
     range_sub: "Data from Syrve for the chosen dates.", income_range: "Income", by_day: "By day",
     by_hour_avg: "By hour · average per day", days_with_sales: "{n} days with sales",
+    avg_by_day: "Average check · by day", avg_by_hour: "Average check · by hour",
+    avg_all_days: "all days together", avg_no_marketing: "without marketing", orders_n: "{n} orders",
     peak1: "1st peak", peak2: "2nd peak", lowest: "Lowest",
     pick_today: "Today", pick_yesterday: "Yesterday", pick_week: "This week", pick_month: "This month", pick_last_month: "Last month", pick_6m: "6 months", pick_12m: "12 months",
     pick_end: "Choose the last day", wdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -528,8 +532,9 @@ function exportXlsx(filename, sheetName, rows) {
 // ====================== bar chart (single series) ======================
 // Colours the highest bar green, the second highest yellow and the lowest red (point.cls);
 // the point at index `skip` (today's unfinished hour) is left out.
-function markPeaks(points, skip = -1) {
-  const idx = points.map((_, i) => i).filter(i => i !== skip).sort((a, b) => points[b].value - points[a].value);
+// skipEmpty: bars marked `empty` (e.g. an hour without orders) are not ranked either.
+function markPeaks(points, skip = -1, skipEmpty = false) {
+  const idx = points.map((_, i) => i).filter(i => i !== skip && !(skipEmpty && points[i].empty)).sort((a, b) => points[b].value - points[a].value);
   if (idx.length < 2) return points;
   points[idx[0]].cls = "peak1";
   points[idx[idx.length - 1]].cls = "low";
@@ -1086,6 +1091,26 @@ async function renderLive(view, demo, fresh = false) {
     }
     if (r.salesDays) hourAvg = markPeaks(hourPoints(r.salesDays));
   }
+  // average order (income without marketing ÷ orders without marketing) per day and per hour
+  const avgPoint = (label, tipLabel, x) => {
+    const o = x ? n(x.orders) : 0, net = x ? n(x.net) : 0, v = o ? net / o : 0;
+    return { label, value: v, empty: !o,
+      tip: `${tipLabel}: ${o ? money(v) : t("none")} · ${t("orders_n").replace("{n}", o)} · ${money(net)}` };
+  };
+  const hasAvg = list => (list || []).some(x => x.orders !== undefined);
+  let avgDay = [], avgHour = [];
+  if (range.from !== range.to && hasAvg(r.byDay)) {
+    for (let d = range.from; d <= range.to; d = shiftDay(d, 1)) avgDay.push(avgPoint(dm(d), dmy(d), (r.byDay || []).find(x => x.day === d)));
+  }
+  if (hasAvg(r.byHour)) {
+    const lo = Math.min(...r.byHour.map(h => h.hour)), hi = Math.max(...r.byHour.map(h => h.hour));
+    for (let h = lo; h <= hi; h++) avgHour.push({ hour: h, ...avgPoint(pad(h) + ":00", `${pad(h)}:00–${pad(h + 1)}:00`, r.byHour.find(x => x.hour === h)) });
+    // today's hour still in progress isn't ranked; hours without orders aren't either
+    markPeaks(avgHour, isToday ? avgHour.findIndex(p => p.hour === new Date().getHours()) : -1, true);
+  }
+  const avgPanel = (title, sub, pts, legend) => `<div class="panel"><div class="panel-head"><h3>${esc(title)}</h3><span class="muted small">${esc(sub)}</span></div><div class="panel-body">
+        ${pts.some(p => !p.empty) ? barChart(pts, { height: 200, width: panelWidth(true) }) + (legend ? peakLegend() : "") : `<div class="empty">${esc(t("no_entries"))}</div>`}
+      </div></div>`;
   const upd = new Date(r._at || Date.now());
   if (S.livePay && !r.byPayType.some(p => p.name === S.livePay)) S.livePay = null;
 
@@ -1111,7 +1136,9 @@ async function renderLive(view, demo, fresh = false) {
       </div></div>
       ${range.from !== range.to ? `<div class="panel"><div class="panel-head"><h3>${esc(t("by_hour_avg"))}</h3>${r.salesDays ? `<span class="muted small">${esc(t("days_with_sales").replace("{n}", r.salesDays))}</span>` : ""}</div><div class="panel-body">
         ${hourAvg.length ? barChart(hourAvg, { height: 200, width: panelWidth(true) }) + peakLegend() : `<div class="empty">${esc(t("no_entries"))}</div>`}
-      </div></div>` : ""}</div>
+      </div></div>` : ""}
+      ${avgDay.length ? avgPanel(t("avg_by_day"), t("avg_no_marketing"), avgDay, false) : ""}
+      ${avgHour.length ? avgPanel(t("avg_by_hour"), range.from !== range.to ? t("avg_all_days") : t("avg_no_marketing"), avgHour, true) : ""}</div>
     </div>
     <div id="payDetail"></div>`;
   wireChartHover(view);
@@ -2345,9 +2372,11 @@ function demoApi(path, opts) {
     const qs = new URLSearchParams(path.split("?")[1] || ""), from = qs.get("from") || todayISO(), to = qs.get("to") || from;
     const days = Math.round((new Date(to + "T12:00:00") - new Date(from + "T12:00:00")) / 864e5) + 1;
     const hrs = []; for (let h = 9; h <= (days > 1 ? 21 : Math.max(10, now.getHours())); h++) hrs.push({ hour: h, sum: days * Math.round(300 + Math.random() * 900 + (h >= 12 && h <= 14 ? 800 : 0) + (h >= 19 ? 900 : 0)) });
+    // orders and income without marketing, for the average-order charts (one quiet hour without orders)
+    hrs.forEach((h, i) => { h.orders = i === 1 ? 0 : Math.max(1, Math.round(h.sum / (30 + (h.hour % 5) * 4))); h.net = h.orders ? h.sum : 0; });
     const total = hrs.reduce((a, h) => a + h.sum, 0);
     return { date: todayISO(), total, orders: Math.round(total / 38), byPayType: [{ name: "Card", sum: Math.round(total * 0.6) }, { name: "Cash", sum: Math.round(total * 0.25) }, { name: "გადარიცხვები", sum: Math.round(total * 0.1) }, { name: "B2B", sum: total - Math.round(total * 0.6) - Math.round(total * 0.25) - Math.round(total * 0.1) }, { name: "მარკეტინგი", sum: 64, notIncome: true }], byHour: hrs,
-      byDay: Array.from({ length: 27 }, (_, i) => ({ day: shiftDay(todayISO(), -i), sum: 1500 + Math.round(Math.sin(i) * 500 + 600) })), salesDays: days, _at: Date.now() };
+      byDay: Array.from({ length: 27 }, (_, i) => { const sum = 1500 + Math.round(Math.sin(i) * 500 + 600); return { day: shiftDay(todayISO(), -i), sum, net: sum, orders: Math.round(sum / (36 + (i % 4) * 3)) }; }), salesDays: days, _at: Date.now() };
   }
   if (path.startsWith("/syrve/monthly")) {
     const months = []; for (let i = 11; i >= 0; i--) { const m = ymShift(ymNow(), -i); const inc = 52000 + Math.round(Math.sin(i) * 9000 + (11 - i) * 900); months.push({ month: m, income: i === 0 ? Math.round(inc * now.getDate() / 30) : inc, cash: Math.round(inc * 0.3), card: Math.round(inc * 0.7), credit: 0, cost: Math.round((i === 0 ? inc * now.getDate() / 30 : inc) * 0.31) }); }

@@ -67,7 +67,7 @@ export async function handleDashboard(request, env, path) {
           }
           return json(await buildMenu(env, from, to, fresh));
         }
-        if (parts[1] === "live") return json(await cached(env, `live2:${from}:${to}`, ttl, fresh, () => syrveLive(env, from, to)));
+        if (parts[1] === "live") return json(await cached(env, `live3:${from}:${to}`, ttl, fresh, () => syrveLive(env, from, to)));
         const name = String(url.searchParams.get("name") || "").slice(0, 100);
         if (!name) return json({ error: "name required" }, 400);
         return json(await cached(env, `pay:${from}:${to}:${name}`, ttl, fresh, () => syrvePayType(env, from, to, name)));
@@ -257,27 +257,53 @@ async function syrveLive(env, from, to) {
         "OpenDate.Typed": { filterType: "DateRange", periodType: "CUSTOM", from, to: end, includeLow: true, includeHigh: false },
         OrderDeleted: { filterType: "IncludeValues", values: ["NOT_DELETED"] },
       };
-      const olap = (fields, aggregates) => post("/v2/reports/olap", { reportType: "SALES", buildSummary: false, groupByRowFields: fields, aggregateFields: aggregates, filters })
+      const olap = (fields, aggregates, f = filters) => post("/v2/reports/olap", { reportType: "SALES", buildSummary: false, groupByRowFields: fields, aggregateFields: aggregates, filters: f })
         .then(r => r.data || []);
+      const ORD = "UniqOrderId.OrdersCount";
       let marketingOrders = 0;
-      for (const r of await olap(["PayTypes"], ["DishDiscountSumInt", "DishSumInt", "UniqOrderId.OrdersCount"])) {
+      const marketing = [];
+      for (const r of await olap(["PayTypes"], ["DishDiscountSumInt", "DishSumInt", ORD])) {
         const name = r.PayTypes || "—";
-        if (isMarketing(name)) { result.byPayType.push({ name, sum: num(r.DishSumInt), notIncome: true }); marketingOrders += num(r["UniqOrderId.OrdersCount"]); continue; }
+        if (isMarketing(name)) { result.byPayType.push({ name, sum: num(r.DishSumInt), notIncome: true }); marketingOrders += num(r[ORD]); marketing.push(name); continue; }
         result.byPayType.push({ name, sum: num(r.DishDiscountSumInt) });
         result.total += num(r.DishDiscountSumInt);
       }
-      const days = await olap(["OpenDate.Typed"], ["DishDiscountSumInt", "UniqOrderId.OrdersCount"]);
-      result.orders = Math.max(0, days.reduce((a, r) => a + num(r["UniqOrderId.OrdersCount"]), 0) - marketingOrders);
+      // The average order per day / hour uses the card's logic: income without marketing ÷ orders without
+      // marketing orders. Marketing per day / hour comes from the same report limited to those payment types.
+      // net = income without marketing, orders = orders without marketing (missing when Syrve can't say).
+      const mFilters = marketing.length ? { ...filters, PayTypes: { filterType: "IncludeValues", values: marketing } } : null;
+      const marketingBy = async (field) => {
+        const out = {};
+        if (!mFilters) return out;
+        for (const r of await olap([field], ["DishDiscountSumInt", ORD], mFilters)) out[String(r[field] ?? "")] = { sum: num(r.DishDiscountSumInt), orders: num(r[ORD]) };
+        return out;
+      };
+      const days = await olap(["OpenDate.Typed"], ["DishDiscountSumInt", ORD]);
+      result.orders = Math.max(0, days.reduce((a, r) => a + num(r[ORD]), 0) - marketingOrders);
       if (from !== to) {
-        result.byDay = days.map(r => ({ day: String(r["OpenDate.Typed"] || "").slice(0, 10), sum: num(r.DishDiscountSumInt) }))
-          .filter(r => r.day).sort((a, b) => a.day.localeCompare(b.day));
+        let mDays = null;
+        try { mDays = await marketingBy("OpenDate.Typed"); } catch (e) { result.avgError = String(e.message || e).slice(0, 200); }
+        result.byDay = days.map(r => {
+          const key = String(r["OpenDate.Typed"] ?? ""), m = mDays && (mDays[key] || { sum: 0, orders: 0 });
+          const day = { day: key.slice(0, 10), sum: num(r.DishDiscountSumInt) };
+          if (m) { day.net = Math.max(0, day.sum - m.sum); day.orders = Math.max(0, num(r[ORD]) - m.orders); }
+          return day;
+        }).filter(r => r.day).sort((a, b) => a.day.localeCompare(b.day));
         result.salesDays = result.byDay.filter(r => r.sum > 0).length; // a range's hours are averaged over these
       }
-      // by hour: one day's hours, or a range's hours summed over all its days
+      // by hour: one day's hours, or a range's hours summed over all its days (+ orders, for the average order)
       try {
-        result.byHour = (await olap(["HourOpen"], ["DishDiscountSumInt"]))
-          .map(r => ({ hour: Number(r.HourOpen), sum: num(r.DishDiscountSumInt) }))
-          .filter(r => !Number.isNaN(r.hour)).sort((a, b) => a.hour - b.hour);
+        let rows, withOrders = true;
+        try { rows = await olap(["HourOpen"], ["DishDiscountSumInt", ORD]); }
+        catch (e) { withOrders = false; result.avgError = String(e.message || e).slice(0, 200); rows = await olap(["HourOpen"], ["DishDiscountSumInt"]); }
+        let mHours = null;
+        if (withOrders) try { mHours = await marketingBy("HourOpen"); } catch (e) { result.avgError = String(e.message || e).slice(0, 200); }
+        result.byHour = rows.map(r => {
+          const h = { hour: Number(r.HourOpen), sum: num(r.DishDiscountSumInt) };
+          const m = mHours && (mHours[String(r.HourOpen ?? "")] || { sum: 0, orders: 0 });
+          if (m) { h.net = Math.max(0, h.sum - m.sum); h.orders = Math.max(0, num(r[ORD]) - m.orders); }
+          return h;
+        }).filter(r => !Number.isNaN(r.hour)).sort((a, b) => a.hour - b.hour);
       } catch (_) {}
       if (!result.byPayType.some(p => p.notIncome)) result.byPayType.push({ name: "მარკეტინგი", sum: 0, notIncome: true });
       result.source = "olap2";
