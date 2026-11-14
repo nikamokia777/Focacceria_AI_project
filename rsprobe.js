@@ -4,7 +4,7 @@
 // and the field names of the first record — so the Debts tabs are built on facts, not guesses.
 
 import { buildEnvelope, parseXml, childOf, findDeep } from "./rsge.js";
-import { withSyrve, xmlRecords, nowLocal } from "./dashboard.js";
+import { withSyrve, xmlRecords, nowLocal, ddmmyyyy } from "./dashboard.js";
 import { loadLog } from "./store.js";
 import { loadBankSettings } from "./bank.js";
 
@@ -108,5 +108,66 @@ export async function runProbe(env) {
     withTin: approved.filter(r => r.sellerTin).length,
     oldest: log.length ? log[log.length - 1].createdAt : "", newest: log.length ? log[0].createdAt : "",
     samples: approved.slice(0, 3).map(r => ({ number: r.number, date: r.date, total: r.total, tin: !!r.sellerTin, createdAt: r.createdAt, decidedAt: r.decidedAt, rows: (r.rows || []).length, rowFields: Object.keys((r.rows || [])[0] || {}) })) };
+  return out;
+}
+
+// ── write-off acts (read-only) ──────────────────────────────────────────────
+// /api/dash/probe/writeoff — how Syrve answers about write-off acts (ჩამოწერის აქტი) for the last 31
+// days, asked in several ways, so the „შემოსავალი ახლა“ write-off rows are built on Syrve's real
+// field names: the reason (write-off account), the cost sum, the act number, time, comment and author.
+// Nothing is written anywhere; each way is tried on its own and its error is shown instead.
+export async function probeWriteoffs(env) {
+  const now = nowLocal(env);
+  const to = now.toISOString().slice(0, 10);
+  const from = new Date(now.getTime() - 31 * 86400000).toISOString().slice(0, 10);
+  const end = new Date(now.getTime() + 86400000).toISOString().slice(0, 10);
+  const out = { at: new Date().toISOString(), from, to };
+  const firstTags = (xml, tag, n = 2) => xmlRecords(xml, tag).slice(0, n).map(r => Object.fromEntries(Object.entries(r).slice(0, 45).map(([k, v]) => [k, cut(v, 80)])));
+  const tagsOf = (xml, tag) => { const r = xmlRecords(xml, tag); return { count: r.length, fields: [...new Set(r.flatMap(x => Object.keys(x)))].slice(0, 80) }; };
+  const tryIt = async (name, fn) => { const t = Date.now(); try { out[name] = { ms: 0, ...(await fn()) }; } catch (e) { out[name] = { error: cut(e.message || e, 300) }; } if (out[name]) out[name].ms = Date.now() - t; };
+  try {
+    await withSyrve(env, async (get, post) => {
+      // 1) the store operations report, write-off documents only (product lines)
+      await tryIt("storeOperations", async () => {
+        const xml = await get("/reports/storeOperations", { dateFrom: ddmmyyyy(from), dateTo: ddmmyyyy(to),
+          documentTypes: "WRITEOFF_DOCUMENT", productDetalization: "true", showCostCorrections: "false" });
+        const recs = xmlRecords(xml, "storeReportItemDto");
+        return { bytes: xml.length, ...tagsOf(xml, "storeReportItemDto"), types: [...new Set(recs.map(r => r.documentType))].slice(0, 10),
+          samples: firstTags(xml, "storeReportItemDto", 3) };
+      });
+      // 2) the write-off documents themselves (JSON, v2)
+      for (const path of ["/v2/documents/writeoff", "/documents/export/writeoffDocument"]) {
+        await tryIt(path, async () => {
+          const text = await get(path, path.startsWith("/v2") ? { dateFrom: from, dateTo: to } : { from, to: end });
+          let body; try { body = JSON.parse(text); } catch (_) { body = null; }
+          if (body) {
+            const list = Array.isArray(body) ? body : body.response || body.documents || body.data || [];
+            const first = Array.isArray(list) ? list[0] : null;
+            return { kind: "json", topKeys: Array.isArray(body) ? "array" : Object.keys(body).slice(0, 20), count: Array.isArray(list) ? list.length : null,
+              firstKeys: first ? Object.keys(first) : [], first: first ? cut(JSON.stringify(first), 1500) : null };
+          }
+          return { kind: "xml", bytes: text.length, root: cut(text.replace(/<\?xml[^>]*\?>/, "").trim(), 60), document: tagsOf(text, "document"), item: tagsOf(text, "item"),
+            firstDoc: cut((text.match(/<document>[\s\S]*?<\/document>/) || [""])[0], 1500) };
+        });
+      }
+      // 3) the write-off accounts (reasons) by name
+      await tryIt("accounts", async () => {
+        const list = JSON.parse(await get("/v2/entities/list", { rootType: "Account" }));
+        return { count: list.length, names: list.map(a => [a.id, a.name, a.code, a.type].map(x => cut(x, 50)).join(" | ")).slice(0, 80) };
+      });
+      // 4) OLAP TRANSACTIONS: which columns exist, then write-offs by account
+      await tryIt("olapColumns", async () => {
+        const cols = JSON.parse(await get("/v2/reports/olap/columns", { reportType: "TRANSACTIONS" }));
+        const names = Object.keys(cols);
+        return { count: names.length, matching: names.filter(n => /account|sum|amount|type|document|comment|author|user|store|product|date|cost/i.test(n)).slice(0, 120) };
+      });
+      await tryIt("olapByAccount", async () => {
+        const r = await post("/v2/reports/olap", { reportType: "TRANSACTIONS", buildSummary: false,
+          groupByRowFields: ["Account.Name", "TransactionType"], aggregateFields: ["Sum.ResignedSum", "Amount"],
+          filters: { "DateTime.Typed": { filterType: "DateRange", periodType: "CUSTOM", from, to: end, includeLow: true, includeHigh: false } } });
+        return { rows: (r.data || []).slice(0, 60) };
+      });
+    });
+  } catch (e) { out.login = { error: cut(e.message || e, 200) }; }
   return out;
 }

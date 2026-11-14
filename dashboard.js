@@ -15,7 +15,7 @@ import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, sync
 import { syncWaybills } from "./waybills.js";
 import { buildDebts, saveDecision, dropOldDebtsData } from "./debts.js";
 import { similar } from "./names.js";
-import { runProbe } from "./rsprobe.js";
+import { runProbe, probeWriteoffs } from "./rsprobe.js";
 
 // staff = { employees: [{ id, name, role, pay: "hour" | "shift" | "month", rate, pid, iban, from, active }],
 //           shifts: [{ id, emp, day: "YYYY-MM-DD", from: "HH:MM", to: "HH:MM", ot: overtime ₾, note }] } — typed in the Employees tab
@@ -107,6 +107,7 @@ export async function handleDashboard(request, env, path) {
       return json(r, r.error ? 400 : 200);
     }
     // one-off read-only check of rs.ge / Syrve / Telegram answers (rsprobe.js)
+    if (parts[0] === "probe" && parts[1] === "writeoff" && request.method === "GET") return json(await probeWriteoffs(env));
     if (parts[0] === "probe" && request.method === "GET") return json(await runProbe(env));
     // bank settings / sync / review
     if (parts[0] === "bank") {
