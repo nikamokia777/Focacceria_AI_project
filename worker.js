@@ -141,7 +141,7 @@ async function handleStock(request, env) {
   } else if (request.method !== "GET") {
     return json({ error: "Method not allowed" }, 405);
   }
-  const data = await buildStock(env, { fresh, day });
+  const data = await buildStock(env, { fresh, day, rs: true });
   data.alarmProblem = data.live ? await checkStockAlarms(env, data) : "";
   return json(data);
 }

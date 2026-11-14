@@ -228,7 +228,52 @@ const T = {
       invError: "ინვენტარიზაციის მონაცემი ვერ წავიკითხე: ",
       error: "Syrve-დან მონაცემი ვერ მივიღე: ",
       showing: (a, b) => `ნაჩვენებია ${a} / ${b} — დააზუსტეთ ძებნა`,
-      empty: "პროდუქტები არ მოიძებნა"
+      empty: "პროდუქტები არ მოიძებნა",
+      rs: {
+        col: "საწყობი RS",
+        diff: "სხვაობა",
+        colHint: "ამ თვის rs.ge ზედნადებები (1-დან, ნულიდან) − დაბრუნება − რაც Syrve-მ გაიტანა (გაყიდვა, ჩამოწერა, ინვენტარიზაცია).",
+        diffHint: "RS − Syrve (Syrve-იც 1-დან, ნულიდან). 0 = ყველა ზედნადები Syrve-შია იგივე რაოდენობით.",
+        open: "ზედნადებები",
+        errors: "rs.ge / Syrve-დან ყველაფერი ვერ წავიკითხე: ",
+        off: "საწყობი RS მხოლოდ მიმდინარე თვისთვის ითვლება.",
+        sum: (from, to) => `${from} – ${to}`,
+        rsIn: "rs.ge ზედნადებები",
+        rsRet: "დაბრუნება",
+        usage: "Syrve-მ გაიტანა",
+        rs: "საწყობი RS",
+        start: "Syrve თვის დასაწყისში",
+        now: "Syrve ახლა",
+        delta: "Syrve ამ თვეში",
+        syrveIn: "Syrve-ის ზედნადებები",
+        syrveRet: "Syrve-ის დაბრუნება",
+        diffLine: "სხვაობა = RS − Syrve ამ თვეში",
+        warn: n => `⚠ ${n} ხაზი ერთეულში ვერ გადავიყვანე და არ ითვლება — შეავსეთ „ზომა (ნეტო)“ პროდუქტებში.`,
+        col2: {
+          n: "ზედნადები",
+          day: "თარიღი",
+          seller: "მომწოდებელი",
+          name: "rs.ge დასახელება",
+          qty: "რაოდ.",
+          amt: "ერთეულში",
+          syrve: "Syrve"
+        },
+        how: {
+          size: "ზომით",
+          learned: "Syrve-დან",
+          pc: "1:1"
+        },
+        ret: "დაბრუნება",
+        inSyrve: "✓",
+        missing: "✗ Syrve-ში არ არის",
+        notOnDoc: "⚠ Syrve-ის ზედნადებზე ეს პროდუქტი არ არის",
+        noWb: "ამ თვეში ზედნადები არ არის.",
+        prods: "პროდუქტები, რომელთა ზედნადებებიც ითვლება:",
+        noProds: "პროდუქტი არ არის დაკავშირებული — RS არ ითვლება.",
+        add: "+ პროდუქტი",
+        remove: "მოხსნა",
+        noCode: "კოდი არ აქვს"
+      }
     }
   },
   en: {
@@ -452,7 +497,52 @@ const T = {
       invError: "Could not read reconciliations: ",
       error: "Could not get data from Syrve: ",
       showing: (a, b) => `Showing ${a} of ${b} — narrow the search`,
-      empty: "No products found"
+      empty: "No products found",
+      rs: {
+        col: "Storage RS",
+        diff: "Difference",
+        colHint: "This month's rs.ge waybills (from the 1st, starting at zero) − returns − what Syrve took out (sales, write-offs, inventory).",
+        diffHint: "RS − Syrve (Syrve also from the 1st, starting at zero). 0 = every waybill is in Syrve with the same amount.",
+        open: "Waybills",
+        errors: "Could not read everything from rs.ge / Syrve: ",
+        off: "Storage RS is counted for the current month only.",
+        sum: (from, to) => `${from} – ${to}`,
+        rsIn: "rs.ge waybills",
+        rsRet: "Returns",
+        usage: "Taken out by Syrve",
+        rs: "Storage RS",
+        start: "Syrve at the start of the month",
+        now: "Syrve now",
+        delta: "Syrve this month",
+        syrveIn: "Syrve invoices",
+        syrveRet: "Syrve returns",
+        diffLine: "Difference = RS − Syrve this month",
+        warn: n => `⚠ ${n} line(s) could not be converted to the unit and don't count — fill in „ზომა (ნეტო)“ in Products.`,
+        col2: {
+          n: "Waybill",
+          day: "Date",
+          seller: "Supplier",
+          name: "rs.ge name",
+          qty: "Qty",
+          amt: "In unit",
+          syrve: "Syrve"
+        },
+        how: {
+          size: "by size",
+          learned: "from Syrve",
+          pc: "1:1"
+        },
+        ret: "return",
+        inSyrve: "✓",
+        missing: "✗ not in Syrve",
+        notOnDoc: "⚠ not on the Syrve invoice",
+        noWb: "No waybills this month.",
+        prods: "Products whose waybills count:",
+        noProds: "No product linked — RS is not counted.",
+        add: "+ product",
+        remove: "Remove",
+        noCode: "no code"
+      }
     }
   }
 };
@@ -1434,6 +1524,150 @@ function StockLink({
     onClick: () => setEditing(true)
   }, t.stock.changeLink)));
 }
+const signed = n => (n > 0 ? "+" : "") + qtyStr(n);
+const isZero = n => Math.abs(num(n)) < 0.0005;
+function RsDetail({
+  t,
+  item,
+  products,
+  readOnly,
+  off,
+  onSave
+}) {
+  const r = t.stock.rs;
+  const rs = item.rs;
+  const [adding, setAdding] = useState(false);
+  if (off) return React.createElement("div", {
+    className: "rs-detail muted small"
+  }, r.off);
+  const linked = rs ? rs.prods : [];
+  const pById = new Map(products.map(p => [p.id, p]));
+  const u = item.unit;
+  const setProds = list => onSave({
+    id: item.id,
+    prods: list
+  });
+  return React.createElement("div", {
+    className: "rs-detail"
+  }, rs && React.createElement("div", {
+    className: "rs-sum"
+  }, React.createElement("div", null, React.createElement("div", {
+    className: "rs-line"
+  }, React.createElement("span", null, r.rsIn), React.createElement("span", {
+    className: "mono"
+  }, "+", qtyStr(rs.rsIn), " ", u)), rs.rsRet !== 0 && React.createElement("div", {
+    className: "rs-line"
+  }, React.createElement("span", null, r.rsRet), React.createElement("span", {
+    className: "mono"
+  }, "−", qtyStr(rs.rsRet), " ", u)), React.createElement("div", {
+    className: "rs-line"
+  }, React.createElement("span", null, r.usage), React.createElement("span", {
+    className: "mono"
+  }, signed(-rs.usage), " ", u)), React.createElement("div", {
+    className: "rs-line strong"
+  }, React.createElement("span", null, r.rs), React.createElement("span", {
+    className: "mono"
+  }, qtyStr(rs.amount), " ", u))), React.createElement("div", null, React.createElement("div", {
+    className: "rs-line"
+  }, React.createElement("span", null, r.start), React.createElement("span", {
+    className: "mono"
+  }, qtyStr(rs.start), " ", u)), React.createElement("div", {
+    className: "rs-line"
+  }, React.createElement("span", null, r.syrveIn), React.createElement("span", {
+    className: "mono"
+  }, "+", qtyStr(rs.syrveIn), " ", u)), rs.syrveRet !== 0 && React.createElement("div", {
+    className: "rs-line"
+  }, React.createElement("span", null, r.syrveRet), React.createElement("span", {
+    className: "mono"
+  }, "−", qtyStr(rs.syrveRet), " ", u)), React.createElement("div", {
+    className: "rs-line"
+  }, React.createElement("span", null, r.now), React.createElement("span", {
+    className: "mono"
+  }, qtyStr(item.syrve), " ", u)), React.createElement("div", {
+    className: "rs-line strong"
+  }, React.createElement("span", null, r.delta), React.createElement("span", {
+    className: "mono"
+  }, signed(rs.delta), " ", u))), React.createElement("div", {
+    className: "rs-diff"
+  }, React.createElement("div", {
+    className: "muted small"
+  }, r.diffLine), React.createElement("div", {
+    className: "rs-diff-value mono " + (isZero(rs.diff) ? "s-ok" : "red-text")
+  }, signed(rs.diff), " ", u))), rs && rs.warn > 0 && React.createElement("div", {
+    className: "warn-line small"
+  }, r.warn(rs.warn)), rs && (rs.wbs.length ? React.createElement("div", {
+    className: "table-scroll"
+  }, React.createElement("table", {
+    className: "table mini rs-wbs"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, r.col2.n), React.createElement("th", null, r.col2.day), React.createElement("th", null, r.col2.seller), React.createElement("th", null, r.col2.name), React.createElement("th", {
+    className: "r"
+  }, r.col2.qty), React.createElement("th", {
+    className: "r"
+  }, r.col2.amt), React.createElement("th", null, r.col2.syrve))), React.createElement("tbody", null, rs.wbs.flatMap(wb => wb.lines.map((l, i) => React.createElement("tr", {
+    key: wb.n + (wb.ret ? "r" : "") + i,
+    className: wb.ret ? "rs-ret" : ""
+  }, React.createElement("td", {
+    className: "mono nowrap"
+  }, i === 0 ? wb.n : "", i === 0 && wb.ret && React.createElement("span", {
+    className: "tag"
+  }, r.ret)), React.createElement("td", {
+    className: "nowrap"
+  }, i === 0 ? fmtDate(wb.day + "T00:00", true).slice(0, 10) : ""), React.createElement("td", null, i === 0 ? wb.seller : ""), React.createElement("td", null, l.name, l.code && React.createElement("span", {
+    className: "muted small"
+  }, " · ", l.code)), React.createElement("td", {
+    className: "r mono nowrap"
+  }, qtyStr(l.qty), " ", l.unit), React.createElement("td", {
+    className: "r mono nowrap"
+  }, l.amt === null ? React.createElement("span", {
+    className: "red-text"
+  }, "⚠") : React.createElement(React.Fragment, null, wb.ret ? "−" : "", qtyStr(l.amt), " ", u), l.how && r.how[l.how] && React.createElement("span", {
+    className: "tag"
+  }, r.how[l.how])), React.createElement("td", {
+    className: "nowrap"
+  }, i !== 0 || wb.ret ? "" : !wb.inSyrve ? React.createElement("span", {
+    className: "red-text"
+  }, r.missing) : wb.syrve === 0 ? React.createElement("span", {
+    className: "warn-text"
+  }, r.notOnDoc) : React.createElement("span", {
+    className: "s-ok"
+  }, r.inSyrve, " ", qtyStr(wb.syrve), " ", u)))))))) : React.createElement("div", {
+    className: "muted small rs-empty"
+  }, r.noWb)), React.createElement("div", {
+    className: "rs-prods"
+  }, React.createElement("span", {
+    className: "muted small"
+  }, linked.length ? r.prods : r.noProds), linked.map(id => {
+    const p = pById.get(id);
+    return React.createElement("span", {
+      key: id,
+      className: "chip"
+    }, p ? p.name : "#" + id, p && React.createElement("span", {
+      className: "muted"
+    }, " · ", p.supplier || "—", " · ", p.code || r.noCode), !readOnly && React.createElement("button", {
+      className: "chip-x",
+      title: r.remove,
+      "aria-label": r.remove,
+      onClick: () => setProds(linked.filter(x => x !== id))
+    }, "✕"));
+  }), !readOnly && (adding ? React.createElement("select", {
+    className: "input link-select",
+    autoFocus: true,
+    value: "",
+    onBlur: () => setAdding(false),
+    onChange: e => {
+      setAdding(false);
+      if (e.target.value) setProds([...linked, Number(e.target.value)]);
+    }
+  }, React.createElement("option", {
+    value: ""
+  }, "—"), products.filter(p => !linked.includes(p.id)).map(p => React.createElement("option", {
+    key: p.id,
+    value: p.id
+  }, p.name, p.supplier ? " · " + p.supplier : ""))) : React.createElement("button", {
+    className: "link-btn",
+    onClick: () => setAdding(true)
+  }, r.add))));
+}
 const shiftDay = (day, n) => new Date(Date.parse(day + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 function StorageTab({
   t,
@@ -1445,6 +1679,7 @@ function StorageTab({
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [day, setDay] = useState("");
+  const [open, setOpen] = useState("");
   const seq = useRef(0);
   const load = useCallback(async fresh => {
     const n = ++seq.current;
@@ -1500,6 +1735,9 @@ function StorageTab({
   const rows = data.items.filter(it => !qn || norm(it.name).includes(qn) || norm(it.group).includes(qn) || norm(it.link?.name).includes(qn)).filter(it => !f || (f === "low" ? isLow(it) : f === "min" ? it.min !== null : it.prio === f)).sort((a, b) => isLow(b) - isLow(a) || (PRIO_RANK[a.prio] ?? 3) - (PRIO_RANK[b.prio] ?? 3) || a.name.localeCompare(b.name));
   const lowCount = data.items.filter(isLow).length;
   const inv = data.inventory;
+  const rsOff = !data.rs || !!data.rs.off;
+  const rsErrors = data.rs && (data.rs.error || Object.values(data.rs.errors || {}).filter(Boolean).join(" · "));
+  const cols = live ? 9 : 6;
   return React.createElement(React.Fragment, null, React.createElement("div", {
     className: "toolbar stock-days"
   }, React.createElement("div", {
@@ -1562,7 +1800,9 @@ function StorageTab({
     className: "card notice"
   }, t.stock.noGroup), data.inventoryError && React.createElement("div", {
     className: "card notice muted small"
-  }, t.stock.invError, data.inventoryError), React.createElement("div", {
+  }, t.stock.invError, data.inventoryError), rsErrors && React.createElement("div", {
+    className: "card notice muted small"
+  }, t.stock.rs.errors, rsErrors), React.createElement("div", {
     className: "card table-card"
   }, React.createElement("div", {
     className: "toolbar inner"
@@ -1605,7 +1845,13 @@ function StorageTab({
     className: "table stock-table" + (live ? "" : " past")
   }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, t.stock.col.prio), React.createElement("th", null, t.stock.col.name), React.createElement("th", {
     className: "r"
-  }, t.stock.col.syrve), live && React.createElement("th", {
+  }, t.stock.col.syrve), React.createElement("th", {
+    className: "r",
+    title: t.stock.rs.colHint
+  }, t.stock.rs.col), React.createElement("th", {
+    className: "r",
+    title: t.stock.rs.diffHint
+  }, t.stock.rs.diff), live && React.createElement("th", {
     className: "r",
     title: t.stock.corrHint
   }, t.stock.col.live), live && React.createElement("th", {
@@ -1613,11 +1859,13 @@ function StorageTab({
     title: t.stock.minHint
   }, t.stock.col.min), React.createElement("th", {
     className: "r"
-  }, t.stock.col.inv), live && React.createElement("th", null, t.stock.col.status))), React.createElement("tbody", null, rows.slice(0, MAX_STOCK_ROWS).map(it => {
+  }, t.stock.col.inv), live && React.createElement("th", null, t.stock.col.status))), React.createElement("tbody", null, rows.slice(0, MAX_STOCK_ROWS).flatMap(it => {
     const low = isLow(it);
-    return React.createElement("tr", {
+    const isOpen = open === it.id;
+    const rs = rsOff ? null : it.rs;
+    return [React.createElement("tr", {
       key: it.id,
-      className: low ? "row-low" : ""
+      className: (low ? "row-low" : "") + (isOpen ? " row-open" : "")
     }, React.createElement("td", null, React.createElement(PrioPicker, {
       t: t,
       value: it.prio,
@@ -1626,11 +1874,16 @@ function StorageTab({
         id: it.id,
         prio
       })
-    })), React.createElement("td", null, React.createElement("div", {
-      className: "strong"
-    }, it.name, it.group && React.createElement("span", {
+    })), React.createElement("td", null, React.createElement("button", {
+      className: "name-btn strong",
+      "aria-expanded": isOpen,
+      title: t.stock.rs.open,
+      onClick: () => setOpen(isOpen ? "" : it.id)
+    }, React.createElement("span", {
+      className: "caret"
+    }, isOpen ? "▾" : "▸"), it.name), it.group && React.createElement("span", {
       className: "tag"
-    }, it.group)), React.createElement(StockLink, {
+    }, it.group), React.createElement(StockLink, {
       t: t,
       item: it,
       products: data.products,
@@ -1641,7 +1894,20 @@ function StorageTab({
       })
     })), React.createElement("td", {
       className: "r mono nowrap" + (live ? " muted" : "")
-    }, qtyStr(it.syrve), " ", it.unit), live && React.createElement("td", {
+    }, qtyStr(it.syrve), " ", it.unit), React.createElement("td", {
+      className: "r mono nowrap"
+    }, rs ? React.createElement(React.Fragment, null, qtyStr(rs.amount), " ", it.unit, rs.warn > 0 && React.createElement("span", {
+      className: "red-text",
+      title: t.stock.rs.warn(rs.warn)
+    }, " ⚠")) : React.createElement("span", {
+      className: "muted"
+    }, "—")), React.createElement("td", {
+      className: "r mono nowrap"
+    }, rs ? React.createElement("span", {
+      className: isZero(rs.diff) ? "s-ok" : "red-text"
+    }, signed(rs.diff)) : React.createElement("span", {
+      className: "muted"
+    }, "—")), live && React.createElement("td", {
       className: "r nowrap"
     }, React.createElement(NumInput, {
       value: it.live,
@@ -1686,7 +1952,22 @@ function StorageTab({
       className: "pill alarm-" + it.alarm
     }, t.stock.alarm[it.alarm]) : low ? React.createElement("span", {
       className: "pill alarm-low"
-    }, t.stock.alarm.low) : null));
+    }, t.stock.alarm.low) : null)), isOpen && React.createElement("tr", {
+      key: it.id + ":rs",
+      className: "sub"
+    }, React.createElement("td", {
+      colSpan: cols
+    }, React.createElement(RsDetail, {
+      t: t,
+      item: {
+        ...it,
+        rs
+      },
+      products: data.products,
+      readOnly: !live,
+      off: rsOff,
+      onSave: save
+    })))];
   })))), !rows.length && React.createElement(Empty, null, t.stock.empty), rows.length > MAX_STOCK_ROWS && React.createElement("div", {
     className: "muted small table-foot"
   }, t.stock.showing(MAX_STOCK_ROWS, rows.length))));

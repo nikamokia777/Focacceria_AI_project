@@ -12,7 +12,8 @@
 // "Stock balance as of <day>"; corrections, minimums and alarms belong to today only.
 //
 // KV keys:
-//   stock:cfg                 { store, items: { <syrveProductId>: { min, prio, link, corr, corrAt } } }
+//   stock:cfg                 { store, items: { <syrveProductId>: { min, prio, link, prods, corr, corrAt } } }
+//                             (prods: the products for „საწყობი RS“, see stockrs.js)
 //   stock:alarms              { <syrveProductId>: { token, state: "open" | "approved" | "rejected", at } }
 //   stockalarm:<token>        one alarm message in Telegram (telegram.js)
 //   dash:cache:stock2         today's Syrve answer (reused for 1 minute)
@@ -22,6 +23,7 @@ import { withSyrve, xmlRecords, nowLocal, localDate, ddmmyyyy } from "./dashboar
 import { loadBasePrices } from "./store.js";
 import { matchProduct, normName } from "./orders.js";
 import { sendStockAlarm } from "./telegram.js";
+import { buildRs } from "./stockrs.js";
 
 const CFG_KEY = "stock:cfg";
 const ALARMS_KEY = "stock:alarms";
@@ -208,15 +210,27 @@ export async function buildStock(env, opts = {}) {
     await saveCfg(env, cfg);
   }
 
+  // „საწყობი RS“ / „სხვაობა“ (stockrs.js): only for the page, not for the cron
+  let rs = null;
+  if (opts.rs) {
+    try {
+      const r = await buildRs(env, { items, cfg, products, day, today: localDate(env), store, fresh: opts.fresh });
+      for (const it of items) it.rs = r.byId[it.id] || null;
+      rs = r.info;
+    } catch (e) {
+      rs = { error: String(e.message || e).slice(0, 200) };
+    }
+  }
+
   return {
     day, live, today: localDate(env), asOf: syrve.asOf, store, stores: syrve.stores, items,
     inventory: lastInv ? { num: lastInv.num, date: lastInv.date, count: Object.keys(lastInv.d).length } : null,
-    inventoryError: syrve.inventoryError,
-    products: products.map((p) => ({ id: p.id, name: p.name })),
+    inventoryError: syrve.inventoryError, rs,
+    products: products.map((p) => ({ id: p.id, name: p.name, supplier: p.supplier, code: p.code })),
   };
 }
 
-// body: { id, min?, prio?, link?, live?, clearCorr? } or { store }
+// body: { id, min?, prio?, link?, prods?, live?, clearCorr? } or { store }
 export async function updateStock(env, body) {
   const cfg = await loadCfg(env);
   if ("store" in body) cfg.store = String(body.store || "").toLowerCase();
@@ -233,6 +247,8 @@ export async function updateStock(env, body) {
       else if (Number(body.link) > 0) c.link = Number(body.link);
       else delete c.link;
     }
+    // the products whose waybills count in „საწყობი RS“ (an empty list = none)
+    if (Array.isArray(body.prods)) c.prods = [...new Set(body.prods.map(Number).filter((x) => Number.isInteger(x) && x > 0))].slice(0, 20);
     if ("live" in body && String(body.live).trim() !== "") {
       // correction against the Syrve amount the page was showing (cached for a minute)
       const syrve = await syrveStock(env);

@@ -246,7 +246,10 @@ export async function listBuyerGoods(env, fromDay, toDay) {
     sellerName: textOf(g, "NAME"),
     createDate: textOf(g, "CREATE_DATE"),
     name: textOf(g, "W_NAME"),
+    code: textOf(g, "BAR_CODE"),
+    unitId: textOf(g, "UNIT_ID"),
     quantity: parseFloat(textOf(g, "QUANTITY")) || 0,
+    price: parseFloat(textOf(g, "PRICE")) || 0,
     amount: parseFloat(textOf(g, "AMOUNT")) || 0,
   }));
 }

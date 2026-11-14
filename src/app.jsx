@@ -143,6 +143,24 @@ const T = {
       error: "Syrve-დან მონაცემი ვერ მივიღე: ",
       showing: (a, b) => `ნაჩვენებია ${a} / ${b} — დააზუსტეთ ძებნა`,
       empty: "პროდუქტები არ მოიძებნა",
+      rs: {
+        col: "საწყობი RS", diff: "სხვაობა",
+        colHint: "ამ თვის rs.ge ზედნადებები (1-დან, ნულიდან) − დაბრუნება − რაც Syrve-მ გაიტანა (გაყიდვა, ჩამოწერა, ინვენტარიზაცია).",
+        diffHint: "RS − Syrve (Syrve-იც 1-დან, ნულიდან). 0 = ყველა ზედნადები Syrve-შია იგივე რაოდენობით.",
+        open: "ზედნადებები", errors: "rs.ge / Syrve-დან ყველაფერი ვერ წავიკითხე: ",
+        off: "საწყობი RS მხოლოდ მიმდინარე თვისთვის ითვლება.",
+        sum: (from, to) => `${from} – ${to}`,
+        rsIn: "rs.ge ზედნადებები", rsRet: "დაბრუნება", usage: "Syrve-მ გაიტანა", rs: "საწყობი RS",
+        start: "Syrve თვის დასაწყისში", now: "Syrve ახლა", delta: "Syrve ამ თვეში", syrveIn: "Syrve-ის ზედნადებები", syrveRet: "Syrve-ის დაბრუნება",
+        diffLine: "სხვაობა = RS − Syrve ამ თვეში",
+        warn: (n) => `⚠ ${n} ხაზი ერთეულში ვერ გადავიყვანე და არ ითვლება — შეავსეთ „ზომა (ნეტო)“ პროდუქტებში.`,
+        col2: { n: "ზედნადები", day: "თარიღი", seller: "მომწოდებელი", name: "rs.ge დასახელება", qty: "რაოდ.", amt: "ერთეულში", syrve: "Syrve" },
+        how: { size: "ზომით", learned: "Syrve-დან", pc: "1:1" },
+        ret: "დაბრუნება", inSyrve: "✓", missing: "✗ Syrve-ში არ არის", notOnDoc: "⚠ Syrve-ის ზედნადებზე ეს პროდუქტი არ არის",
+        noWb: "ამ თვეში ზედნადები არ არის.",
+        prods: "პროდუქტები, რომელთა ზედნადებებიც ითვლება:", noProds: "პროდუქტი არ არის დაკავშირებული — RS არ ითვლება.",
+        add: "+ პროდუქტი", remove: "მოხსნა", noCode: "კოდი არ აქვს",
+      },
     },
   },
   en: {
@@ -276,6 +294,24 @@ const T = {
       error: "Could not get data from Syrve: ",
       showing: (a, b) => `Showing ${a} of ${b} — narrow the search`,
       empty: "No products found",
+      rs: {
+        col: "Storage RS", diff: "Difference",
+        colHint: "This month's rs.ge waybills (from the 1st, starting at zero) − returns − what Syrve took out (sales, write-offs, inventory).",
+        diffHint: "RS − Syrve (Syrve also from the 1st, starting at zero). 0 = every waybill is in Syrve with the same amount.",
+        open: "Waybills", errors: "Could not read everything from rs.ge / Syrve: ",
+        off: "Storage RS is counted for the current month only.",
+        sum: (from, to) => `${from} – ${to}`,
+        rsIn: "rs.ge waybills", rsRet: "Returns", usage: "Taken out by Syrve", rs: "Storage RS",
+        start: "Syrve at the start of the month", now: "Syrve now", delta: "Syrve this month", syrveIn: "Syrve invoices", syrveRet: "Syrve returns",
+        diffLine: "Difference = RS − Syrve this month",
+        warn: (n) => `⚠ ${n} line(s) could not be converted to the unit and don't count — fill in „ზომა (ნეტო)“ in Products.`,
+        col2: { n: "Waybill", day: "Date", seller: "Supplier", name: "rs.ge name", qty: "Qty", amt: "In unit", syrve: "Syrve" },
+        how: { size: "by size", learned: "from Syrve", pc: "1:1" },
+        ret: "return", inSyrve: "✓", missing: "✗ not in Syrve", notOnDoc: "⚠ not on the Syrve invoice",
+        noWb: "No waybills this month.",
+        prods: "Products whose waybills count:", noProds: "No product linked — RS is not counted.",
+        add: "+ product", remove: "Remove", noCode: "no code",
+      },
     },
   },
 };
@@ -987,6 +1023,92 @@ function StockLink({ t, item, products, onSave, readOnly }) {
   );
 }
 
+const signed = (n) => (n > 0 ? "+" : "") + qtyStr(n);
+const isZero = (n) => Math.abs(num(n)) < 0.0005;
+
+// The click view of a storage item: how „საწყობი RS“ is made, its waybills, and its products.
+function RsDetail({ t, item, products, readOnly, off, onSave }) {
+  const r = t.stock.rs;
+  const rs = item.rs;
+  const [adding, setAdding] = useState(false);
+  if (off) return <div className="rs-detail muted small">{r.off}</div>;
+  const linked = rs ? rs.prods : [];
+  const pById = new Map(products.map((p) => [p.id, p]));
+  const u = item.unit;
+  const setProds = (list) => onSave({ id: item.id, prods: list });
+  return (
+    <div className="rs-detail">
+      {rs && (
+        <div className="rs-sum">
+          <div>
+            <div className="rs-line"><span>{r.rsIn}</span><span className="mono">+{qtyStr(rs.rsIn)} {u}</span></div>
+            {rs.rsRet !== 0 && <div className="rs-line"><span>{r.rsRet}</span><span className="mono">−{qtyStr(rs.rsRet)} {u}</span></div>}
+            <div className="rs-line"><span>{r.usage}</span><span className="mono">{signed(-rs.usage)} {u}</span></div>
+            <div className="rs-line strong"><span>{r.rs}</span><span className="mono">{qtyStr(rs.amount)} {u}</span></div>
+          </div>
+          <div>
+            <div className="rs-line"><span>{r.start}</span><span className="mono">{qtyStr(rs.start)} {u}</span></div>
+            <div className="rs-line"><span>{r.syrveIn}</span><span className="mono">+{qtyStr(rs.syrveIn)} {u}</span></div>
+            {rs.syrveRet !== 0 && <div className="rs-line"><span>{r.syrveRet}</span><span className="mono">−{qtyStr(rs.syrveRet)} {u}</span></div>}
+            <div className="rs-line"><span>{r.now}</span><span className="mono">{qtyStr(item.syrve)} {u}</span></div>
+            <div className="rs-line strong"><span>{r.delta}</span><span className="mono">{signed(rs.delta)} {u}</span></div>
+          </div>
+          <div className="rs-diff">
+            <div className="muted small">{r.diffLine}</div>
+            <div className={"rs-diff-value mono " + (isZero(rs.diff) ? "s-ok" : "red-text")}>{signed(rs.diff)} {u}</div>
+          </div>
+        </div>
+      )}
+      {rs && rs.warn > 0 && <div className="warn-line small">{r.warn(rs.warn)}</div>}
+      {rs && (rs.wbs.length ? (
+        <div className="table-scroll">
+          <table className="table mini rs-wbs">
+            <thead><tr>
+              <th>{r.col2.n}</th><th>{r.col2.day}</th><th>{r.col2.seller}</th><th>{r.col2.name}</th>
+              <th className="r">{r.col2.qty}</th><th className="r">{r.col2.amt}</th><th>{r.col2.syrve}</th>
+            </tr></thead>
+            <tbody>
+              {rs.wbs.flatMap((wb) => wb.lines.map((l, i) => (
+                <tr key={wb.n + (wb.ret ? "r" : "") + i} className={wb.ret ? "rs-ret" : ""}>
+                  <td className="mono nowrap">{i === 0 ? wb.n : ""}{i === 0 && wb.ret && <span className="tag">{r.ret}</span>}</td>
+                  <td className="nowrap">{i === 0 ? fmtDate(wb.day + "T00:00", true).slice(0, 10) : ""}</td>
+                  <td>{i === 0 ? wb.seller : ""}</td>
+                  <td>{l.name}{l.code && <span className="muted small"> · {l.code}</span>}</td>
+                  <td className="r mono nowrap">{qtyStr(l.qty)} {l.unit}</td>
+                  <td className="r mono nowrap">{l.amt === null ? <span className="red-text">⚠</span> : <>{wb.ret ? "−" : ""}{qtyStr(l.amt)} {u}</>}
+                    {l.how && r.how[l.how] && <span className="tag">{r.how[l.how]}</span>}</td>
+                  <td className="nowrap">{i !== 0 || wb.ret ? "" : !wb.inSyrve ? <span className="red-text">{r.missing}</span>
+                    : wb.syrve === 0 ? <span className="warn-text">{r.notOnDoc}</span>
+                    : <span className="s-ok">{r.inSyrve} {qtyStr(wb.syrve)} {u}</span>}</td>
+                </tr>
+              )))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className="muted small rs-empty">{r.noWb}</div>)}
+      <div className="rs-prods">
+        <span className="muted small">{linked.length ? r.prods : r.noProds}</span>
+        {linked.map((id) => {
+          const p = pById.get(id);
+          return (
+            <span key={id} className="chip">
+              {p ? p.name : "#" + id}{p && <span className="muted"> · {p.supplier || "—"} · {p.code || r.noCode}</span>}
+              {!readOnly && <button className="chip-x" title={r.remove} aria-label={r.remove} onClick={() => setProds(linked.filter((x) => x !== id))}>✕</button>}
+            </span>
+          );
+        })}
+        {!readOnly && (adding ? (
+          <select className="input link-select" autoFocus value="" onBlur={() => setAdding(false)}
+            onChange={(e) => { setAdding(false); if (e.target.value) setProds([...linked, Number(e.target.value)]); }}>
+            <option value="">—</option>
+            {products.filter((p) => !linked.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}{p.supplier ? " · " + p.supplier : ""}</option>)}
+          </select>
+        ) : <button className="link-btn" onClick={() => setAdding(true)}>{r.add}</button>)}
+      </div>
+    </div>
+  );
+}
+
 // "YYYY-MM-DD" moved by n days
 const shiftDay = (day, n) => new Date(Date.parse(day + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 
@@ -997,6 +1119,7 @@ function StorageTab({ t, guard }) {
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [day, setDay] = useState(""); // "" = today (live), otherwise a past "YYYY-MM-DD"
+  const [open, setOpen] = useState(""); // the storage item whose waybills are shown
   const seq = useRef(0); // only the latest answer may fill the table
 
   const load = useCallback(async (fresh) => {
@@ -1045,6 +1168,9 @@ function StorageTab({ t, guard }) {
     .sort((a, b) => (isLow(b) - isLow(a)) || ((PRIO_RANK[a.prio] ?? 3) - (PRIO_RANK[b.prio] ?? 3)) || a.name.localeCompare(b.name));
   const lowCount = data.items.filter(isLow).length;
   const inv = data.inventory;
+  const rsOff = !data.rs || !!data.rs.off;
+  const rsErrors = data.rs && (data.rs.error || Object.values(data.rs.errors || {}).filter(Boolean).join(" · "));
+  const cols = live ? 9 : 6;
 
   return (
     <>
@@ -1075,6 +1201,7 @@ function StorageTab({ t, guard }) {
       {err && <div className="card notice error-text">{t.stock.error}{err}</div>}
       {data.alarmProblem === "no_group" && <div className="card notice">{t.stock.noGroup}</div>}
       {data.inventoryError && <div className="card notice muted small">{t.stock.invError}{data.inventoryError}</div>}
+      {rsErrors && <div className="card notice muted small">{t.stock.rs.errors}{rsErrors}</div>}
 
       <div className="card table-card">
         <div className="toolbar inner">
@@ -1099,22 +1226,30 @@ function StorageTab({ t, guard }) {
               <tr>
                 <th>{t.stock.col.prio}</th><th>{t.stock.col.name}</th>
                 <th className="r">{t.stock.col.syrve}</th>
+                <th className="r" title={t.stock.rs.colHint}>{t.stock.rs.col}</th>
+                <th className="r" title={t.stock.rs.diffHint}>{t.stock.rs.diff}</th>
                 {live && <th className="r" title={t.stock.corrHint}>{t.stock.col.live}</th>}
                 {live && <th className="r" title={t.stock.minHint}>{t.stock.col.min}</th>}
                 <th className="r">{t.stock.col.inv}</th>{live && <th>{t.stock.col.status}</th>}
               </tr>
             </thead>
             <tbody>
-              {rows.slice(0, MAX_STOCK_ROWS).map((it) => {
+              {rows.slice(0, MAX_STOCK_ROWS).flatMap((it) => {
                 const low = isLow(it);
-                return (
-                  <tr key={it.id} className={low ? "row-low" : ""}>
+                const isOpen = open === it.id;
+                const rs = rsOff ? null : it.rs;
+                return [
+                  <tr key={it.id} className={(low ? "row-low" : "") + (isOpen ? " row-open" : "")}>
                     <td><PrioPicker t={t} value={it.prio} readOnly={!live} onChange={(prio) => save({ id: it.id, prio })} /></td>
                     <td>
-                      <div className="strong">{it.name}{it.group && <span className="tag">{it.group}</span>}</div>
+                      <button className="name-btn strong" aria-expanded={isOpen} title={t.stock.rs.open} onClick={() => setOpen(isOpen ? "" : it.id)}>
+                        <span className="caret">{isOpen ? "▾" : "▸"}</span>{it.name}
+                      </button>{it.group && <span className="tag">{it.group}</span>}
                       <StockLink t={t} item={it} products={data.products} readOnly={!live} onSave={(link) => save({ id: it.id, link })} />
                     </td>
                     <td className={"r mono nowrap" + (live ? " muted" : "")}>{qtyStr(it.syrve)} {it.unit}</td>
+                    <td className="r mono nowrap">{rs ? <>{qtyStr(rs.amount)} {it.unit}{rs.warn > 0 && <span className="red-text" title={t.stock.rs.warn(rs.warn)}> ⚠</span>}</> : <span className="muted">—</span>}</td>
+                    <td className="r mono nowrap">{rs ? <span className={isZero(rs.diff) ? "s-ok" : "red-text"}>{signed(rs.diff)}</span> : <span className="muted">—</span>}</td>
                     {live && <td className="r nowrap">
                       <NumInput value={it.live} title={t.stock.corrHint} onSave={(live) => save({ id: it.id, live })} />
                       <span className="unit-label">{it.unit}</span>
@@ -1134,8 +1269,15 @@ function StorageTab({ t, guard }) {
                       {it.alarm ? <span className={"pill alarm-" + it.alarm}>{t.stock.alarm[it.alarm]}</span>
                         : low ? <span className="pill alarm-low">{t.stock.alarm.low}</span> : null}
                     </td>}
-                  </tr>
-                );
+                  </tr>,
+                  isOpen && (
+                    <tr key={it.id + ":rs"} className="sub">
+                      <td colSpan={cols}>
+                        <RsDetail t={t} item={{ ...it, rs }} products={data.products} readOnly={!live} off={rsOff} onSave={save} />
+                      </td>
+                    </tr>
+                  ),
+                ];
               })}
             </tbody>
           </table>
