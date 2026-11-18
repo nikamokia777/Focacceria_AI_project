@@ -286,6 +286,12 @@
     .chip-x { border: 0; background: #f0eee9; color: var(--muted); width: 20px; height: 20px; border-radius: 50%; font-size: 11px; line-height: 1; padding: 0; }
     .chip-x:hover { background: #fde4e2; color: var(--red); }
     @media (max-width: 700px) { .rs-sum { grid-template-columns: 1fr; } }
+    /* report: stock usage */
+    .report-days { flex-wrap: wrap; gap: 8px; }
+    .table-card .table.usage-table { min-width: 860px; }
+    .usage-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .usage-table th.sortable:hover, .usage-table th.sortable.on { color: var(--dark); }
+    .usage-table tfoot td { background: var(--head); border-top: 1px solid var(--line); }
 
     /* phones & tablets */
     @media (max-width: 1000px) {

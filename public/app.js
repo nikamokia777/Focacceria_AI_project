@@ -17,6 +17,7 @@ const T = {
       bazaar: "ბაზარი",
       orders: "შეკვეთები",
       storage: "საწყობი",
+      report: "რეპორტი",
       mistakes: "შეცდომები",
       debts: "ვალები",
       history: "ისტორია"
@@ -274,6 +275,54 @@ const T = {
         remove: "მოხსნა",
         noCode: "კოდი არ აქვს"
       }
+    },
+    report: {
+      title: "საქონლის ხარჯი",
+      presets: {
+        today: "დღეს",
+        yesterday: "გუშინ",
+        week: "ეს კვირა",
+        month: "ეს თვე",
+        lastMonth: "წინა თვე"
+      },
+      from: "დან",
+      to: "მდე",
+      kpi: {
+        cost: "ხარჯი, თვითღირებულება",
+        items: "პროდუქტი",
+        days: "დღე გაყიდვებით",
+        perDay: "საშუალოდ დღეში"
+      },
+      search: "პროდუქტის ძებნა…",
+      allGroups: "ყველა ჯგუფი",
+      type: "ტიპი",
+      kinds: {
+        all: "ყველა ტიპი",
+        goods: "ნედლეული",
+        semi: "ნახევარფაბრიკატი (ნ/ფ)",
+        other: "სხვა"
+      },
+      sortBy: "დალაგება",
+      sorts: {
+        most: "ყველაზე მეტი ხარჯი",
+        least: "ყველაზე ნაკლები ხარჯი",
+        costMost: "ყველაზე ძვირი ხარჯი",
+        costLeast: "ყველაზე იაფი ხარჯი"
+      },
+      col: {
+        name: "პროდუქტი",
+        group: "ჯგუფი",
+        unit: "ერთ.",
+        qty: "ხარჯი",
+        cost: "თვითღირებულება",
+        avg: "საშუალოდ დღეში",
+        share: "წილი"
+      },
+      semiTag: "ნ/ფ",
+      totalRow: n => `სულ · ${n} პროდუქტი`,
+      empty: "ამ პერიოდში ხარჯი არ არის",
+      error: "Syrve-დან მონაცემი ვერ მივიღე: ",
+      note: "Syrve-ის „საქონლის ხარჯი“ (Product COST): რამდენი წაიღო გაყიდვებმა რეცეპტით. საშუალო დღეში = ხარჯი ÷ დღეები გაყიდვებით. სვეტის სათაურზე დაჭერით — დიდიდან პატარისკენ / პატარიდან დიდისკენ."
     }
   },
   en: {
@@ -286,6 +335,7 @@ const T = {
       bazaar: "Bazaar",
       orders: "Orders",
       storage: "Storage",
+      report: "Report",
       mistakes: "Mistakes",
       debts: "Debts",
       history: "History"
@@ -543,10 +593,58 @@ const T = {
         remove: "Remove",
         noCode: "no code"
       }
+    },
+    report: {
+      title: "Stock usage",
+      presets: {
+        today: "Today",
+        yesterday: "Yesterday",
+        week: "This week",
+        month: "This month",
+        lastMonth: "Last month"
+      },
+      from: "from",
+      to: "to",
+      kpi: {
+        cost: "Usage, at cost",
+        items: "Products",
+        days: "Days with sales",
+        perDay: "Average per day"
+      },
+      search: "Search products…",
+      allGroups: "All groups",
+      type: "Type",
+      kinds: {
+        all: "All types",
+        goods: "Raw goods",
+        semi: "Semi-finished",
+        other: "Other"
+      },
+      sortBy: "Sort",
+      sorts: {
+        most: "Most used first",
+        least: "Least used first",
+        costMost: "Highest cost first",
+        costLeast: "Lowest cost first"
+      },
+      col: {
+        name: "Product",
+        group: "Group",
+        unit: "Unit",
+        qty: "Used",
+        cost: "Cost",
+        avg: "Avg per day",
+        share: "Share"
+      },
+      semiTag: "semi",
+      totalRow: n => `Total · ${n} products`,
+      empty: "No usage in this period",
+      error: "Could not get data from Syrve: ",
+      note: "Syrve's „Product COST“: what sales took out by recipe. Average per day = usage ÷ days with sales. Click a column header to sort highest first / lowest first."
     }
   }
 };
-const TABS = ["products", "distributors", "bazaar", "orders", "storage", "mistakes", "debts", "history"];
+const TABS = ["products", "distributors", "bazaar", "orders", "storage", "report", "mistakes", "debts", "history"];
 const CATEGORIES = ["ხორცეული", "ყველი", "ზეთი", "პასტა", "ბოსტნეული", "რძის პროდუქტი", "ყავა", "თხილეული", "გაყინული", "სხვა"];
 const CAT_EN = {
   "ხორცეული": "Meat",
@@ -1432,6 +1530,255 @@ function DebtsTab({
   }, t.debtsTitle), React.createElement("div", {
     className: "muted"
   }, t.debtsSoon));
+}
+const pad2 = n => String(n).padStart(2, "0");
+const isoDay = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+function reportPresets(today) {
+  const d = new Date(today + "T12:00:00");
+  const wd = (d.getDay() + 6) % 7;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - wd);
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  const prevFirst = new Date(d.getFullYear(), d.getMonth() - 1, 1),
+    prevLast = new Date(d.getFullYear(), d.getMonth(), 0);
+  const yest = new Date(d);
+  yest.setDate(d.getDate() - 1);
+  return {
+    today: [today, today],
+    yesterday: [isoDay(yest), isoDay(yest)],
+    week: [isoDay(monday), today],
+    month: [isoDay(first), today],
+    lastMonth: [isoDay(prevFirst), isoDay(prevLast)]
+  };
+}
+const TYPE_KIND = type => type === "PREPARED" ? "semi" : type === "GOODS" ? "goods" : "other";
+function ReportTab({
+  t,
+  guard
+}) {
+  const r = t.report;
+  const todayStr = isoDay(new Date());
+  const presets = reportPresets(todayStr);
+  const [range, setRange] = useState(presets.month);
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState("");
+  const [group, setGroup] = useState("");
+  const [kind, setKind] = useState("");
+  const [sort, setSort] = useState({
+    key: "qty",
+    dir: -1
+  });
+  const seq = useRef(0);
+  const load = useCallback(async fresh => {
+    const n = ++seq.current;
+    setBusy(true);
+    const qs = new URLSearchParams({
+      from: range[0],
+      to: range[1]
+    });
+    if (fresh) qs.set("fresh", "1");
+    try {
+      const res = await guard(() => api("/api/report/usage?" + qs));
+      if (n === seq.current) {
+        setData(res);
+        setErr("");
+      }
+    } catch (e) {
+      if (n === seq.current) setErr(e.message);
+    }
+    if (n === seq.current) setBusy(false);
+  }, [guard, range[0], range[1]]);
+  useEffect(() => {
+    load(false);
+  }, [load]);
+  const preset = Object.keys(presets).find(k => presets[k][0] === range[0] && presets[k][1] === range[1]) || "";
+  const setFrom = v => v && setRange([v, v > range[1] ? v : range[1]]);
+  const setTo = v => v && setRange([v < range[0] ? v : range[0], v > todayStr ? todayStr : v]);
+  const toolbar = React.createElement("div", {
+    className: "toolbar stock-days report-days"
+  }, React.createElement("div", {
+    className: "segmented"
+  }, ["today", "yesterday", "week", "month", "lastMonth"].map(k => React.createElement("button", {
+    key: k,
+    className: preset === k ? "on" : "",
+    onClick: () => setRange(presets[k])
+  }, r.presets[k]))), React.createElement("input", {
+    type: "date",
+    className: "input",
+    "aria-label": r.from,
+    title: r.from,
+    max: todayStr,
+    value: range[0],
+    onChange: e => setFrom(e.target.value)
+  }), React.createElement("span", {
+    className: "muted"
+  }, "–"), React.createElement("input", {
+    type: "date",
+    className: "input",
+    "aria-label": r.to,
+    title: r.to,
+    max: todayStr,
+    value: range[1],
+    onChange: e => setTo(e.target.value)
+  }), busy && React.createElement("span", {
+    className: "muted small"
+  }, t.loading));
+  if (!data) {
+    return React.createElement(React.Fragment, null, toolbar, React.createElement("div", {
+      className: "card"
+    }, err ? React.createElement("div", {
+      className: "empty error-text"
+    }, r.error, err) : React.createElement(Empty, null, t.loading)));
+  }
+  const days = data.days || 0;
+  const total = data.total || 0;
+  const groups = [...new Set(data.items.map(i => i.group).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const qn = norm(q);
+  const value = (i, key) => key === "avg" ? days ? i.qty / days : 0 : key === "share" ? total ? i.cost / total : 0 : i[key];
+  const rows = data.items.filter(i => !qn || norm(i.name).includes(qn) || norm(i.group).includes(qn)).filter(i => !group || i.group === group).filter(i => !kind || TYPE_KIND(i.type) === kind).sort((a, b) => {
+    const x = value(a, sort.key),
+      y = value(b, sort.key);
+    const c = typeof x === "string" ? String(x).localeCompare(String(y)) : x - y;
+    return c * sort.dir || a.name.localeCompare(b.name);
+  });
+  const shownCost = rows.reduce((a, i) => a + i.cost, 0);
+  const head = (key, label, right) => React.createElement("th", {
+    className: (right ? "r " : "") + "sortable" + (sort.key === key ? " on" : ""),
+    "aria-sort": sort.key === key ? sort.dir < 0 ? "descending" : "ascending" : "none",
+    onClick: () => setSort(sort.key === key ? {
+      key,
+      dir: -sort.dir
+    } : {
+      key,
+      dir: typeof value(data.items[0] || {}, key) === "string" ? 1 : -1
+    })
+  }, label, React.createElement("span", {
+    className: "sort-mark"
+  }, sort.key === key ? sort.dir < 0 ? " ▼" : " ▲" : ""));
+  const exportCsv = () => downloadCsv(`usage-${range[0]}_${range[1]}.csv`, [r.col.name, r.col.group, r.col.unit, r.col.qty, r.col.cost, r.col.avg, r.col.share], rows.map(i => [i.name, i.group, i.unit, i.qty, i.cost, days ? Math.round(i.qty / days * 1000) / 1000 : "", total ? Math.round(i.cost / total * 10000) / 100 : ""]));
+  return React.createElement(React.Fragment, null, toolbar, React.createElement("div", {
+    className: "kpis"
+  }, React.createElement("div", {
+    className: "card kpi"
+  }, React.createElement("div", {
+    className: "kpi-label"
+  }, r.kpi.cost), React.createElement("div", {
+    className: "kpi-value"
+  }, money(total))), React.createElement("div", {
+    className: "card kpi"
+  }, React.createElement("div", {
+    className: "kpi-label"
+  }, r.kpi.items), React.createElement("div", {
+    className: "kpi-value"
+  }, data.items.length)), React.createElement("div", {
+    className: "card kpi"
+  }, React.createElement("div", {
+    className: "kpi-label"
+  }, r.kpi.days), React.createElement("div", {
+    className: "kpi-value"
+  }, days)), React.createElement("div", {
+    className: "card kpi"
+  }, React.createElement("div", {
+    className: "kpi-label"
+  }, r.kpi.perDay), React.createElement("div", {
+    className: "kpi-value"
+  }, days ? money(total / days) : "—"))), err && React.createElement("div", {
+    className: "card notice error-text"
+  }, r.error, err), React.createElement("div", {
+    className: "card table-card"
+  }, React.createElement("div", {
+    className: "toolbar inner"
+  }, React.createElement("input", {
+    className: "input grow",
+    placeholder: r.search,
+    value: q,
+    onChange: e => setQ(e.target.value)
+  }), React.createElement("select", {
+    className: "input",
+    value: group,
+    onChange: e => setGroup(e.target.value),
+    "aria-label": r.col.group
+  }, React.createElement("option", {
+    value: ""
+  }, r.allGroups), groups.map(g => React.createElement("option", {
+    key: g,
+    value: g
+  }, g))), React.createElement("select", {
+    className: "input",
+    value: kind,
+    onChange: e => setKind(e.target.value),
+    "aria-label": r.type
+  }, React.createElement("option", {
+    value: ""
+  }, r.kinds.all), React.createElement("option", {
+    value: "goods"
+  }, r.kinds.goods), React.createElement("option", {
+    value: "semi"
+  }, r.kinds.semi), React.createElement("option", {
+    value: "other"
+  }, r.kinds.other)), React.createElement("select", {
+    className: "input",
+    value: sort.key + ":" + sort.dir,
+    "aria-label": r.sortBy,
+    onChange: e => {
+      const [key, dir] = e.target.value.split(":");
+      setSort({
+        key,
+        dir: Number(dir)
+      });
+    }
+  }, React.createElement("option", {
+    value: "qty:-1"
+  }, r.sorts.most), React.createElement("option", {
+    value: "qty:1"
+  }, r.sorts.least), React.createElement("option", {
+    value: "cost:-1"
+  }, r.sorts.costMost), React.createElement("option", {
+    value: "cost:1"
+  }, r.sorts.costLeast)), React.createElement("button", {
+    className: "btn-outline",
+    onClick: exportCsv
+  }, t.csv), React.createElement("button", {
+    className: "btn-outline",
+    disabled: busy,
+    onClick: () => load(true)
+  }, t.stock.refresh)), React.createElement("div", {
+    className: "table-scroll"
+  }, React.createElement("table", {
+    className: "table usage-table"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", {
+    className: "r"
+  }, "#"), head("name", r.col.name), head("group", r.col.group), React.createElement("th", null, r.col.unit), head("qty", r.col.qty, true), head("cost", r.col.cost, true), head("avg", r.col.avg, true), head("share", r.col.share, true))), React.createElement("tbody", null, rows.map((i, k) => React.createElement("tr", {
+    key: i.id
+  }, React.createElement("td", {
+    className: "r muted mono"
+  }, k + 1), React.createElement("td", {
+    className: "strong"
+  }, i.name, TYPE_KIND(i.type) === "semi" && React.createElement("span", {
+    className: "tag"
+  }, r.semiTag)), React.createElement("td", {
+    className: "muted"
+  }, i.group || "—"), React.createElement("td", {
+    className: "muted"
+  }, i.unit), React.createElement("td", {
+    className: "r mono nowrap strong"
+  }, qtyStr(i.qty)), React.createElement("td", {
+    className: "r mono nowrap"
+  }, money(i.cost)), React.createElement("td", {
+    className: "r mono nowrap"
+  }, days ? qtyStr(i.qty / days) : "—"), React.createElement("td", {
+    className: "r mono nowrap"
+  }, total ? (i.cost / total * 100).toFixed(1) + "%" : "—")))), rows.length > 0 && React.createElement("tfoot", null, React.createElement("tr", null, React.createElement("td", null), React.createElement("td", {
+    className: "strong"
+  }, r.totalRow(rows.length)), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null), React.createElement("td", {
+    className: "r mono nowrap strong"
+  }, money(shownCost)), React.createElement("td", null), React.createElement("td", {
+    className: "r mono nowrap"
+  }, total ? (shownCost / total * 100).toFixed(1) + "%" : "—"))))), !rows.length && React.createElement(Empty, null, r.empty), React.createElement("div", {
+    className: "muted small table-foot"
+  }, r.note)));
 }
 const PRIORITIES = ["red", "yellow", "cyan"];
 const PRIO_RANK = {
@@ -2515,6 +2862,9 @@ function App() {
     order: order,
     orderOps: orderOps
   }), tab === "storage" && React.createElement(StorageTab, {
+    t: t,
+    guard: guard
+  }), tab === "report" && React.createElement(ReportTab, {
     t: t,
     guard: guard
   }), tab === "mistakes" && React.createElement(MistakesTab, {

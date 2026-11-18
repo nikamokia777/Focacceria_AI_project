@@ -17,6 +17,7 @@
 //   POST     /api/log/action   { token, action: "resolve" | "reopen" }
 //   GET/POST /api/stock        the Storage tab: Syrve stock, minimums, priorities (POST { id, ... });
 //                              GET ?date=YYYY-MM-DD = the end of a past day, read-only
+//   GET      /api/report/usage the „რეპორტი“ tab: stock used in a period (?from&to), see usage.js
 //   *        /api/dash/...     the Dashboard (costs, ratings, tasks, Syrve data) — see dashboard.js
 //
 // Everything else is served from the static files in /public.
@@ -37,6 +38,7 @@ import { buildStock, updateStock, checkStockAlarms, scheduledStockCheck } from "
 import { scheduledBankSync } from "./bank.js";
 import { scheduledMenuCosts } from "./menu.js";
 import { scheduledWaybills } from "./waybills.js";
+import { handleUsage } from "./usage.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 
@@ -206,6 +208,7 @@ const PROTECTED = {
   "/api/log": handleLog,
   "/api/log/action": handleLogAction,
   "/api/stock": handleStock,
+  "/api/report/usage": handleUsage, // „რეპორტი“ → „საქონლის ხარჯი“ (usage.js)
 };
 
 export default {
