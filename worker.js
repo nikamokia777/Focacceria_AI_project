@@ -38,7 +38,7 @@ import { buildStock, updateStock, checkStockAlarms, scheduledStockCheck } from "
 import { scheduledBankSync } from "./bank.js";
 import { scheduledMenuCosts } from "./menu.js";
 import { scheduledWaybills } from "./waybills.js";
-import { handleUsage } from "./usage.js";
+import { handleUsage, handleUsageItem } from "./usage.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 
@@ -209,6 +209,7 @@ const PROTECTED = {
   "/api/log/action": handleLogAction,
   "/api/stock": handleStock,
   "/api/report/usage": handleUsage, // „რეპორტი“ → „საქონლის ხარჯი“ (usage.js)
+  "/api/report/usage/item": handleUsageItem, // one product: deliveries + dishes (usage.js)
 };
 
 export default {

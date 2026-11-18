@@ -174,7 +174,14 @@ const T = {
       semiTag: "ნ/ფ", totalRow: (n) => `სულ · ${n} პროდუქტი`,
       empty: "ამ პერიოდში ხარჯი არ არის",
       error: "Syrve-დან მონაცემი ვერ მივიღე: ",
-      note: "Syrve-ის „საქონლის ხარჯი“ (Product COST): რამდენი წაიღო გაყიდვებმა რეცეპტით. საშუალო დღეში = ხარჯი ÷ დღეები გაყიდვებით. სვეტის სათაურზე დაჭერით — დიდიდან პატარისკენ / პატარიდან დიდისკენ.",
+      note: "Syrve-ის „საქონლის ხარჯი“ (Product COST): რამდენი წაიღო გაყიდვებმა რეცეპტით. საშუალო დღეში = ხარჯი ÷ დღეები გაყიდვებით. სვეტის სათაურზე დაჭერით — დიდიდან პატარისკენ / პატარიდან დიდისკენ. პროდუქტზე დაჭერით — შევსებები და კერძები.",
+      det: {
+        restocks: "შევსება (მომწოდებლის ზედნადები)", dishes: "სად დაიხარჯა (კერძები)",
+        col: { day: "თარიღი", num: "ზედნადები №", supplier: "მომწოდებელი", qty: "რაოდენობა", price: "ფასი", sum: "თანხა", dish: "კერძი", used: "ხარჯი", cost: "თვითღირებულება", share: "წილი" },
+        restockTotal: (n, q) => `სულ ${n} შევსება · ${q}`, usedTotal: "სულ",
+        noRestocks: "ამ პერიოდში შევსება არ ყოფილა", noDishes: "ამ პერიოდში ხარჯი არ არის",
+        error: "ვერ წავიკითხე: ", close: "დახურვა",
+      },
     },
   },
   en: {
@@ -339,7 +346,14 @@ const T = {
       semiTag: "semi", totalRow: (n) => `Total · ${n} products`,
       empty: "No usage in this period",
       error: "Could not get data from Syrve: ",
-      note: "Syrve's „Product COST“: what sales took out by recipe. Average per day = usage ÷ days with sales. Click a column header to sort highest first / lowest first.",
+      note: "Syrve's „Product COST“: what sales took out by recipe. Average per day = usage ÷ days with sales. Click a column header to sort highest first / lowest first. Click a product to see its restocks and dishes.",
+      det: {
+        restocks: "Restocks (supplier waybills)", dishes: "Where it was used (dishes)",
+        col: { day: "Date", num: "Waybill №", supplier: "Supplier", qty: "Quantity", price: "Price", sum: "Sum", dish: "Dish", used: "Used", cost: "Cost", share: "Share" },
+        restockTotal: (n, q) => `Total ${n} restock(s) · ${q}`, usedTotal: "Total",
+        noRestocks: "No restocks in this period", noDishes: "No usage in this period",
+        error: "Could not read: ", close: "Close",
+      },
     },
   },
 };
@@ -1018,6 +1032,70 @@ function reportPresets(today) {
 }
 const TYPE_KIND = (type) => (type === "PREPARED" ? "semi" : type === "GOODS" ? "goods" : "other");
 
+// One product of the report: every delivery (never summed) and the dishes it went into.
+function UsageDetail({ t, guard, item, range }) {
+  const d = t.report.det;
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let live = true;
+    setData(null); setErr("");
+    const qs = new URLSearchParams({ id: item.id, from: range[0], to: range[1] });
+    guard(() => api("/api/report/usage/item?" + qs)).then((r) => { if (live) setData(r); }).catch((e) => { if (live) setErr(e.message); });
+    return () => { live = false; };
+  }, [guard, item.id, range[0], range[1]]);
+  if (err) return <div className="usage-detail error-text">{d.error}{err}</div>;
+  if (!data) return <div className="usage-detail muted small">{t.loading}</div>;
+  const u = data.unit || item.unit;
+  const fmtDay = (day) => day.split("-").reverse().join(".");
+  const restockQty = data.restocks.reduce((a, x) => a + x.qty, 0);
+  return (
+    <div className="usage-detail">
+      <div className="usage-block">
+        <div className="section-title">{d.restocks}</div>
+        {data.errors?.restocks && <div className="error-text small">{d.error}{data.errors.restocks}</div>}
+        {data.restocks.length ? (
+          <div className="table-scroll">
+            <table className="table mini">
+              <thead><tr><th>{d.col.day}</th><th>{d.col.num}</th><th>{d.col.supplier}</th><th className="r">{d.col.qty}</th><th className="r">{d.col.price}</th><th className="r">{d.col.sum}</th></tr></thead>
+              <tbody>
+                {data.restocks.map((x, i) => (
+                  <tr key={x.num + ":" + i}>
+                    <td className="nowrap mono">{fmtDay(x.day)}</td><td className="mono">{x.num || "—"}</td><td>{x.supplier || "—"}</td>
+                    <td className="r mono nowrap strong">{qtyStr(x.qty)} {u}</td><td className="r mono nowrap">{money(x.price)}</td><td className="r mono nowrap">{money(x.sum)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr><td colSpan={3} className="strong">{d.restockTotal(data.restocks.length, qtyStr(restockQty) + " " + u)}</td><td></td><td></td>
+                <td className="r mono nowrap strong">{money(data.restocks.reduce((a, x) => a + x.sum, 0))}</td></tr></tfoot>
+            </table>
+          </div>
+        ) : <div className="muted small">{d.noRestocks}</div>}
+      </div>
+      <div className="usage-block">
+        <div className="section-title">{d.dishes}</div>
+        {data.errors?.dishes && <div className="error-text small">{d.error}{data.errors.dishes}</div>}
+        {data.dishes.length ? (
+          <div className="table-scroll">
+            <table className="table mini">
+              <thead><tr><th>{d.col.dish}</th><th className="r">{d.col.used}</th><th className="r">{d.col.cost}</th><th className="r">{d.col.share}</th></tr></thead>
+              <tbody>
+                {data.dishes.map((x) => (
+                  <tr key={x.name}>
+                    <td>{x.name}</td><td className="r mono nowrap strong">{qtyStr(x.qty)} {u}</td><td className="r mono nowrap">{money(x.cost)}</td>
+                    <td className="r mono nowrap">{data.used.qty ? (x.qty / data.used.qty * 100).toFixed(1) + "%" : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr><td className="strong">{d.usedTotal}</td><td className="r mono nowrap strong">{qtyStr(data.used.qty)} {u}</td><td className="r mono nowrap strong">{money(data.used.cost)}</td><td></td></tr></tfoot>
+            </table>
+          </div>
+        ) : <div className="muted small">{d.noDishes}</div>}
+      </div>
+    </div>
+  );
+}
+
 function ReportTab({ t, guard }) {
   const r = t.report;
   const todayStr = isoDay(new Date());
@@ -1030,6 +1108,7 @@ function ReportTab({ t, guard }) {
   const [group, setGroup] = useState("");
   const [kind, setKind] = useState("");
   const [sort, setSort] = useState({ key: "qty", dir: -1 }); // -1 = highest first
+  const [open, setOpen] = useState(""); // the product whose restocks and dishes are shown
   const seq = useRef(0);
 
   const load = useCallback(async (fresh) => {
@@ -1136,18 +1215,21 @@ function ReportTab({ t, guard }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((i, k) => (
-                <tr key={i.id}>
+              {rows.flatMap((i, k) => [
+                <tr key={i.id} className={"usage-row" + (open === i.id ? " row-open" : "")} onClick={() => setOpen(open === i.id ? "" : i.id)}>
                   <td className="r muted mono">{k + 1}</td>
-                  <td className="strong">{i.name}{TYPE_KIND(i.type) === "semi" && <span className="tag">{r.semiTag}</span>}</td>
+                  <td className="strong"><span className="caret">{open === i.id ? "▾" : "▸"}</span>{i.name}{TYPE_KIND(i.type) === "semi" && <span className="tag">{r.semiTag}</span>}</td>
                   <td className="muted">{i.group || "—"}</td>
                   <td className="muted">{i.unit}</td>
                   <td className="r mono nowrap strong">{qtyStr(i.qty)}</td>
                   <td className="r mono nowrap">{money(i.cost)}</td>
                   <td className="r mono nowrap">{days ? qtyStr(i.qty / days) : "—"}</td>
                   <td className="r mono nowrap">{total ? (i.cost / total * 100).toFixed(1) + "%" : "—"}</td>
-                </tr>
-              ))}
+                </tr>,
+                open === i.id && (
+                  <tr key={i.id + ":d"} className="sub"><td colSpan={8}><UsageDetail t={t} guard={guard} item={i} range={range} /></td></tr>
+                ),
+              ])}
             </tbody>
             {rows.length > 0 && (
               <tfoot>

@@ -322,7 +322,29 @@ const T = {
       totalRow: n => `სულ · ${n} პროდუქტი`,
       empty: "ამ პერიოდში ხარჯი არ არის",
       error: "Syrve-დან მონაცემი ვერ მივიღე: ",
-      note: "Syrve-ის „საქონლის ხარჯი“ (Product COST): რამდენი წაიღო გაყიდვებმა რეცეპტით. საშუალო დღეში = ხარჯი ÷ დღეები გაყიდვებით. სვეტის სათაურზე დაჭერით — დიდიდან პატარისკენ / პატარიდან დიდისკენ."
+      note: "Syrve-ის „საქონლის ხარჯი“ (Product COST): რამდენი წაიღო გაყიდვებმა რეცეპტით. საშუალო დღეში = ხარჯი ÷ დღეები გაყიდვებით. სვეტის სათაურზე დაჭერით — დიდიდან პატარისკენ / პატარიდან დიდისკენ. პროდუქტზე დაჭერით — შევსებები და კერძები.",
+      det: {
+        restocks: "შევსება (მომწოდებლის ზედნადები)",
+        dishes: "სად დაიხარჯა (კერძები)",
+        col: {
+          day: "თარიღი",
+          num: "ზედნადები №",
+          supplier: "მომწოდებელი",
+          qty: "რაოდენობა",
+          price: "ფასი",
+          sum: "თანხა",
+          dish: "კერძი",
+          used: "ხარჯი",
+          cost: "თვითღირებულება",
+          share: "წილი"
+        },
+        restockTotal: (n, q) => `სულ ${n} შევსება · ${q}`,
+        usedTotal: "სულ",
+        noRestocks: "ამ პერიოდში შევსება არ ყოფილა",
+        noDishes: "ამ პერიოდში ხარჯი არ არის",
+        error: "ვერ წავიკითხე: ",
+        close: "დახურვა"
+      }
     }
   },
   en: {
@@ -640,7 +662,29 @@ const T = {
       totalRow: n => `Total · ${n} products`,
       empty: "No usage in this period",
       error: "Could not get data from Syrve: ",
-      note: "Syrve's „Product COST“: what sales took out by recipe. Average per day = usage ÷ days with sales. Click a column header to sort highest first / lowest first."
+      note: "Syrve's „Product COST“: what sales took out by recipe. Average per day = usage ÷ days with sales. Click a column header to sort highest first / lowest first. Click a product to see its restocks and dishes.",
+      det: {
+        restocks: "Restocks (supplier waybills)",
+        dishes: "Where it was used (dishes)",
+        col: {
+          day: "Date",
+          num: "Waybill №",
+          supplier: "Supplier",
+          qty: "Quantity",
+          price: "Price",
+          sum: "Sum",
+          dish: "Dish",
+          used: "Used",
+          cost: "Cost",
+          share: "Share"
+        },
+        restockTotal: (n, q) => `Total ${n} restock(s) · ${q}`,
+        usedTotal: "Total",
+        noRestocks: "No restocks in this period",
+        noDishes: "No usage in this period",
+        error: "Could not read: ",
+        close: "Close"
+      }
     }
   }
 };
@@ -1552,6 +1596,113 @@ function reportPresets(today) {
   };
 }
 const TYPE_KIND = type => type === "PREPARED" ? "semi" : type === "GOODS" ? "goods" : "other";
+function UsageDetail({
+  t,
+  guard,
+  item,
+  range
+}) {
+  const d = t.report.det;
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let live = true;
+    setData(null);
+    setErr("");
+    const qs = new URLSearchParams({
+      id: item.id,
+      from: range[0],
+      to: range[1]
+    });
+    guard(() => api("/api/report/usage/item?" + qs)).then(r => {
+      if (live) setData(r);
+    }).catch(e => {
+      if (live) setErr(e.message);
+    });
+    return () => {
+      live = false;
+    };
+  }, [guard, item.id, range[0], range[1]]);
+  if (err) return React.createElement("div", {
+    className: "usage-detail error-text"
+  }, d.error, err);
+  if (!data) return React.createElement("div", {
+    className: "usage-detail muted small"
+  }, t.loading);
+  const u = data.unit || item.unit;
+  const fmtDay = day => day.split("-").reverse().join(".");
+  const restockQty = data.restocks.reduce((a, x) => a + x.qty, 0);
+  return React.createElement("div", {
+    className: "usage-detail"
+  }, React.createElement("div", {
+    className: "usage-block"
+  }, React.createElement("div", {
+    className: "section-title"
+  }, d.restocks), data.errors?.restocks && React.createElement("div", {
+    className: "error-text small"
+  }, d.error, data.errors.restocks), data.restocks.length ? React.createElement("div", {
+    className: "table-scroll"
+  }, React.createElement("table", {
+    className: "table mini"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, d.col.day), React.createElement("th", null, d.col.num), React.createElement("th", null, d.col.supplier), React.createElement("th", {
+    className: "r"
+  }, d.col.qty), React.createElement("th", {
+    className: "r"
+  }, d.col.price), React.createElement("th", {
+    className: "r"
+  }, d.col.sum))), React.createElement("tbody", null, data.restocks.map((x, i) => React.createElement("tr", {
+    key: x.num + ":" + i
+  }, React.createElement("td", {
+    className: "nowrap mono"
+  }, fmtDay(x.day)), React.createElement("td", {
+    className: "mono"
+  }, x.num || "—"), React.createElement("td", null, x.supplier || "—"), React.createElement("td", {
+    className: "r mono nowrap strong"
+  }, qtyStr(x.qty), " ", u), React.createElement("td", {
+    className: "r mono nowrap"
+  }, money(x.price)), React.createElement("td", {
+    className: "r mono nowrap"
+  }, money(x.sum))))), React.createElement("tfoot", null, React.createElement("tr", null, React.createElement("td", {
+    colSpan: 3,
+    className: "strong"
+  }, d.restockTotal(data.restocks.length, qtyStr(restockQty) + " " + u)), React.createElement("td", null), React.createElement("td", null), React.createElement("td", {
+    className: "r mono nowrap strong"
+  }, money(data.restocks.reduce((a, x) => a + x.sum, 0))))))) : React.createElement("div", {
+    className: "muted small"
+  }, d.noRestocks)), React.createElement("div", {
+    className: "usage-block"
+  }, React.createElement("div", {
+    className: "section-title"
+  }, d.dishes), data.errors?.dishes && React.createElement("div", {
+    className: "error-text small"
+  }, d.error, data.errors.dishes), data.dishes.length ? React.createElement("div", {
+    className: "table-scroll"
+  }, React.createElement("table", {
+    className: "table mini"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, d.col.dish), React.createElement("th", {
+    className: "r"
+  }, d.col.used), React.createElement("th", {
+    className: "r"
+  }, d.col.cost), React.createElement("th", {
+    className: "r"
+  }, d.col.share))), React.createElement("tbody", null, data.dishes.map(x => React.createElement("tr", {
+    key: x.name
+  }, React.createElement("td", null, x.name), React.createElement("td", {
+    className: "r mono nowrap strong"
+  }, qtyStr(x.qty), " ", u), React.createElement("td", {
+    className: "r mono nowrap"
+  }, money(x.cost)), React.createElement("td", {
+    className: "r mono nowrap"
+  }, data.used.qty ? (x.qty / data.used.qty * 100).toFixed(1) + "%" : "—")))), React.createElement("tfoot", null, React.createElement("tr", null, React.createElement("td", {
+    className: "strong"
+  }, d.usedTotal), React.createElement("td", {
+    className: "r mono nowrap strong"
+  }, qtyStr(data.used.qty), " ", u), React.createElement("td", {
+    className: "r mono nowrap strong"
+  }, money(data.used.cost)), React.createElement("td", null))))) : React.createElement("div", {
+    className: "muted small"
+  }, d.noDishes)));
+}
 function ReportTab({
   t,
   guard
@@ -1570,6 +1721,7 @@ function ReportTab({
     key: "qty",
     dir: -1
   });
+  const [open, setOpen] = useState("");
   const seq = useRef(0);
   const load = useCallback(async fresh => {
     const n = ++seq.current;
@@ -1750,13 +1902,17 @@ function ReportTab({
     className: "table usage-table"
   }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", {
     className: "r"
-  }, "#"), head("name", r.col.name), head("group", r.col.group), React.createElement("th", null, r.col.unit), head("qty", r.col.qty, true), head("cost", r.col.cost, true), head("avg", r.col.avg, true), head("share", r.col.share, true))), React.createElement("tbody", null, rows.map((i, k) => React.createElement("tr", {
-    key: i.id
+  }, "#"), head("name", r.col.name), head("group", r.col.group), React.createElement("th", null, r.col.unit), head("qty", r.col.qty, true), head("cost", r.col.cost, true), head("avg", r.col.avg, true), head("share", r.col.share, true))), React.createElement("tbody", null, rows.flatMap((i, k) => [React.createElement("tr", {
+    key: i.id,
+    className: "usage-row" + (open === i.id ? " row-open" : ""),
+    onClick: () => setOpen(open === i.id ? "" : i.id)
   }, React.createElement("td", {
     className: "r muted mono"
   }, k + 1), React.createElement("td", {
     className: "strong"
-  }, i.name, TYPE_KIND(i.type) === "semi" && React.createElement("span", {
+  }, React.createElement("span", {
+    className: "caret"
+  }, open === i.id ? "▾" : "▸"), i.name, TYPE_KIND(i.type) === "semi" && React.createElement("span", {
     className: "tag"
   }, r.semiTag)), React.createElement("td", {
     className: "muted"
@@ -1770,7 +1926,17 @@ function ReportTab({
     className: "r mono nowrap"
   }, days ? qtyStr(i.qty / days) : "—"), React.createElement("td", {
     className: "r mono nowrap"
-  }, total ? (i.cost / total * 100).toFixed(1) + "%" : "—")))), rows.length > 0 && React.createElement("tfoot", null, React.createElement("tr", null, React.createElement("td", null), React.createElement("td", {
+  }, total ? (i.cost / total * 100).toFixed(1) + "%" : "—")), open === i.id && React.createElement("tr", {
+    key: i.id + ":d",
+    className: "sub"
+  }, React.createElement("td", {
+    colSpan: 8
+  }, React.createElement(UsageDetail, {
+    t: t,
+    guard: guard,
+    item: i,
+    range: range
+  })))])), rows.length > 0 && React.createElement("tfoot", null, React.createElement("tr", null, React.createElement("td", null), React.createElement("td", {
     className: "strong"
   }, r.totalRow(rows.length)), React.createElement("td", null), React.createElement("td", null), React.createElement("td", null), React.createElement("td", {
     className: "r mono nowrap strong"

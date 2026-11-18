@@ -292,6 +292,15 @@
     .usage-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
     .usage-table th.sortable:hover, .usage-table th.sortable.on { color: var(--dark); }
     .usage-table tfoot td { background: var(--head); border-top: 1px solid var(--line); }
+    .usage-row { cursor: pointer; }
+    .usage-row:hover td { background: #faf9f6; }
+    .usage-table .row-open td { background: #f7f6f3; }
+    .usage-table tr.sub > td { background: #fbfaf8; padding: 12px 16px 16px; }
+    .usage-detail { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; position: sticky; left: 16px; max-width: min(1100px, calc(100vw - 72px)); }
+    .usage-detail .section-title { margin: 0 0 8px; }
+    .usage-detail .table.mini { min-width: 0; }
+    .usage-detail tfoot td { background: var(--head); }
+    @media (max-width: 900px) { .usage-detail { grid-template-columns: 1fr; } }
 
     /* phones & tablets */
     @media (max-width: 1000px) {
