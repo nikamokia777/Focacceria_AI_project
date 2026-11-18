@@ -36,7 +36,9 @@ export async function fetchUsage(env, from, to) {
     return {
       stores: st,
       rows: await olap(["Account.Name", "Product.Id", "Product.Name"], ["Amount", "Sum.ResignedSum"]),
-      dayRows: await olap(["DateTime.Typed"], ["Sum.ResignedSum"]),
+      // per day and account: a day's store side and expense side cancel out (checked live 18 Nov), so the
+      // days with sales are the days whose store side has usage
+      dayRows: await olap(["DateTime.Typed", "Account.Name"], ["Amount", "Sum.ResignedSum"]),
     };
   });
   // the store side: a store's account, or (when the store list is unknown) the rows going out
@@ -60,7 +62,7 @@ export async function fetchUsage(env, from, to) {
     items.push({ id: x.id, name: p[0] || x.name, unit: p[2] || "", group: p[3] || "", type: p[1] || "", qty: r3(x.qty), cost: r2(x.cost) });
   }
   items.sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name));
-  const days = new Set(dayRows.filter((r) => Math.abs(num(r["Sum.ResignedSum"])) > 0).map((r) => String(r["DateTime.Typed"] || "").slice(0, 10)).filter(Boolean)).size;
+  const days = new Set(dayRows.filter((r) => storeSide(r) && (Math.abs(num(r.Amount)) > 1e-9 || Math.abs(num(r["Sum.ResignedSum"])) > 0)).map((r) => String(r["DateTime.Typed"] || "").slice(0, 10)).filter(Boolean)).size;
   return { from, to, days, total: r2(items.reduce((a, i) => a + i.cost, 0)), items };
 }
 
@@ -73,6 +75,6 @@ export async function handleUsage(request, env) {
   if (to > today) to = today;
   if (from > to) return out({ error: "bad range" }, 400);
   const ttl = to >= today ? 60 : 3600;
-  const data = await cached(env, `usage:${from}:${to}`, ttl, q.get("fresh") === "1", () => fetchUsage(env, from, to));
+  const data = await cached(env, `usage2:${from}:${to}`, ttl, q.get("fresh") === "1", () => fetchUsage(env, from, to));
   return out(data);
 }
