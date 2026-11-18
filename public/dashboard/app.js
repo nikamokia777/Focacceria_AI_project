@@ -65,7 +65,7 @@ const T = {
     avg_by_day: "საშუალო ჩეკი · დღეების მიხედვით", avg_by_hour: "საშუალო ჩეკი · საათების მიხედვით",
     avg_all_days: "ყველა დღე ერთად", avg_no_marketing: "მარკეტინგის გარეშე", orders_n: "{n} შეკვეთა",
     by_weekday: "საშუალოდ კვირის დღის მიხედვით", wd_sub: "დღეები გაყიდვებით · დღევანდელი დაუმთავრებელი დღე არ ითვლება",
-    wd_tip: "{d}: {v} · {n} დღე · საშ. {o} შეკვეთა · საშ. ჩეკი {c}",
+    wd_tip: "{d}: {v} · {n} დღე · საშ. {o} შეკვეთა · საშ. ჩეკი {c}", wd_none: "{d}: ამ პერიოდში გაყიდვების დღე არ არის",
     wdays_full: ["ორშაბათი", "სამშაბათი", "ოთხშაბათი", "ხუთშაბათი", "პარასკევი", "შაბათი", "კვირა"],
     peak1: "1-ლი პიკი", peak2: "მე-2 პიკი", lowest: "ყველაზე დაბალი",
     pick_today: "დღეს", pick_yesterday: "გუშინ", pick_week: "ეს კვირა", pick_month: "ეს თვე", pick_last_month: "წინა თვე", pick_6m: "6 თვე", pick_12m: "12 თვე",
@@ -258,7 +258,7 @@ const T = {
     avg_by_day: "Average check · by day", avg_by_hour: "Average check · by hour",
     avg_all_days: "all days together", avg_no_marketing: "without marketing", orders_n: "{n} orders",
     by_weekday: "Average by weekday", wd_sub: "days with sales · today's unfinished day not counted",
-    wd_tip: "{d}: {v} · {n} day(s) · avg {o} orders · avg check {c}",
+    wd_tip: "{d}: {v} · {n} day(s) · avg {o} orders · avg check {c}", wd_none: "{d}: no sales day in this period",
     wdays_full: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
     peak1: "1st peak", peak2: "2nd peak", lowest: "Lowest",
     pick_today: "Today", pick_yesterday: "Yesterday", pick_week: "This week", pick_month: "This month", pick_last_month: "Last month", pick_6m: "6 months", pick_12m: "12 months",
@@ -1133,15 +1133,15 @@ async function renderLive(view, demo, fresh = false) {
   if (range.from !== range.to) {
     const W = Array.from({ length: 7 }, () => ({ income: 0, days: 0, orders: 0, net: 0 }));
     const wdOf = d => (new Date(d + "T12:00:00Z").getUTCDay() + 6) % 7; // Monday = 0
-    const present = new Set();
-    for (let d = range.from; d <= range.to; d = shiftDay(d, 1)) if (d !== todayISO()) present.add(wdOf(d));
     for (const x of r.byDay || []) {
       if (x.day < range.from || x.day > range.to || x.day === todayISO() || !(n(x.sum) > 0)) continue;
       const w = W[wdOf(x.day)];
       w.income += n(x.income ?? x.sum); w.days++; w.orders += n(x.orders); w.net += n(x.net ?? x.sum);
     }
-    weekPts = [0, 1, 2, 3, 4, 5, 6].filter(i => present.has(i)).map(i => {
+    // all seven weekdays are always shown; one without sales days in the range stays empty and unranked
+    weekPts = [0, 1, 2, 3, 4, 5, 6].map(i => {
       const w = W[i], v = w.days ? w.income / w.days : 0;
+      if (!w.days) return { label: t("wdays")[i], value: 0, empty: true, tip: t("wd_none").replace("{d}", t("wdays_full")[i]) };
       const tip = t("wd_tip").replace("{d}", t("wdays_full")[i]).replace("{v}", money(v)).replace("{n}", w.days)
         .replace("{o}", w.days ? Math.round(w.orders / w.days) : 0).replace("{c}", w.orders ? money(w.net / w.orders) : t("none"));
       return { label: t("wdays")[i], value: v, empty: !w.days, tip };
