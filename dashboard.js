@@ -10,7 +10,7 @@
 //   COMPANY_TIN (our tax ID — transfers to it are between our own accounts, not supplier payments)
 
 import { listOutgoingWaybills } from "./rsge.js";
-import { buildMenu, buildDish, buildMenuMonthly } from "./menu.js";
+import { buildMenu, buildDish, buildMenuMonthly, loadBase } from "./menu.js";
 import { bankConfigured, loadBankSettings, saveBankSettings, loadBankState, syncStep, bumpVersion, loadVersion } from "./bank.js";
 import { syncWaybills } from "./waybills.js";
 import { buildDebts, saveDecision, dropOldDebtsData } from "./debts.js";
@@ -49,7 +49,7 @@ export async function handleDashboard(request, env, path) {
     // Syrve
     if (parts[0] === "syrve" && request.method === "GET") {
       const fresh = url.searchParams.get("fresh") === "1";
-      if (parts[1] === "live" || parts[1] === "paytype" || parts[1] === "menu") {
+      if (parts[1] === "live" || parts[1] === "paytype" || parts[1] === "menu" || parts[1] === "writeoff") {
         // a date range (inclusive); today by default. Ranges that include today are refreshed every minute.
         const today = localDate(env);
         const day = v => (/^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : "");
@@ -67,7 +67,12 @@ export async function handleDashboard(request, env, path) {
           }
           return json(await buildMenu(env, from, to, fresh));
         }
-        if (parts[1] === "live") return json(await cached(env, `live3:${from}:${to}`, ttl, fresh, () => syrveLive(env, from, to)));
+        if (parts[1] === "live") return json(await cached(env, `live4:${from}:${to}`, ttl, fresh, () => syrveLive(env, from, to)));
+        if (parts[1] === "writeoff") {
+          const kind = String(url.searchParams.get("kind") || "");
+          if (!WRITEOFF_KINDS.some(k => k.kind === kind)) return json({ error: "kind required" }, 400);
+          return json(await cached(env, `wo:${from}:${to}:${kind}`, ttl, fresh, () => syrveWriteoffs(env, from, to, kind)));
+        }
         const name = String(url.searchParams.get("name") || "").slice(0, 100);
         if (!name) return json({ error: "name required" }, 400);
         return json(await cached(env, `pay:${from}:${to}:${name}`, ttl, fresh, () => syrvePayType(env, from, to, name)));
@@ -265,10 +270,21 @@ async function syrveLive(env, from, to) {
       const marketing = [];
       for (const r of await olap(["PayTypes"], ["DishDiscountSumInt", "DishSumInt", ORD])) {
         const name = r.PayTypes || "—";
-        if (isMarketing(name)) { result.byPayType.push({ name, sum: num(r.DishSumInt), notIncome: true }); marketingOrders += num(r[ORD]); marketing.push(name); continue; }
+        if (isMarketing(name)) { result.byPayType.push({ name, sum: num(r.DishSumInt), kind: "marketing" }); marketingOrders += num(r[ORD]); marketing.push(name); continue; }
         result.byPayType.push({ name, sum: num(r.DishDiscountSumInt) });
         result.total += num(r.DishDiscountSumInt);
       }
+      // write-off acts of the three reasons, at cost (per day for the day chart)
+      const woDay = {};
+      try {
+        const wo = await writeoffActs(get, post, from, to);
+        for (const k of WRITEOFF_KINDS) {
+          const acts = wo.docs.filter(d => d.kind === k.kind);
+          result.byPayType.push({ name: k.label, kind: "writeoff", wo: k.kind, sum: r2(acts.reduce((a, d) => a + d.sum, 0)), acts: acts.length });
+        }
+        for (const d of wo.docs) woDay[d.at.slice(0, 10)] = (woDay[d.at.slice(0, 10)] || 0) + d.sum;
+        result.writeoffCheck = wo.check;
+      } catch (e) { result.writeoffError = String(e.message || e).slice(0, 200); }
       // The average order per day / hour uses the card's logic: income without marketing ÷ orders without
       // marketing orders. Marketing per day / hour comes from the same report limited to those payment types.
       // net = income without marketing, orders = orders without marketing (missing when Syrve can't say).
@@ -276,7 +292,7 @@ async function syrveLive(env, from, to) {
       const marketingBy = async (field) => {
         const out = {};
         if (!mFilters) return out;
-        for (const r of await olap([field], ["DishDiscountSumInt", ORD], mFilters)) out[String(r[field] ?? "")] = { sum: num(r.DishDiscountSumInt), orders: num(r[ORD]) };
+        for (const r of await olap([field], ["DishDiscountSumInt", "DishSumInt", ORD], mFilters)) out[String(r[field] ?? "")] = { sum: num(r.DishDiscountSumInt), menu: num(r.DishSumInt), orders: num(r[ORD]) };
         return out;
       };
       const days = await olap(["OpenDate.Typed"], ["DishDiscountSumInt", ORD]);
@@ -285,11 +301,16 @@ async function syrveLive(env, from, to) {
         let mDays = null;
         try { mDays = await marketingBy("OpenDate.Typed"); } catch (e) { result.avgError = String(e.message || e).slice(0, 200); }
         result.byDay = days.map(r => {
-          const key = String(r["OpenDate.Typed"] ?? ""), m = mDays && (mDays[key] || { sum: 0, orders: 0 });
+          const key = String(r["OpenDate.Typed"] ?? ""), m = mDays && (mDays[key] || { sum: 0, menu: 0, orders: 0 });
           const day = { day: key.slice(0, 10), sum: num(r.DishDiscountSumInt) };
           if (m) { day.net = Math.max(0, day.sum - m.sum); day.orders = Math.max(0, num(r[ORD]) - m.orders); }
+          // this tab's income: sales + marketing at menu price + write-offs at cost
+          day.income = r2((m ? day.net + m.menu : day.sum) + (woDay[day.day] || 0));
           return day;
-        }).filter(r => r.day).sort((a, b) => a.day.localeCompare(b.day));
+        }).filter(r => r.day);
+        // a day with write-offs but no sales
+        for (const [d, sum] of Object.entries(woDay)) if (!result.byDay.some(x => x.day === d)) result.byDay.push({ day: d, sum: 0, net: 0, orders: 0, income: r2(sum) });
+        result.byDay.sort((a, b) => a.day.localeCompare(b.day));
         result.salesDays = result.byDay.filter(r => r.sum > 0).length; // a range's hours are averaged over these
       }
       // by hour: one day's hours, or a range's hours summed over all its days (+ orders, for the average order)
@@ -301,12 +322,15 @@ async function syrveLive(env, from, to) {
         if (withOrders) try { mHours = await marketingBy("HourOpen"); } catch (e) { result.avgError = String(e.message || e).slice(0, 200); }
         result.byHour = rows.map(r => {
           const h = { hour: Number(r.HourOpen), sum: num(r.DishDiscountSumInt) };
-          const m = mHours && (mHours[String(r.HourOpen ?? "")] || { sum: 0, orders: 0 });
+          const m = mHours && (mHours[String(r.HourOpen ?? "")] || { sum: 0, menu: 0, orders: 0 });
           if (m) { h.net = Math.max(0, h.sum - m.sum); h.orders = Math.max(0, num(r[ORD]) - m.orders); }
+          // sales + marketing at menu price (write-off acts carry the shift's end, not the hour)
+          h.income = r2(m ? h.net + m.menu : h.sum);
           return h;
         }).filter(r => !Number.isNaN(r.hour)).sort((a, b) => a.hour - b.hour);
       } catch (_) {}
-      if (!result.byPayType.some(p => p.notIncome)) result.byPayType.push({ name: "მარკეტინგი", sum: 0, notIncome: true });
+      if (!result.byPayType.some(p => p.kind === "marketing")) result.byPayType.push({ name: "მარკეტინგი", sum: 0, kind: "marketing" });
+      incomeTotals(result);
       result.source = "olap2";
       return result;
     } catch (e) {
@@ -323,14 +347,15 @@ async function syrveLive(env, from, to) {
       for (const r of rows) {
         const name = r.PayTypes || "—";
         // Marketing (food given away) is shown at menu price but is not income
-        if (isMarketing(name)) { result.byPayType.push({ name, sum: num(r.DishSumInt), notIncome: true }); continue; }
+        if (isMarketing(name)) { result.byPayType.push({ name, sum: num(r.DishSumInt), kind: "marketing" }); continue; }
         const sum = num(r.DishDiscountSumInt);
         result.byPayType.push({ name, sum });
         result.total += sum;
         result.orders += num(r["UniqOrderId.OrdersCount"]);
       }
       // always list marketing, even on days without it
-      if (!result.byPayType.some(p => p.notIncome)) result.byPayType.push({ name: "მარკეტინგი", sum: 0, notIncome: true });
+      if (!result.byPayType.some(p => p.kind === "marketing")) result.byPayType.push({ name: "მარკეტინგი", sum: 0, kind: "marketing" });
+      incomeTotals(result);
       // 2) by hour for one day, by day for a range (optional — ignore if the field isn't supported)
       try {
         if (from === to) {
@@ -437,6 +462,86 @@ async function syrvePayType(env, from, to, name) {
 }
 const isB2B = name => /b2b/i.test(name);
 const isMarketing = name => /მარკეტ|market|маркет/i.test(name);
+const r2 = x => Math.round(x * 100) / 100;
+
+// „შემოსავალი ახლა“: total = real sales (the Main page and profit use it); income = sales + marketing at
+// menu price + the three write-off reasons at cost (this tab's card and %).
+function incomeTotals(result) {
+  result.marketing = r2(result.byPayType.filter(p => p.kind === "marketing").reduce((a, p) => a + p.sum, 0));
+  result.writeoff = r2(result.byPayType.filter(p => p.kind === "writeoff").reduce((a, p) => a + p.sum, 0));
+  result.income = r2(result.total + result.marketing + result.writeoff);
+}
+
+// ---------- write-off acts (ჩამოწერის აქტი) ----------
+// Read live on 14 Nov 2026 (/api/dash/probe/writeoff): /v2/documents/writeoff gives each act's number,
+// dateIncoming, status, comment, storeId, accountId (the reason) and items (productId, amount, cost);
+// the reasons are write-off accounts (/v2/entities/list?rootType=Account). Syrve doesn't send who made
+// an act. Whether an item's `cost` is the line's total or per unit is decided by Syrve's own totals
+// (the TRANSACTIONS report, write-offs per account): the reading that matches them is used.
+export const WRITEOFF_KINDS = [
+  { kind: "spoiled", label: "გაფუჭებული პროდუქცია", re: /გაფუჭებ/ },   // Syrve: „ადგილზე გაფუჭებული პროდუქცია“
+  { kind: "expired", label: "ვადაგასული პროდუქცია", re: /ვადაგასულ/ },
+  { kind: "marketing", label: "ჩამოწერა მარკეტინგი", re: /^\s*მარკეტინგ/ }, // Syrve: the write-off account „მარკეტინგი“
+];
+async function writeoffActs(get, post, from, to) {
+  const kindOf = {};
+  for (const a of JSON.parse(await get("/v2/entities/list", { rootType: "Account" }))) {
+    if (a.deleted) continue;
+    const k = WRITEOFF_KINDS.find(w => w.re.test(String(a.name || "")));
+    if (k) kindOf[String(a.id).toLowerCase()] = k.kind;
+  }
+  const end = addDaysIso(to, 1);
+  const body = JSON.parse(await get("/v2/documents/writeoff", { dateFrom: from, dateTo: end }));
+  const docs = [];
+  for (const d of Array.isArray(body) ? body : body.response || []) {
+    if (d.status && d.status !== "PROCESSED") continue;
+    const kind = kindOf[String(d.accountId || "").toLowerCase()];
+    const at = String(d.dateIncoming || "").slice(0, 16);
+    if (!kind || at.slice(0, 10) < from || at.slice(0, 10) > to) continue;
+    docs.push({ id: d.id, num: String(d.documentNumber || ""), at, kind, store: String(d.storeId || "").toLowerCase(), comment: String(d.comment || ""),
+      items: (d.items || []).map(i => ({ p: String(i.productId || "").toLowerCase(), amount: num(i.amount), cost: num(i.cost) })) });
+  }
+  // Syrve's totals per reason
+  let syrve = null;
+  try {
+    const r = await post("/v2/reports/olap", { reportType: "TRANSACTIONS", buildSummary: false, groupByRowFields: ["Account.Name", "TransactionType"],
+      aggregateFields: ["Sum.ResignedSum"], filters: { "DateTime.Typed": { filterType: "DateRange", periodType: "CUSTOM", from, to: end, includeLow: true, includeHigh: false } } });
+    syrve = {};
+    for (const row of r.data || []) {
+      if (row.TransactionType !== "WRITEOFF") continue;
+      const k = WRITEOFF_KINDS.find(w => w.re.test(String(row["Account.Name"] || "")));
+      if (k) syrve[k.kind] = r2((syrve[k.kind] || 0) + num(row["Sum.ResignedSum"]));
+    }
+  } catch (_) {}
+  const items = docs.flatMap(d => d.items);
+  const asTotal = items.reduce((a, i) => a + i.cost, 0), asUnit = items.reduce((a, i) => a + i.cost * i.amount, 0);
+  const target = syrve ? Object.values(syrve).reduce((a, b) => a + b, 0) : null;
+  const perUnit = target !== null && Math.abs(asUnit - target) < Math.abs(asTotal - target);
+  for (const d of docs) {
+    for (const i of d.items) i.sum = r2(perUnit ? i.cost * i.amount : i.cost);
+    d.sum = r2(d.items.reduce((a, i) => a + i.sum, 0));
+  }
+  return { docs, check: { syrve, acts: r2(perUnit ? asUnit : asTotal), perUnit } };
+}
+
+// One reason's acts in detail (click on its row): newest first, with product names.
+async function syrveWriteoffs(env, from, to, kind) {
+  const k = WRITEOFF_KINDS.find(w => w.kind === kind);
+  const [{ docs, check }, stores] = await withSyrve(env, async (get, post) => {
+    const wo = await writeoffActs(get, post, from, to);
+    const st = {};
+    try { for (const s of xmlRecords(await get("/corporation/stores"), "corporateItemDto")) st[String(s.id || "").toLowerCase()] = s.name || s.code || ""; } catch (_) {}
+    return [wo, st];
+  });
+  let products = {};
+  try { products = (await loadBase(env, false)).products || {}; } catch (_) {}
+  const acts = docs.filter(d => d.kind === kind).sort((a, b) => b.at.localeCompare(a.at)).map(d => ({
+    num: d.num, at: d.at, store: stores[d.store] || "", comment: d.comment, sum: d.sum,
+    items: d.items.map(i => ({ name: (products[i.p] || [])[0] || "?", unit: (products[i.p] || [])[2] || "", amount: Math.round(i.amount * 1000) / 1000, sum: i.sum })),
+  }));
+  return { kind, name: k.label, total: r2(acts.reduce((a, d) => a + d.sum, 0)), acts, check };
+}
+
 const addDaysIso = (day, n) => { const d = new Date(day + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
 // ---------- MONTHLY: last 12 months — income and the cost of the food sold ----------

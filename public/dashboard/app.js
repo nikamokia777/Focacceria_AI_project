@@ -71,6 +71,9 @@ const T = {
     products: "პროდუქტები", waybill: "ზედნადები (rs.ge)", by_customer: "კლიენტების მიხედვით", close: "დახურვა",
     wb_found: "ზედნადები", wb_missing: "rs.ge-ზე ვერ მოიძებნა", wb_diff: "თანხა განსხვავდება", wb_none: "ზედნადები",
     wb_of: "{a} / {b} ზედნადებით", no_orders: "გადახდები არ არის", not_income: "შემოსავალში არ ითვლება · მენიუს ფასით",
+    at_menu_price: "მენიუს ფასით", wo_note: "ჩამოწერის აქტი · თვითღირებულებით · {n} აქტი",
+    split_line: "გაყიდვები {a} · მარკეტინგი {b} · ჩამოწერა {c}", wo_error: "ჩამოწერის აქტები Syrve-დან ვერ წავიკითხე",
+    wo_acts: "აქტი", act_no: "აქტი №", store: "საწყობი", comment: "კომენტარი", no_acts: "ამ პერიოდში აქტი არ არის", items_col: "პროდუქტები",
     wb_uploaded: "ატვირთულია", wb_not_uploaded: "არ არის ატვირთული", time: "დრო", more_items: "კიდევ {n}",
     cash: "ნაღდი", card: "ბარათი", credit: "კრედიტი",
     income: "შემოსავალი", fixed: "ფიქსირებული", variable: "ცვლადი", profit: "მოგება",
@@ -258,6 +261,9 @@ const T = {
     products: "Products", waybill: "Waybill (rs.ge)", by_customer: "By customer", close: "Close",
     wb_found: "Waybill", wb_missing: "Not found on rs.ge", wb_diff: "amount differs", wb_none: "Waybill",
     wb_of: "{a} of {b} with a waybill", no_orders: "No payments", not_income: "Not counted in income · at menu price",
+    at_menu_price: "at menu price", wo_note: "write-off act · at cost · {n} act(s)",
+    split_line: "sales {a} · marketing {b} · write-offs {c}", wo_error: "Could not read the write-off acts from Syrve",
+    wo_acts: "acts", act_no: "Act №", store: "Store", comment: "Comment", no_acts: "No acts in this period", items_col: "Products",
     wb_uploaded: "Uploaded", wb_not_uploaded: "Not uploaded", time: "Time", more_items: "{n} more",
     cash: "Cash", card: "Card", credit: "Credit",
     income: "Income", fixed: "Fixed", variable: "Variable", profit: "Profit",
@@ -1065,7 +1071,12 @@ async function renderLive(view, demo, fresh = false) {
   if (!S.syrve["live" + q]) view.innerHTML = demo + `<div class="loading">${esc(t("loading"))}</div>`;
   const r = await loadSyrve("live", q, fresh);
   const maxPay = Math.max(1, ...r.byPayType.map(p => p.sum));
-  const payRows = r.byPayType.slice().sort((a, b) => (!!a.notIncome - !!b.notIncome) || b.sum - a.sum);
+  // sales first (largest first), then marketing, then the write-off reasons in Syrve's order
+  const KIND_RANK = { marketing: 1, writeoff: 2 };
+  const payRows = r.byPayType.map((p, i) => ({ ...p, i })).sort((a, b) => ((KIND_RANK[a.kind] || 0) - (KIND_RANK[b.kind] || 0)) || (a.kind === "writeoff" ? a.i - b.i : b.sum - a.sum));
+  // this tab's income: sales + marketing (menu price) + write-offs (cost); the average check stays on sales
+  const income = r.income ?? r.total;
+  const splitLine = r.income !== undefined ? t("split_line").replace("{a}", money(r.total)).replace("{b}", money(r.marketing || 0)).replace("{c}", money(r.writeoff || 0)) : "";
   const avg = r.orders ? r.total / r.orders : 0;
   // income per hour (divided by `days` for a range's average day), first hour sold to last
   const hourPoints = (days = 1) => {
@@ -1073,7 +1084,8 @@ async function renderLive(view, demo, fresh = false) {
     if (!r.byHour || !r.byHour.length) return pts;
     const lo = Math.min(...r.byHour.map(h => h.hour)), hi = Math.max(...r.byHour.map(h => h.hour));
     for (let h = lo; h <= hi; h++) {
-      const v = ((r.byHour.find(x => x.hour === h) || {}).sum || 0) / days;
+      const x = r.byHour.find(x => x.hour === h) || {};
+      const v = (x.income ?? x.sum ?? 0) / days;
       pts.push({ hour: h, label: pad(h) + ":00", value: v, tip: `${pad(h)}:00–${pad(h + 1)}:00: ${money(v)}` });
     }
     return pts;
@@ -1086,7 +1098,8 @@ async function renderLive(view, demo, fresh = false) {
   } else {
     chartTitle = t("by_day");
     for (let d = range.from; d <= range.to; d = shiftDay(d, 1)) {
-      const v = ((r.byDay || []).find(x => x.day === d) || {}).sum || 0;
+      const x = (r.byDay || []).find(x => x.day === d) || {};
+      const v = x.income ?? x.sum ?? 0;
       chart.push({ label: dm(d), value: v, tip: `${dmy(d)}: ${money(v)}` });
     }
     if (r.salesDays) hourAvg = markPeaks(hourPoints(r.salesDays));
@@ -1118,16 +1131,16 @@ async function renderLive(view, demo, fresh = false) {
     `<div class="range-pick"><button class="btn range-btn" id="rangeBtn" type="button">📅 ${esc(rangeLabel(range))}</button><div class="rc-pop panel" id="calPop" hidden></div></div>
      <span class="muted small">${esc(t("updated"))} ${pad(upd.getHours())}:${pad(upd.getMinutes())}</span><button class="btn" id="liveRefresh">${esc(t("refresh"))}</button>`) +
     `<div class="cards">
-      ${card(isToday ? t("today_income") : t("income_range"), money(r.total), esc(rangeLabel(range)), "hero")}
+      ${card(isToday ? t("today_income") : t("income_range"), money(income), esc(rangeLabel(range)) + (splitLine ? `<div class="split-line">${esc(splitLine)}</div>` : ""), "hero")}
       ${card(t("orders"), r.orders ? String(r.orders) : t("none"))}
       ${card(t("avg_check"), r.orders ? money(avg) : t("none"))}
     </div>
     <div class="grid-2">
       <div class="panel"><div class="panel-head"><h3>${esc(t("by_payment"))}</h3>${r.byPayType.length && r.source !== "cashshifts" ? `<span class="muted small">${esc(t("pay_click"))}</span>` : ""}</div><div class="panel-body">
         ${payRows.length ? `<div class="split">${payRows.map(p => `
-          <button type="button" class="split-row pay-row ${p.notIncome ? "not-income" : ""} ${S.livePay === p.name ? "on" : ""}" data-pay="${esc(p.name)}" ${r.source === "cashshifts" ? "disabled" : ""}>
-          <span>${esc(payName(p.name))} <span class="chev">›</span>${p.notIncome ? `<div class="muted small">${esc(t("not_income"))}</div>` : ""}</span>
-          <span class="num"><b>${money(p.sum)}</b>${p.notIncome ? "" : ` <span class="muted small">${r.total ? Math.round(p.sum / r.total * 100) : 0}%</span>`}</span>
+          <button type="button" class="split-row pay-row ${p.kind ? "pay-" + p.kind : ""} ${S.livePay === p.name ? "on" : ""}" data-pay="${esc(p.name)}" data-wo="${esc(p.wo || "")}" ${r.source === "cashshifts" ? "disabled" : ""}>
+          <span>${esc(payName(p.name))} <span class="chev">›</span>${p.kind === "marketing" ? `<div class="muted small">${esc(t("at_menu_price"))}</div>` : p.kind === "writeoff" ? `<div class="muted small">${esc(t("wo_note").replace("{n}", p.acts || 0))}</div>` : ""}</span>
+          <span class="num"><b>${money(p.sum)}</b> <span class="muted small">${income ? Math.round(p.sum / income * 100) : 0}%</span></span>
           <div class="bar-track"><div class="bar-fill" style="width:${(p.sum / maxPay * 100).toFixed(1)}%"></div></div></button>`).join("")}</div>`
         : `<div class="empty">${esc(t("no_entries"))}</div>`}
       </div></div>
@@ -1140,12 +1153,14 @@ async function renderLive(view, demo, fresh = false) {
       ${avgDay.length ? avgPanel(t("avg_by_day"), t("avg_no_marketing"), avgDay, false) : ""}
       ${avgHour.length ? avgPanel(t("avg_by_hour"), range.from !== range.to ? t("avg_all_days") : t("avg_no_marketing"), avgHour, true) : ""}</div>
     </div>
+    ${r.writeoffError ? `<div class="notice" style="margin-top:12px">${esc(t("wo_error"))}: ${esc(r.writeoffError)}</div>` : ""}
     <div id="payDetail"></div>`;
   wireChartHover(view);
   wireCalendar(view, "live", () => { S.livePay = null; renderLive(view, demo).catch(e => toast(e.message)); });
   $("#liveRefresh", view).addEventListener("click", () => renderLive(view, demo, true).catch(e => toast(e.message)));
   $$(".pay-row", view).forEach(b => b.addEventListener("click", () => {
     S.livePay = S.livePay === b.dataset.pay ? null : b.dataset.pay;
+    S.livePayWo = S.livePay ? b.dataset.wo || "" : "";
     $$(".pay-row", view).forEach(x => x.classList.toggle("on", x.dataset.pay === S.livePay));
     renderPayDetail(view, range, fresh);
   }));
@@ -1179,11 +1194,43 @@ function renderB2B(box, view, d, range) {
         <td><b>${esc(o.customer || "—")}</b></td><td class="r num nowrap"><b>${money(o.sum)}</b></td><td class="nowrap">${cell(o)}</td></tr>`).join("")
       : `<tr><td colspan="5" class="empty">${esc(t("no_orders"))}</td></tr>`}</tbody>
     </table></div></div>`;
-  $("#payClose", box).addEventListener("click", () => { S.livePay = null; $$(".pay-row", view).forEach(x => x.classList.remove("on")); box.innerHTML = ""; });
+  $("#payClose", box).addEventListener("click", () => { S.livePay = null; S.livePayWo = ""; $$(".pay-row", view).forEach(x => x.classList.remove("on")); box.innerHTML = ""; });
   $("#payExport", box).addEventListener("click", () => {
     const out = [[t("date"), t("time"), t("order_no"), t("customer"), t("amount"), t("waybill")]];
     d.orders.forEach(o => out.push([o.day, o.time, o.num, o.customer, o.sum, status(o)]));
     exportXlsx(`${d.name}-${range.from}_${range.to}.xlsx`, String(d.name).slice(0, 30), out);
+  });
+}
+
+// One write-off reason (ჩამოწერის აქტი): every act of the period with its products, at cost.
+async function renderWriteoffDetail(view, box, range, fresh) {
+  const name = S.livePay, kind = S.livePayWo;
+  box.innerHTML = `<div class="panel"><div class="loading">${esc(t("loading"))}</div></div>`;
+  let d;
+  try { d = await loadSyrve("writeoff", `${rangeQuery(range)}&kind=${encodeURIComponent(kind)}`, fresh); }
+  catch (e) { box.innerHTML = `<div class="notice bad">${esc(t("syrve_error"))}: ${esc(e.message)}</div>`; return; }
+  if (S.livePay !== name) return; // another row was clicked meanwhile
+  const multiDay = range.from !== range.to;
+  const when = a => `${multiDay ? esc(dm(a.at.slice(0, 10))) + " " : ""}${esc(a.at.slice(11, 16))}`;
+  const items = a => a.items.map(i => `${esc(i.name)} × ${i.amount % 1 ? i.amount.toFixed(3).replace(/0+$/, "") : i.amount}${i.unit ? " " + esc(i.unit) : ""} <span class="muted">(${money(i.sum)})</span>`).join(" · ");
+  box.innerHTML = `<div class="panel pay-detail">
+    <div class="panel-head"><h3>${esc(d.name || name)} · ${esc(rangeLabel(range))}</h3>
+      <div class="actions"><span class="num"><b>${money(d.total)}</b> · ${d.acts.length} ${esc(t("wo_acts"))}</span>
+      <button class="btn small" id="payExport">${esc(t("export"))}</button><button class="btn small ghost" id="payClose">✕ ${esc(t("close"))}</button></div></div>
+    <div class="table-wrap"><table class="pay-orders">
+      <thead><tr><th>${esc(multiDay ? t("date") : t("time"))}</th><th>${esc(t("act_no"))}</th><th>${esc(t("items_col"))}</th><th>${esc(t("comment"))}</th><th>${esc(t("store"))}</th><th class="r">${esc(t("amount"))}</th></tr></thead>
+      <tbody>${d.acts.length ? d.acts.map(a => `<tr>
+        <td class="nowrap num">${when(a)}</td><td class="num">${esc(a.num)}</td>
+        <td><div class="items-line small">${items(a) || "—"}</div></td>
+        <td class="small">${esc(a.comment)}</td><td class="small">${esc(a.store)}</td>
+        <td class="r num nowrap"><b>${money(a.sum)}</b></td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty">${esc(t("no_acts"))}</td></tr>`}</tbody>
+    </table></div></div>`;
+  $("#payClose", box).addEventListener("click", () => { S.livePay = null; S.livePayWo = ""; $$(".pay-row", view).forEach(x => x.classList.remove("on")); box.innerHTML = ""; });
+  $("#payExport", box).addEventListener("click", () => {
+    const out = [[t("date"), t("time"), t("act_no"), t("items_col"), t("comment"), t("store"), t("amount")]];
+    d.acts.forEach(a => out.push([a.at.slice(0, 10), a.at.slice(11, 16), a.num, a.items.map(i => `${i.name} × ${i.amount} (${i.sum})`).join("; "), a.comment, a.store, a.sum]));
+    exportXlsx(`${kind}-${range.from}_${range.to}.xlsx`, String(d.name || name).slice(0, 30), out);
   });
 }
 
@@ -1192,6 +1239,7 @@ async function renderPayDetail(view, range, fresh = false) {
   if (!box) return;
   const name = S.livePay;
   if (!name) { box.innerHTML = ""; return; }
+  if (S.livePayWo) return renderWriteoffDetail(view, box, range, fresh);
   box.innerHTML = `<div class="panel"><div class="loading">${esc(t("loading"))}</div></div>`;
   let d;
   try { d = await loadSyrve("paytype", `${rangeQuery(range)}&name=${encodeURIComponent(name)}`, fresh); }
@@ -1251,7 +1299,7 @@ async function renderPayDetail(view, range, fresh = false) {
         ${showWb ? `<td class="nowrap">${wbCell(o)}</td>` : ""}</tr>`).join("")
       : `<tr><td colspan="6" class="empty">${esc(t("no_orders"))}</td></tr>`}</tbody>
     </table></div></div>`;
-  $("#payClose", box).addEventListener("click", () => { S.livePay = null; $$(".pay-row", view).forEach(x => x.classList.remove("on")); box.innerHTML = ""; });
+  $("#payClose", box).addEventListener("click", () => { S.livePay = null; S.livePayWo = ""; $$(".pay-row", view).forEach(x => x.classList.remove("on")); box.innerHTML = ""; });
   $("#payExport", box).addEventListener("click", () => {
     const out = [[t("date"), t("time"), t("order_no"), t("customer"), t("cashier"), t("amount"), t("products"), t("waybill")]];
     d.orders.forEach(o => out.push([o.day, o.time, o.num, o.customer, o.cashier, o.sum,
@@ -2368,6 +2416,14 @@ function demoApi(path, opts) {
       waybill: b2b ? [{ number: "0988938607", amount: 420 }, null, { number: "0988938655", amount: 250 }, { number: "0988938700", amount: 95 }][i] : undefined }));
     return { name, b2b, total: orders.reduce((a, o) => a + o.sum, 0), orders, waybillError: "", itemsError: "" };
   }
+  if (path.startsWith("/syrve/writeoff")) {
+    const qs = new URLSearchParams(path.split("?")[1] || ""), kind = qs.get("kind") || "spoiled";
+    const name = { spoiled: "გაფუჭებული პროდუქცია", expired: "ვადაგასული პროდუქცია", marketing: "ჩამოწერა მარკეტინგი" }[kind];
+    const acts = [{ num: "0512", at: todayISO() + "T23:00", store: "Основной склад", comment: "Создано на терминале Main Pos. Номер: 7123", sum: 12.6,
+        items: [{ name: "ფოკაჩა კლასიკური", unit: "шт", amount: 2, sum: 4.2 }, { name: "სტრაჩატელა *", unit: "кг", amount: 0.12, sum: 8.4 }] },
+      { num: "0509", at: todayISO() + "T15:40", store: "Основной склад", comment: "", sum: 5.8, items: [{ name: "რძე ჩვ *", unit: "л", amount: 2, sum: 5.8 }] }];
+    return { kind, name, total: 18.4, acts };
+  }
   if (path.startsWith("/syrve/live")) {
     const qs = new URLSearchParams(path.split("?")[1] || ""), from = qs.get("from") || todayISO(), to = qs.get("to") || from;
     const days = Math.round((new Date(to + "T12:00:00") - new Date(from + "T12:00:00")) / 864e5) + 1;
@@ -2375,7 +2431,10 @@ function demoApi(path, opts) {
     // orders and income without marketing, for the average-order charts (one quiet hour without orders)
     hrs.forEach((h, i) => { h.orders = i === 1 ? 0 : Math.max(1, Math.round(h.sum / (30 + (h.hour % 5) * 4))); h.net = h.orders ? h.sum : 0; });
     const total = hrs.reduce((a, h) => a + h.sum, 0);
-    return { date: todayISO(), total, orders: Math.round(total / 38), byPayType: [{ name: "Card", sum: Math.round(total * 0.6) }, { name: "Cash", sum: Math.round(total * 0.25) }, { name: "გადარიცხვები", sum: Math.round(total * 0.1) }, { name: "B2B", sum: total - Math.round(total * 0.6) - Math.round(total * 0.25) - Math.round(total * 0.1) }, { name: "მარკეტინგი", sum: 64, notIncome: true }], byHour: hrs,
+    return { date: todayISO(), total, orders: Math.round(total / 38), byPayType: [{ name: "Card", sum: Math.round(total * 0.6) }, { name: "Cash", sum: Math.round(total * 0.25) }, { name: "გადარიცხვები", sum: Math.round(total * 0.1) }, { name: "B2B", sum: total - Math.round(total * 0.6) - Math.round(total * 0.25) - Math.round(total * 0.1) }, { name: "მარკეტინგი", sum: 64, kind: "marketing" },
+      { name: "გაფუჭებული პროდუქცია", sum: 18.4 * days, kind: "writeoff", wo: "spoiled", acts: 2 * days }, { name: "ვადაგასული პროდუქცია", sum: 9.5 * days, kind: "writeoff", wo: "expired", acts: days },
+      { name: "ჩამოწერა მარკეტინგი", sum: 22.3 * days, kind: "writeoff", wo: "marketing", acts: 3 * days }], byHour: hrs,
+      marketing: 64, writeoff: Math.round(50.2 * days * 100) / 100, income: Math.round((total + 64 + 50.2 * days) * 100) / 100,
       byDay: Array.from({ length: 27 }, (_, i) => { const sum = 1500 + Math.round(Math.sin(i) * 500 + 600); return { day: shiftDay(todayISO(), -i), sum, net: sum, orders: Math.round(sum / (36 + (i % 4) * 3)) }; }), salesDays: days, _at: Date.now() };
   }
   if (path.startsWith("/syrve/monthly")) {

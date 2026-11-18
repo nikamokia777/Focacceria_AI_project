@@ -249,7 +249,7 @@ function economics(price, cost) {
 
 // ── the MENU list ────────────────────────────────────────────────────────────
 
-async function loadBase(env, fresh) { return cached(env, "menu-base3", BASE_TTL, fresh, () => fetchBase(env)); }
+export async function loadBase(env, fresh) { return cached(env, "menu-base3", BASE_TTL, fresh, () => fetchBase(env)); }
 async function loadSales(env, from, to, fresh) {
   return cached(env, `menu-sales2:${from}:${to}`, to >= localDate(env) ? 120 : 3600, fresh, () => fetchSales(env, from, to));
 }

@@ -376,8 +376,9 @@ td.rv-actions:has(.remember input) { width: 240px; }
 .items-line { color: var(--ink-2); margin-top: 2px; }
 table.pay-orders { min-width: 760px; }
 @media (max-width: 640px) { .rc-pop { position: fixed; left: 16px; right: 16px; width: auto; top: 120px; } }
-.pay-row.not-income .bar-fill { background: var(--line-strong); }
-.pay-row.not-income { border-top: 1px dashed var(--line); border-radius: 0 0 8px 8px; }
+.pay-row.pay-writeoff .bar-fill { background: var(--line-strong); }
+.pay-row:not(.pay-marketing):not(.pay-writeoff) + .pay-marketing, .pay-row:not(.pay-writeoff) + .pay-writeoff { border-top: 1px dashed var(--line); }
+.card .split-line { margin-top: 4px; color: var(--ink-3); font-size: 12px; }
 
 /* ---------- MENU ---------- */
 .menu-filters { padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; }
