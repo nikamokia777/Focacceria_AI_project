@@ -64,6 +64,9 @@ const T = {
     by_hour_avg: "საათების მიხედვით · საშუალო დღეში", days_with_sales: "{n} დღე გაყიდვებით",
     avg_by_day: "საშუალო ჩეკი · დღეების მიხედვით", avg_by_hour: "საშუალო ჩეკი · საათების მიხედვით",
     avg_all_days: "ყველა დღე ერთად", avg_no_marketing: "მარკეტინგის გარეშე", orders_n: "{n} შეკვეთა",
+    by_weekday: "საშუალოდ კვირის დღის მიხედვით", wd_sub: "დღეები გაყიდვებით · დღევანდელი დაუმთავრებელი დღე არ ითვლება",
+    wd_tip: "{d}: {v} · {n} დღე · საშ. {o} შეკვეთა · საშ. ჩეკი {c}",
+    wdays_full: ["ორშაბათი", "სამშაბათი", "ოთხშაბათი", "ხუთშაბათი", "პარასკევი", "შაბათი", "კვირა"],
     peak1: "1-ლი პიკი", peak2: "მე-2 პიკი", lowest: "ყველაზე დაბალი",
     pick_today: "დღეს", pick_yesterday: "გუშინ", pick_week: "ეს კვირა", pick_month: "ეს თვე", pick_last_month: "წინა თვე", pick_6m: "6 თვე", pick_12m: "12 თვე",
     pick_end: "აირჩიეთ ბოლო დღე", wdays: ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვ"],
@@ -254,6 +257,9 @@ const T = {
     by_hour_avg: "By hour · average per day", days_with_sales: "{n} days with sales",
     avg_by_day: "Average check · by day", avg_by_hour: "Average check · by hour",
     avg_all_days: "all days together", avg_no_marketing: "without marketing", orders_n: "{n} orders",
+    by_weekday: "Average by weekday", wd_sub: "days with sales · today's unfinished day not counted",
+    wd_tip: "{d}: {v} · {n} day(s) · avg {o} orders · avg check {c}",
+    wdays_full: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
     peak1: "1st peak", peak2: "2nd peak", lowest: "Lowest",
     pick_today: "Today", pick_yesterday: "Yesterday", pick_week: "This week", pick_month: "This month", pick_last_month: "Last month", pick_6m: "6 months", pick_12m: "12 months",
     pick_end: "Choose the last day", wdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -1121,6 +1127,27 @@ async function renderLive(view, demo, fresh = false) {
     // today's hour still in progress isn't ranked; hours without orders aren't either
     markPeaks(avgHour, isToday ? avgHour.findIndex(p => p.hour === new Date().getHours()) : -1, true);
   }
+  // average per weekday (Mon … Sun) over the range: this tab's income (like the day chart) ÷ that weekday's
+  // days with sales; today's day isn't finished, so it's left out. Orders / check use real sales.
+  let weekPts = [];
+  if (range.from !== range.to) {
+    const W = Array.from({ length: 7 }, () => ({ income: 0, days: 0, orders: 0, net: 0 }));
+    const wdOf = d => (new Date(d + "T12:00:00Z").getUTCDay() + 6) % 7; // Monday = 0
+    const present = new Set();
+    for (let d = range.from; d <= range.to; d = shiftDay(d, 1)) if (d !== todayISO()) present.add(wdOf(d));
+    for (const x of r.byDay || []) {
+      if (x.day < range.from || x.day > range.to || x.day === todayISO() || !(n(x.sum) > 0)) continue;
+      const w = W[wdOf(x.day)];
+      w.income += n(x.income ?? x.sum); w.days++; w.orders += n(x.orders); w.net += n(x.net ?? x.sum);
+    }
+    weekPts = [0, 1, 2, 3, 4, 5, 6].filter(i => present.has(i)).map(i => {
+      const w = W[i], v = w.days ? w.income / w.days : 0;
+      const tip = t("wd_tip").replace("{d}", t("wdays_full")[i]).replace("{v}", money(v)).replace("{n}", w.days)
+        .replace("{o}", w.days ? Math.round(w.orders / w.days) : 0).replace("{c}", w.orders ? money(w.net / w.orders) : t("none"));
+      return { label: t("wdays")[i], value: v, empty: !w.days, tip };
+    });
+    markPeaks(weekPts, -1, true);
+  }
   const avgPanel = (title, sub, pts, legend) => `<div class="panel"><div class="panel-head"><h3>${esc(title)}</h3><span class="muted small">${esc(sub)}</span></div><div class="panel-body">
         ${pts.some(p => !p.empty) ? barChart(pts, { height: 200, width: panelWidth(true) }) + (legend ? peakLegend() : "") : `<div class="empty">${esc(t("no_entries"))}</div>`}
       </div></div>`;
@@ -1147,6 +1174,9 @@ async function renderLive(view, demo, fresh = false) {
       <div><div class="panel"><div class="panel-head"><h3>${esc(chartTitle)}</h3></div><div class="panel-body">
         ${chart.length ? barChart(chart, { height: 200, width: panelWidth(true) }) + (range.from === range.to ? peakLegend() : "") : `<div class="empty">${esc(t("no_entries"))}</div>`}
       </div></div>
+      ${weekPts.length ? `<div class="panel"><div class="panel-head"><h3>${esc(t("by_weekday"))}</h3><span class="muted small">${esc(t("wd_sub"))}</span></div><div class="panel-body">
+        ${weekPts.some(p => !p.empty) ? barChart(weekPts, { height: 200, width: panelWidth(true) }) + peakLegend() : `<div class="empty">${esc(t("no_entries"))}</div>`}
+      </div></div>` : ""}
       ${range.from !== range.to ? `<div class="panel"><div class="panel-head"><h3>${esc(t("by_hour_avg"))}</h3>${r.salesDays ? `<span class="muted small">${esc(t("days_with_sales").replace("{n}", r.salesDays))}</span>` : ""}</div><div class="panel-body">
         ${hourAvg.length ? barChart(hourAvg, { height: 200, width: panelWidth(true) }) + peakLegend() : `<div class="empty">${esc(t("no_entries"))}</div>`}
       </div></div>` : ""}
