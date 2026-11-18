@@ -113,8 +113,8 @@ async function fetchDetailData(env, from, to) {
         const dish = String(row["Contr-Product.Name"] || "").trim() || "—";
         const d = (dishes[id] = dishes[id] || {});
         const x = (d[dish] = d[dish] || [0, 0]);
-        x[0] = r3(x[0] - num(row.Amount));
-        x[1] = r2(x[1] - num(row["Sum.ResignedSum"]));
+        x[0] -= num(row.Amount);            // kept unrounded: rounded once when shown, so the dishes
+        x[1] -= num(row["Sum.ResignedSum"]); // add up exactly to the list's total
       }
     } catch (e) { dishError = String(e.message || e).slice(0, 200); }
     // deliveries: [number, day, productId, qty, price, sum, supplierId]
@@ -162,18 +162,20 @@ export async function handleUsageItem(request, env) {
   if (to > today) to = today;
   if (from > to) return out({ error: "bad range" }, 400);
   const ttl = to >= today ? 60 : 3600;
-  const data = await cached(env, `usagedet:${from}:${to}`, ttl, q.get("fresh") === "1", () => fetchDetailData(env, from, to));
+  const data = await cached(env, `usagedet2:${from}:${to}`, ttl, q.get("fresh") === "1", () => fetchDetailData(env, from, to));
   const names = await sellerNames(env);
   let base = { products: {} };
   try { base = await loadBase(env, false); } catch (_) {}
   const p = base.products?.[id] || [];
   const restocks = data.inv.filter((x) => x[2] === id).map(([n, day, , qty, price, sum]) => ({ day, num: n, supplier: names.get(n.replace(/^0+/, "")) || "", qty, price, sum }))
     .sort((a, b) => a.day.localeCompare(b.day) || a.num.localeCompare(b.num));
-  const dishes = Object.entries(data.dishes[id] || {}).map(([name, [qty, cost]]) => ({ name, qty, cost })).filter((d) => Math.abs(d.qty) > 1e-9 || Math.abs(d.cost) > 0.004)
+  const raw = Object.entries(data.dishes[id] || {}).filter(([, [qty, cost]]) => Math.abs(qty) > 1e-9 || Math.abs(cost) > 0.004);
+  const used = { qty: r3(raw.reduce((a, [, [q]]) => a + q, 0)), cost: r2(raw.reduce((a, [, [, c]]) => a + c, 0)) };
+  const dishes = raw.map(([name, [qty, cost]]) => ({ name, qty: r3(qty), cost: r2(cost) }))
     .sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name));
   return out({
     id, name: p[0] || "", unit: p[2] || "", from, to, restocks, dishes,
-    used: { qty: r3(dishes.reduce((a, d) => a + d.qty, 0)), cost: r2(dishes.reduce((a, d) => a + d.cost, 0)) },
+    used,
     errors: { dishes: data.dishError || undefined, restocks: data.invError || undefined },
   });
 }
